@@ -1,5 +1,9 @@
-use pbrt::geom::vector2;
 use pbrt::config::Config;
+use pbrt::geom::intersectable::Intersectable;
+use pbrt::geom::ray::Ray;
+use pbrt::geom::sphere::Sphere;
+use pbrt::geom::vector3::Vector3;
+use pbrt::scene::Scene;
 use std::env;
 use std::process;
 
@@ -8,6 +12,19 @@ fn main() {
     let config = Config::new(&args).unwrap_or_else(|err| {
         eprintln!("Problem parsing arguments: {}", err);
         process::exit(1);        
+    });
+
+    let sphere = Sphere::new(Vector3::new(0., 0., 0.), 1.0);
+    let ray = Ray {};
+    let _collisions = sphere.intersect(&ray);
+
+    let mut scene = Scene::new();
+    scene
+        .add(Box::new(Sphere::new(Vector3::new(0., 0., 0.), 1.0)))
+        .add(Box::new(Sphere::new(Vector3::new(0., 10., 0.), 1.0)));
+
+    scene.intersect(&ray).iter().for_each(|item| {
+        println!("Intersection {:?}", item);
     });
 
     let mut pixels:Vec<u8> = Vec::new();
@@ -21,6 +38,7 @@ fn main() {
             pixels.append(&mut sample);
         }
     }
+
     image_write(&config.output_filename, &pixels);
 }
 
