@@ -3,8 +3,8 @@ use std::slice::ChunksExact;
 
 #[derive(Debug)]
 pub struct Config {
-    input_filename: String,
-    output_filename: String
+    pub input_filename: String,
+    pub output_filename: String
 }
 
 type OptionParserFn = fn(&mut Config, &String);
@@ -20,7 +20,7 @@ fn parse_output_filename(config: &mut Config, value: &String) {
 fn default_config() -> Config {
     Config {
         input_filename: "input".to_string(),
-        output_filename: "output".to_string()
+        output_filename: "output.png".to_string()
     }
 }
 
@@ -47,17 +47,10 @@ impl Config {
         let pairs: Vec<_> = pairs_iter.collect(); // _ stands for &[String]
         for pair in pairs {
             let k = &pair[0];
-            match options_parsers.get(&k[..]) {
-                Some(&f) => {
-                    println!("Found {:?}", k);
-                    let v = &pair[1];
-                    f(&mut c, &v.to_string());
-                }
-                None => {
-                    println!("Unknown option {:?}", k);
-                    return Err("Unknown option")
-                }
-            }
+            println!("Found {:?}", k);
+            let f = options_parsers.get(&k[..]).expect("Unknown option");
+            let v = &pair[1];
+            f(&mut c, &v.to_string());
         }
 
         Ok(c)
