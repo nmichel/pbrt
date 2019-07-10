@@ -1,3 +1,6 @@
+use std::ops::{Add, AddAssign};
+use std::marker::Copy;
+
 /// A 2D vector generic type.
 /// 
 #[derive(Debug, PartialEq)]
@@ -22,7 +25,7 @@ impl<T> Vector2<T> {
     }
 }
 
-impl <T: std::ops::Add<Output = T>> std::ops::Add for Vector2<T> {
+impl <T: Add<Output = T>> Add for Vector2<T> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
@@ -30,8 +33,8 @@ impl <T: std::ops::Add<Output = T>> std::ops::Add for Vector2<T> {
     }
 }
 
-impl <T> std::ops::AddAssign for Vector2<T>
-    where T: std::ops::Add<Output = T> + std::ops::AddAssign {
+impl <T> AddAssign for Vector2<T>
+    where T: Add<Output = T> + AddAssign {
 
     fn add_assign(&mut self, other: Self) {
         self.x += other.x;
@@ -39,8 +42,8 @@ impl <T> std::ops::AddAssign for Vector2<T>
     }
 }
 
-impl<T> std::ops::AddAssign<&Vector2<T>> for Vector2<T>
-    where T: std::ops::AddAssign + std::marker::Copy {
+impl<T> AddAssign<&Vector2<T>> for Vector2<T>
+    where T: AddAssign + Copy {
 
     fn add_assign(&mut self, rhs: &Vector2<T>) {
         self.x += rhs.x;
@@ -49,12 +52,12 @@ impl<T> std::ops::AddAssign<&Vector2<T>> for Vector2<T>
 }
 
 pub fn add<T>(u: &Vector2<T>, v: &Vector2<T>) -> Vector2<T> 
-    where T: std::ops::Add<Output = T> + std::marker::Copy {
+    where T: Add<Output = T> + Copy {
     Vector2 { x: u.x + v.x, y: u.y + v.y }
 }
 
 impl<T> Vector2<T>
-    where T: std::ops::AddAssign + std::marker::Copy {
+    where T: AddAssign + Copy {
 
     pub fn add_to_me(self: &mut Self, v: &Self) -> &mut Self {
         // self += v;
