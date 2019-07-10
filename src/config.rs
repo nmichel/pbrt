@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::slice::ChunksExact;
 
 #[derive(Debug)]
 pub struct Config {
@@ -36,14 +37,25 @@ impl Config {
             ("--output", parse_output_filename as OptionParserFn)
         ].iter().cloned().collect();
 
-        for o in &args[1..] {
-            match options_parsers.get(&o[..]) {
+        let pairs_iter: ChunksExact<_> = args[1..].chunks_exact(2);
+        if pairs_iter.remainder().len() > 0 {
+            let rem = &pairs_iter.remainder()[0];
+            println!("found trailing parameter {:?}", &rem);
+            return Err("trailing parameter")
+        }
+
+        let pairs: Vec<_> = pairs_iter.collect(); // _ stands for &[String]
+        for pair in pairs {
+            let k = &pair[0];
+            match options_parsers.get(&k[..]) {
                 Some(&f) => {
-                    println!("Found {:?}", o);
-                    f(&mut c, &"prout".to_string());
+                    println!("Found {:?}", k);
+                    let v = &pair[1];
+                    f(&mut c, &v.to_string());
                 }
                 None => {
-                    println!("Unknown option {:?}", o);
+                    println!("Unknown option {:?}", k);
+                    return Err("Unknown option")
                 }
             }
         }
