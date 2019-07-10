@@ -10,28 +10,35 @@ fn main() {
         process::exit(1);        
     });
 
-    println!("Config {:?}", config);
-
-    let _a = vector2::Vector2::new(1, 2);
-
-    test_png_writer();
+    let mut pixels:Vec<u8> = Vec::new();
+    let width: u64 = 1920;
+    let height: u64 = 1024;
+    for row in 0..height {
+        let r = (((row+1) as f64 / height as f64) * 255.0) as u8;
+        for col in 0..width {
+            let g = (((col+1) as f64 / width as f64) * 255.0) as u8;
+            let mut sample = vec![r, g, 0, 255];
+            pixels.append(&mut sample);
+        }
+    }
+    image_write(&config.output_filename, &pixels);
 }
 
-fn test_png_writer() {
+fn image_write(filename: &str, data: &Vec<u8>) {
     use std::path::Path;
     use std::fs::File;
     use std::io::BufWriter;
-    // To use encoder.set()
     use png::HasParameters;
 
-    let path = Path::new(r"./image.png");
+    let path = Path::new(filename);
     let file = File::create(path).unwrap();
     let ref mut w = BufWriter::new(file);
 
-    let mut encoder = png::Encoder::new(w, 2, 1); // Width is 2 pixels and height is 1.
-    encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
-     let mut writer = encoder.write_header().unwrap();
+    let mut encoder = png::Encoder::new(w, 1920, 1024);
+    encoder
+        .set(png::ColorType::RGBA)
+        .set(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().unwrap();
 
-    let data = [255, 0, 0, 255, 0, 0, 0, 255]; // An array containing a RGBA sequence. First pixel is red and second pixel is black.
-    writer.write_image_data(&data).unwrap(); // Save
+    writer.write_image_data(&data[..]).unwrap();
 }
