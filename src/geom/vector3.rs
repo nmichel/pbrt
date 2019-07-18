@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, Div};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub};
 use std::marker::Copy;
 
 /// A 3D vector generic type.
@@ -18,30 +18,7 @@ impl<T> fmt::Display for Vector3<T>
     }
 }
 
-
 pub type Vector3f = Vector3<f64>;
-
-pub trait Invert {
-    type Output;
-
-    fn invert(self) -> Self::Output;
-}
-
-impl Invert for f64 {
-    type Output = Self;
-
-    fn invert(self) -> Self {
-        1.0/self
-    }
-}
-
-impl Invert for i64 {
-    type Output = f64;
-
-    fn invert(self) -> Self::Output {
-        1.0/(self as Self::Output)
-    }
-}
 
 impl<T> Vector3<T> {
     /// Constructs a new `Vector3` initialized from parameters.
@@ -66,37 +43,68 @@ impl<T> Vector3<T> {
 
         dot(self, self)
     }
+}
 
-    pub fn normalize(&mut self) -> &mut Self
-        where T: MulAssign + Add<Output = T> + Mul<Output = T> + Div<Output = T> + Copy + Invert<Output=T> {
-
-        let inv_norm = Invert::invert(self.length());
+impl Vector3<f64> {
+    pub fn normalize(&mut self) -> &mut Self {
+        let norm: f64 = self.length();
+        let inv_norm = 1.0 / norm.sqrt();
         (*self) *= inv_norm;
         self
     } 
 }
 
-impl <T> Add for Vector3<T>
+impl<T> Add for Vector3<T>
     where T: Add<Output = T> {
 
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
-        Self::new(self.x + other.x, self.y + other.y, self.z + other.z)
+        Self::Output::new(self.x + other.x, self.y + other.y, self.z + other.z)
     }
 }
 
-impl <T> Add<&Vector3<T>> for Vector3<T>
+impl<T> Add for &Vector3<T>
     where T: Add<Output = T> + Copy {
+
+    type Output = Vector3<T>;
+
+    fn add(self, other: Self) -> Self::Output {
+        Self::Output::new(self.x + other.x, self.y + other.y, self.z + other.z)
+    }
+}
+
+impl<T> Sub for Vector3<T>
+    where T: Sub<Output = T> {
 
     type Output = Self;
 
-    fn add(self, rhs: &Vector3<T>) -> Self::Output {
-        Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+    fn sub(self, other: Self) -> Self::Output {
+        Self::Output::new(self.x - other.x, self.y - other.y, self.z - other.z)
     }
 }
 
-impl <T> AddAssign for Vector3<T>
+impl<T> Sub for &Vector3<T>
+    where T: Sub<Output = T> + Copy {
+
+    type Output = Vector3<T>;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self::Output::new(self.x - other.x, self.y - other.y, self.z - other.z)
+    }
+}
+
+impl<T> Mul<T> for Vector3<T>
+    where T: Mul<Output = T> + Copy {
+
+    type Output = Vector3<T>;
+
+    fn mul(self, other: T) -> Self::Output {
+        Self::Output::new(self.x * other, self.y * other, self.z * other)
+    }
+}
+
+impl<T> AddAssign for Vector3<T>
     where T: Add<Output = T> + AddAssign {
 
     fn add_assign(&mut self, other: Self) {
@@ -145,6 +153,12 @@ impl<T> Vector3<T>
         self.y *= v;
         self.z *= v;
         self
+    }
+}
+
+impl Vector3<f64> {
+    pub fn quite_same(self: &Self, v: &Self) -> bool {
+        (self - v).length() < 0.0001
     }
 }
 
@@ -245,7 +259,7 @@ mod tests {
         let a = Vector3::new(1.0, 2.0, 3.0);
         let b = Vector3::new(3.0, 2.0, 1.0);
         let c = &b;
-        assert_eq!(Vector3::new(4.0, 4.0, 4.0), a + c);
+        assert_eq!(Vector3::new(4.0, 4.0, 4.0), &a + c);
     }
 
     #[test]
