@@ -21,9 +21,14 @@ impl Scene {
 impl Intersectable for Scene {
     fn intersect(&self, ray: &Ray) -> Vec<Intersection> {
         let res: RefCell<Vec<Intersection>> = RefCell::new(Vec::new());
-        self.objects.iter().fold(res, |acc, item| {
-            acc.borrow_mut().append(&mut item.intersect(ray));
-            acc
-        }).into_inner()
+        let mut intersections = 
+            self.objects.iter().fold(res, |acc, item| {
+                acc.borrow_mut().append(&mut item.intersect(ray));
+                acc
+            })
+            .into_inner();
+
+        intersections.sort_by(|a, b| a.d.partial_cmp(&b.d).unwrap());
+        intersections
     }
 }
