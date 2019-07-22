@@ -104,6 +104,16 @@ impl<T> Mul<T> for Vector3<T>
     }
 }
 
+impl<T> Mul<T> for &Vector3<T>
+    where T: Mul<Output = T> + Copy {
+
+    type Output = Vector3<T>;
+
+    fn mul(self, other: T) -> Self::Output {
+        Self::Output::new(self.x * other, self.y * other, self.z * other)
+    }
+}
+
 impl<T> AddAssign for Vector3<T>
     where T: Add<Output = T> + AddAssign {
 

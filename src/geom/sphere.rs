@@ -1,5 +1,6 @@
 use super::intersectable::{Intersectable, Intersection};
 use super::ray::Ray;
+use super::vector3;
 use super::vector3::Vector3f;
 
 pub struct Sphere {
@@ -23,6 +24,34 @@ impl Sphere {
 
 impl Intersectable for Sphere {
     fn intersect(&self, ray: &Ray) -> Vec<Intersection> {
-        vec![]
+        let t0: f64;
+        let t1: f64;
+        let L = &self.o - &ray.origin; 
+        let tca = vector3::dot(&L, &ray.direction);
+        if tca < 0.0 {
+            return vec![]
+        }
+
+        let radius2 = self.r * self.r;
+        let d2 = vector3::dot(&L, &L) - tca * tca;
+        if d2 > radius2 {
+            return vec![]
+        }
+
+        let thc = (radius2 - d2).sqrt();
+        t0 = tca - thc;
+        t1 = tca + thc;
+
+        let t = f64::min(t0, t1);
+
+        let hit = &ray.origin + &(&ray.direction * t);
+        let mut norm = &hit - &self.o;
+        norm.normalize();
+
+        vec![Intersection {
+            p: hit,
+            d: t,
+            n: norm
+        }]
     }
 }

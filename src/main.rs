@@ -1,8 +1,9 @@
 use pbrt::config::Config;
 use pbrt::geom::matrix4::Matrix4;
-use pbrt::geom::intersectable::Intersectable;
+use pbrt::geom::intersectable::{Intersectable, Intersection};
 use pbrt::geom::ray::Ray;
 use pbrt::geom::sphere::Sphere;
+use pbrt::geom::vector3;
 use pbrt::geom::vector3::Vector3f;
 use pbrt::scene::Scene;
 use std::env;
@@ -18,8 +19,12 @@ fn main() {
 
     let mut scene = Scene::new();
     scene
-        .add(Box::new(Sphere::new(Vector3f::new(0., 0., 0.), 1.)))
-        .add(Box::new(Sphere::new(Vector3f::new(0., 10., 0.), 1.)));
+        .add(Box::new(Sphere::new(Vector3f::new( 0.0,  2.0,  5.0), 1.)))
+        .add(Box::new(Sphere::new(Vector3f::new( 0.0, -2.0,  7.0), 1.)))
+        .add(Box::new(Sphere::new(Vector3f::new( 2.0,  2.0,  7.0), 1.)))
+        .add(Box::new(Sphere::new(Vector3f::new(-2.0, -2.0,  10.0), 1.)))
+        .add(Box::new(Sphere::new(Vector3f::new( 0.0,  0.0, -10.0), 1.))) // behind the camera
+        ;
 
     let image_width: u64 = 1920;
     let image_height: u64 = 1024;
@@ -55,19 +60,22 @@ fn main() {
 
     let mut pixels:Vec<u8> = Vec::new();
     for pixel_y in 0..image_height {
-        let r = (((pixel_y+1) as f64 / image_height as f64) * 255.) as u8;
         for pixel_x in 0..image_width {
-            let camera_vector = &trans * &Vector3f::new(pixel_x as f64, pixel_y as f64, 0.0);
-            println!("[{}, {}] => {}", pixel_x, pixel_y, camera_vector);
-
-            let g = (((pixel_x+1) as f64 / image_width as f64) * 255.) as u8;
-            let mut sample = vec![r, g, 0, 255];
-
-            let ray = Ray::new();
-            scene.intersect(&ray).iter().for_each(|item| {
-                println!("Intersection {}", item);
-            });
-
+            let mut camera_vector = &trans * &Vector3f::new(pixel_x as f64, pixel_y as f64, 0.0);
+            camera_vector.normalize();
+            let ray = Ray::new(Vector3f::new(0.0, 0.0, 0.0), camera_vector);
+            let collisions: Vec<Intersection> = scene.intersect(&ray);
+            let mut sample =
+                if collisions.len() > 0 {
+                    let Intersection { p: _, d: _, n } = &collisions[0];
+                    let s = 1.0 - vector3::dot(&ray.direction, &n);
+                    println!("[{}, {}] => {}", pixel_x, pixel_y, s);
+                    let c = (s * 255.0) as u8;
+                    vec![c, c, c, 255]
+                }
+                else {
+                    vec![0, 0, 0, 255]
+                };
             pixels.append(&mut sample);
         }
     }
