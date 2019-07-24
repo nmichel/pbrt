@@ -3,11 +3,13 @@ use std::marker::Copy;
 
 /// A 2D vector generic type.
 /// 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Vector2<T> {
     pub x: T,
     pub y: T
 }
+
+pub type Vector2u = Vector2<u32>;
 
 impl<T> Vector2<T> {
     /// Constructs a new `Vector2` initialized from parameters.
