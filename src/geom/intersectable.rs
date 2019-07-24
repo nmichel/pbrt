@@ -18,7 +18,7 @@ pub struct Intersection {
 }
 
 pub trait Intersectable {
-    fn intersect(&self, ray: &Ray) -> Vec<Intersection>;
+    fn intersect(&self, ray: &Ray) -> Option<Intersection>;
 }
 
 impl fmt::Display for Intersection {

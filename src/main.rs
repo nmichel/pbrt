@@ -39,19 +39,26 @@ pub trait Integrator {
 }
 
 struct WhittedIntegrator {
+    // Max recursion depth
+    max_depth: usize
+}
 
+impl WhittedIntegrator {
+    pub fn new(max_depth: usize) -> Self {
+        Self { max_depth }
+    }
 }
 
 impl Integrator for WhittedIntegrator {
     fn li(&self, ray: &Ray, scene: &Scene, depth: usize) -> Spectrum {
-        let collisions: Vec<Intersection> = scene.intersect(&ray);
-        if collisions.len() > 0 {
-            let Intersection { n, wo, .. } = &collisions[0];
-            let s = vector3::dot(wo, &n);
-            Spectrum::new(s, s, s)
-        }
-        else {
-            Spectrum::new(0.0, 0.0, 0.0)
+        match scene.intersect(&ray) {
+            Some(Intersection { n, wo, .. }) => {
+                let s = vector3::dot(&wo, &n);
+                Spectrum::new(s, s, s)
+            },
+            None => {
+                Spectrum::new(0.0, 0.0, 0.0)
+            }
         }
     }
 }
@@ -84,10 +91,11 @@ fn main() {
     let fov = config.fov_deg * f64::consts::PI / 180.0;
     let near = config.near;
     let far = config.far;
+    let max_depth = config.max_depth;
 
     let resolution = Vector2u::new(image_width, image_height);
     let camera = PinHoleCamera::new(&resolution, fov, near, far);
-    let integrator = WhittedIntegrator{};
+    let integrator = WhittedIntegrator::new(max_depth);
     let mut pixels:Vec<u8> = Vec::new();
     let patch = Bounds2::new(&Vector2::new(0, 0), &resolution);
     for pixel_coords in patch.to_iter() {

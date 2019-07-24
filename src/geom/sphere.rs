@@ -23,19 +23,19 @@ impl Sphere {
 }
 
 impl Intersectable for Sphere {
-    fn intersect(&self, ray: &Ray) -> Vec<Intersection> {
+    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
         let t0: f64;
         let t1: f64;
         let L = &self.o - &ray.origin; 
         let tca = vector3::dot(&L, &ray.direction);
         if tca < 0.0 {
-            return vec![]
+            return None;
         }
 
         let radius2 = self.r * self.r;
         let d2 = vector3::dot(&L, &L) - tca * tca;
         if d2 > radius2 {
-            return vec![]
+            return None;
         }
 
         let thc = (radius2 - d2).sqrt();
@@ -48,11 +48,11 @@ impl Intersectable for Sphere {
         let mut norm = &hit - &self.o;
         norm.normalize();
 
-        vec![Intersection {
+        Some(Intersection {
             p: hit,
             d: t,
             n: norm,
             wo: &ray.direction * -1.0
-        }]
+        })
     }
 }

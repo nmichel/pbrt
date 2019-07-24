@@ -19,16 +19,27 @@ impl Scene {
 }
 
 impl Intersectable for Scene {
-    fn intersect(&self, ray: &Ray) -> Vec<Intersection> {
-        let res: RefCell<Vec<Intersection>> = RefCell::new(Vec::new());
-        let mut intersections = 
-            self.objects.iter().fold(res, |acc, item| {
-                acc.borrow_mut().append(&mut item.intersect(ray));
-                acc
-            })
-            .into_inner();
-
-        intersections.sort_by(|a, b| a.d.partial_cmp(&b.d).unwrap());
-        intersections
+    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
+        let res: Option<Intersection> = None;
+        self.objects.iter().fold(res, |acc, item| {
+            match item.intersect(ray) {
+                Some(intersection) => {
+                    match acc {
+                        None =>
+                            Some(intersection),
+                        Some(prev_intersection) => {
+                            if intersection.d < prev_intersection.d {
+                                Some(intersection)
+                            }
+                            else {
+                                Some(prev_intersection)
+                            }
+                        }
+                    }
+                },
+                None =>
+                    acc
+            }
+        })
     }
 }
