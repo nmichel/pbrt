@@ -2,6 +2,7 @@ use pbrt::camera::{Camera, PinHoleCamera};
 use pbrt::config::Config;
 use pbrt::geom::bounds2::Bounds2;
 use pbrt::geom::intersectable::{Intersectable, Intersection};
+use pbrt::geom::ray::Ray;
 use pbrt::geom::sphere::Sphere;
 use pbrt::geom::vector2::{Vector2, Vector2u};
 use pbrt::geom::vector3;
@@ -10,6 +11,50 @@ use pbrt::scene::Scene;
 use std::env;
 use std::f64;
 use std::process;
+
+fn in_bound(v: f64) -> f64 {
+    f64::min(1.0, f64::max(0.0, v))
+}
+
+pub struct Spectrum {
+    spectrum: [f64; 3]
+}
+
+impl Spectrum {
+    pub fn new(r: f64, g: f64, b: f64) -> Self {
+        Self { spectrum: [in_bound(r), in_bound(g), in_bound(b)]}
+    }
+
+    pub fn to_rgb(&self) -> Vec<u8> {
+        let mut res = vec![0, 0, 0, 255];
+        res[0] = (self.spectrum[0] * 255.0) as u8;
+        res[1] = (self.spectrum[1] * 255.0) as u8;
+        res[2] = (self.spectrum[2] * 255.0) as u8;
+        res
+    }
+}
+
+pub trait Integrator {
+    fn li(&self, ray: &Ray, scene: &Scene, depth: usize) -> Spectrum;
+}
+
+struct WhittedIntegrator {
+
+}
+
+impl Integrator for WhittedIntegrator {
+    fn li(&self, ray: &Ray, scene: &Scene, depth: usize) -> Spectrum {
+        let collisions: Vec<Intersection> = scene.intersect(&ray);
+        if collisions.len() > 0 {
+            let Intersection { n, wo, .. } = &collisions[0];
+            let s = vector3::dot(wo, &n);
+            Spectrum::new(s, s, s)
+        }
+        else {
+            Spectrum::new(0.0, 0.0, 0.0)
+        }
+    }
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -42,21 +87,13 @@ fn main() {
 
     let resolution = Vector2u::new(image_width, image_height);
     let camera = PinHoleCamera::new(&resolution, fov, near, far);
+    let integrator = WhittedIntegrator{};
     let mut pixels:Vec<u8> = Vec::new();
     let patch = Bounds2::new(&Vector2::new(0, 0), &resolution);
     for pixel_coords in patch.to_iter() {
         let ray = camera.get_ray(&pixel_coords);
-        let collisions: Vec<Intersection> = scene.intersect(&ray);
-        let mut sample =
-            if collisions.len() > 0 {
-                let Intersection { p: _, d: _, n } = &collisions[0];
-                let s = 1.0 - vector3::dot(&ray.direction, &n);
-                let c = (s * 255.0) as u8;
-                vec![c, c, c, 255]
-            }
-            else {
-                vec![0, 0, 0, 255]
-            };
+        let spectrum = integrator.li(&ray, &scene, 3);
+        let mut sample = spectrum.to_rgb();
         pixels.append(&mut sample);
     }
 

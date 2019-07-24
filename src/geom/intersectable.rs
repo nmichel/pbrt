@@ -4,9 +4,17 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct Intersection {
+    /// Intersection point
     pub p: Vector3f,
+
+    /// Distance to the `Ray` origin
     pub d: f64,
-    pub n: Vector3f
+
+    /// Normal vector at intersection point
+    pub n: Vector3f,
+
+    /// Inverse direction of the `Ray`
+    pub wo: Vector3f
 }
 
 pub trait Intersectable {

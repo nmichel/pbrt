@@ -51,7 +51,8 @@ impl Intersectable for Sphere {
         vec![Intersection {
             p: hit,
             d: t,
-            n: norm
+            n: norm,
+            wo: &ray.direction * -1.0
         }]
     }
 }
