@@ -1,0 +1,35 @@
+use std::ops::Add;
+
+pub struct Spectrum {
+    spectrum: [f64; 3]
+}
+
+impl Spectrum {
+    pub fn new(r: f64, g: f64, b: f64) -> Self {
+        Self { spectrum: [in_bound(r), in_bound(g), in_bound(b)]}
+    }
+
+    pub fn to_rgb(&self) -> Vec<u8> {
+        let mut res = vec![0, 0, 0, 255];
+        res[0] = (self.spectrum[0] * 255.0) as u8;
+        res[1] = (self.spectrum[1] * 255.0) as u8;
+        res[2] = (self.spectrum[2] * 255.0) as u8;
+        res
+    }
+}
+
+impl Add for Spectrum {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        Spectrum::new(
+            in_bound(self.spectrum[0] + other.spectrum[0]),
+            in_bound(self.spectrum[1] + other.spectrum[1]),
+            in_bound(self.spectrum[2] + other.spectrum[2])
+        )
+    }
+}
+
+fn in_bound(v: f64) -> f64 {
+    f64::min(1.0, f64::max(0.0, v))
+}

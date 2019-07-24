@@ -7,32 +7,12 @@ use pbrt::geom::sphere::Sphere;
 use pbrt::geom::vector2::{Vector2, Vector2u};
 use pbrt::geom::vector3;
 use pbrt::geom::vector3::Vector3f;
+use pbrt::light::PointLight;
 use pbrt::scene::Scene;
+use pbrt::spectrum::Spectrum;
 use std::env;
 use std::f64;
 use std::process;
-
-fn in_bound(v: f64) -> f64 {
-    f64::min(1.0, f64::max(0.0, v))
-}
-
-pub struct Spectrum {
-    spectrum: [f64; 3]
-}
-
-impl Spectrum {
-    pub fn new(r: f64, g: f64, b: f64) -> Self {
-        Self { spectrum: [in_bound(r), in_bound(g), in_bound(b)]}
-    }
-
-    pub fn to_rgb(&self) -> Vec<u8> {
-        let mut res = vec![0, 0, 0, 255];
-        res[0] = (self.spectrum[0] * 255.0) as u8;
-        res[1] = (self.spectrum[1] * 255.0) as u8;
-        res[2] = (self.spectrum[2] * 255.0) as u8;
-        res
-    }
-}
 
 pub trait Integrator {
     fn li(&self, ray: &Ray, scene: &Scene, depth: usize) -> Spectrum;
@@ -57,7 +37,7 @@ impl Integrator for WhittedIntegrator {
                 Spectrum::new(s, s, s)
             },
             None => {
-                Spectrum::new(0.0, 0.0, 0.0)
+                scene.background_radiance(&ray)
             }
         }
     }
@@ -72,18 +52,19 @@ fn main() {
 
     let mut scene = Scene::new();
     // scene
-    //     .add(Box::new(Sphere::new(Vector3f::new( 0.0,  2.0,  5.0), 1.)))
-    //     .add(Box::new(Sphere::new(Vector3f::new( 0.0, -2.0,  7.0), 1.)))
-    //     .add(Box::new(Sphere::new(Vector3f::new( 2.0,  2.0,  7.0), 1.)))
-    //     .add(Box::new(Sphere::new(Vector3f::new(-2.0, -2.0,  10.0), 1.)))
-    //     .add(Box::new(Sphere::new(Vector3f::new( 0.0,  0.0, -10.0), 1.))) // behind the camera
+    //     .add_object(Box::new(Sphere::new(Vector3f::new( 0.0,  2.0,  5.0), 1.)))
+    //     .add_object(Box::new(Sphere::new(Vector3f::new( 0.0, -2.0,  7.0), 1.)))
+    //     .add_object(Box::new(Sphere::new(Vector3f::new( 2.0,  2.0,  7.0), 1.)))
+    //     .add_object(Box::new(Sphere::new(Vector3f::new(-2.0, -2.0,  10.0), 1.)))
+    //     .add_object(Box::new(Sphere::new(Vector3f::new( 0.0,  0.0, -10.0), 1.))) // behind the camera
     //     ;
 
     scene
-        .add(Box::new(Sphere::new(Vector3f::new( 0.0,  0.0,  5.0), 1.)))
-        .add(Box::new(Sphere::new(Vector3f::new( 0.0,  0.0, 10.0), 1.)))
-        .add(Box::new(Sphere::new(Vector3f::new( 3.0, -2.0, 10.0), 1.)))
-        .add(Box::new(Sphere::new(Vector3f::new( 3.0,  2.0,  5.0), 1.)))
+        .add_light(Box::new(PointLight::new(Vector3f::new( 0.0,  5.0,  5.0))))
+        .add_object(Box::new(Sphere::new(Vector3f::new( 0.0,  0.0,  5.0), 1.)))
+        .add_object(Box::new(Sphere::new(Vector3f::new( 0.0,  0.0, 10.0), 1.)))
+        .add_object(Box::new(Sphere::new(Vector3f::new( 3.0, -2.0, 10.0), 1.)))
+        .add_object(Box::new(Sphere::new(Vector3f::new( 3.0,  2.0,  5.0), 1.)))
         ;
 
     let image_width = config.output_width as u32;

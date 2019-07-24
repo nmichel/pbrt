@@ -1,20 +1,32 @@
-use std::cell::RefCell;
 use super::geom::intersectable::{Intersectable, Intersection};
 use super::geom::ray::Ray;
-
+use super::light::Light;
+use super::spectrum::Spectrum;
 
 pub struct Scene {
-    objects: Vec<Box<dyn Intersectable>>
+    objects: Vec<Box<dyn Intersectable>>,
+    lights: Vec<Box<dyn Light>>
 }
 
 impl Scene {
     pub fn new() -> Scene {
-        Scene { objects: Vec::new() }
+        Scene { objects: Vec::new(), lights: Vec::new() }
     }
 
-    pub fn add(&mut self, object: Box<Intersectable>) -> &mut Self {
+    pub fn add_object(&mut self, object: Box<Intersectable>) -> &mut Self {
         self.objects.push(object);
         self
+    }
+
+    pub fn add_light(&mut self, light: Box<Light>) -> &mut Self {
+        self.lights.push(light);
+        self
+    }
+
+    pub fn background_radiance(&self, ray: &Ray) -> Spectrum {
+        self.lights.iter().fold(Spectrum::new(0.0, 0.0, 0.0), |res, light| {
+            res + light.le(&ray)
+        })
     }
 }
 
