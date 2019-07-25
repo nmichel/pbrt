@@ -6,10 +6,16 @@ pub struct Ray {
 }
 
 impl Ray {
-    pub fn new(origin: Vector3f, direction: Vector3f) -> Self {
+    pub fn new(origin: &Vector3f, direction: &Vector3f) -> Self {
         Self {
-            origin,
-            direction
+            origin : *origin,
+            direction: *direction
         }
+    }
+
+    pub fn spawn_from_through(from: &Vector3f, through: &Vector3f) -> Self {
+        let mut direction = through - from;
+        direction.normalize();
+        Self::new(from, &direction)
     }
 }

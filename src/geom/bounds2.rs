@@ -60,7 +60,6 @@ mod tests {
     fn test_iterate() {
         let bounds2 = Bounds2::new(&Vector2u::new(0, 0), &Vector2u::new(2, 4));
         let res: Vec<_> = bounds2.to_iter().collect();
-        println!("{:?}", res);
         let reference = vec![
             Vector2 { x: 0, y: 0 }, Vector2 { x: 1, y: 0 },
             Vector2 { x: 0, y: 1 }, Vector2 { x: 1, y: 1 },

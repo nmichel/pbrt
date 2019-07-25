@@ -4,7 +4,7 @@ use std::marker::Copy;
 
 /// A 3D vector generic type.
 /// 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Vector3<T> {
     pub x: T,
     pub y: T,
@@ -36,9 +36,9 @@ impl<T> Vector3<T> {
         Vector3 { x, y, z }
     }
 
-    /// Returns the length of a `Vector3`.
+    /// Returns the squared length of a `Vector3`.
     /// 
-    pub fn length(&self) -> T
+    pub fn squared_length(&self) -> T
         where T: Mul<Output = T> + Add<Output = T> + Copy {
 
         dot(self, self)
@@ -47,7 +47,7 @@ impl<T> Vector3<T> {
 
 impl Vector3<f64> {
     pub fn normalize(&mut self) -> &mut Self {
-        let norm: f64 = self.length();
+        let norm: f64 = self.squared_length();
         let inv_norm = 1.0 / norm.sqrt();
         (*self) *= inv_norm;
         self
@@ -168,7 +168,7 @@ impl<T> Vector3<T>
 
 impl Vector3<f64> {
     pub fn quite_same(self: &Self, v: &Self) -> bool {
-        (self - v).length() < 0.0001
+        (self - v).squared_length() < 0.0001
     }
 }
 
@@ -204,8 +204,8 @@ mod tests {
             ($ident: ident, $expr: expr) => {
                 let mut $ident = $expr;
                 $ident.normalize();
-                assert!($ident.length() >= 0.9999) ;
-                assert!($ident.length() <= 1.0001) ;
+                assert!($ident.squared_length() >= 0.9999) ;
+                assert!($ident.squared_length() <= 1.0001) ;
             };
         }
         test_axis!(ux, Vector3::new(1.0, 0.0, 0.0));
@@ -234,9 +234,9 @@ mod tests {
     }
 
     #[test]
-    fn test_length_method() {
+    fn test_squared_length_method() {
         let a = Vector3::new(1.0, 2.0, 3.0);
-        assert_eq!(14.0, a.length());
+        assert_eq!(14.0, a.squared_length());
     }
 
     #[test]

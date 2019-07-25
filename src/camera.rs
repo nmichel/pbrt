@@ -52,6 +52,6 @@ impl Camera for PinHoleCamera {
         let pixel3d = Vector3f::new(pixel.x as f64, pixel.y as f64, 0.0);
         let mut camera_vector = &self.raster_to_screen * &pixel3d;
         camera_vector.normalize();
-        Ray::new(Vector3f::new(0.0, 0.0, 0.0), camera_vector)
+        Ray::new(&Vector3f::new(0.0, 0.0, 0.0), &camera_vector)
     }
 }

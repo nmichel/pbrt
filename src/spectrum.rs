@@ -1,5 +1,6 @@
-use std::ops::Add;
+use std::ops::{Add, Mul};
 
+#[derive(Debug)]
 pub struct Spectrum {
     spectrum: [f64; 3]
 }
@@ -26,6 +27,42 @@ impl Add for Spectrum {
             in_bound(self.spectrum[0] + other.spectrum[0]),
             in_bound(self.spectrum[1] + other.spectrum[1]),
             in_bound(self.spectrum[2] + other.spectrum[2])
+        )
+    }
+}
+
+impl Mul<&Spectrum> for Spectrum {
+    type Output = Self;
+
+    fn mul(self, other: &Self) -> Self::Output {
+        Spectrum::new(
+            in_bound(self.spectrum[0] * other.spectrum[0]),
+            in_bound(self.spectrum[1] * other.spectrum[1]),
+            in_bound(self.spectrum[2] * other.spectrum[2])
+        )
+    }
+}
+
+impl Mul<f64> for &Spectrum {
+    type Output = Spectrum;
+
+    fn mul(self, scale: f64) -> Self::Output {
+        Spectrum::new(
+            in_bound(self.spectrum[0] * scale),
+            in_bound(self.spectrum[1] * scale),
+            in_bound(self.spectrum[2] * scale)
+        )
+    }
+}
+
+impl Mul<f64> for Spectrum {
+    type Output = Spectrum;
+
+    fn mul(self, scale: f64) -> Self::Output {
+        Spectrum::new(
+            in_bound(self.spectrum[0] * scale),
+            in_bound(self.spectrum[1] * scale),
+            in_bound(self.spectrum[2] * scale)
         )
     }
 }

@@ -4,8 +4,8 @@ use super::light::Light;
 use super::spectrum::Spectrum;
 
 pub struct Scene {
-    objects: Vec<Box<dyn Intersectable>>,
-    lights: Vec<Box<dyn Light>>
+    pub objects: Vec<Box<dyn Intersectable>>,
+    pub lights: Vec<Box<dyn Light>>
 }
 
 impl Scene {

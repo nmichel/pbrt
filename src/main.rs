@@ -31,13 +31,29 @@ impl WhittedIntegrator {
 
 impl Integrator for WhittedIntegrator {
     fn li(&self, ray: &Ray, scene: &Scene, depth: usize) -> Spectrum {
-        match scene.intersect(&ray) {
-            Some(Intersection { n, wo, .. }) => {
-                let s = vector3::dot(&wo, &n);
-                Spectrum::new(s, s, s)
+        let intersection_opt = scene.intersect(&ray);
+        match intersection_opt {
+            Some(intersection) => {
+                //let s = vector3::dot(&wo, &n);
+                //Spectrum::new(s, s, s);
+
+                let Intersection { ref n, ref wo, .. } = intersection;
+                let l = Spectrum::new(0.0, 0.0, 0.0);
+                // L += isect.Le(wo); // Dans le cas ou le material est un emitter
+                scene.lights.iter().fold(l, |acc, light| {
+                    let (ref li, ref wi, ref tester) = light.li(&intersection);
+                    // Spectrum f = isect.bsdf->f(wo, wi);
+                    let f = Spectrum::new(1.0, 0.0, 0.0); // NOTE : HARDCODED RED Spectrum for every object !
+                    if tester.unoccluded(&scene) {
+                        acc + f * li * vector3::dot(&wi, n).abs()
+                    }
+                    else {
+                        acc
+                    }
+                })
             },
             None => {
-                scene.background_radiance(&ray)
+                scene.background_radiance(&ray) // In the book, part of the integrator
             }
         }
     }
@@ -60,11 +76,11 @@ fn main() {
     //     ;
 
     scene
-        .add_light(Box::new(PointLight::new(Vector3f::new( 0.0,  5.0,  5.0))))
-        .add_object(Box::new(Sphere::new(Vector3f::new( 0.0,  0.0,  5.0), 1.)))
-        .add_object(Box::new(Sphere::new(Vector3f::new( 0.0,  0.0, 10.0), 1.)))
-        .add_object(Box::new(Sphere::new(Vector3f::new( 3.0, -2.0, 10.0), 1.)))
-        .add_object(Box::new(Sphere::new(Vector3f::new( 3.0,  2.0,  5.0), 1.)))
+        .add_light(Box::new(PointLight::new(Vector3f::new( 0.0,  5.0,  4.0), Spectrum::new(1.0, 0.0, 0.0))))
+        .add_object(Box::new(Sphere::new(Vector3f::new( -2.0, -2.0, 5.0), 1.)))
+        .add_object(Box::new(Sphere::new(Vector3f::new( -2.0,  2.0, 5.0), 1.)))
+        .add_object(Box::new(Sphere::new(Vector3f::new(  2.0, -2.0, 5.0), 1.)))
+        .add_object(Box::new(Sphere::new(Vector3f::new(  2.0,  2.0, 5.0), 1.)))
         ;
 
     let image_width = config.output_width as u32;
