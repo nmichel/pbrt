@@ -24,8 +24,6 @@ impl Sphere {
 
 impl Intersectable for Sphere {
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
-        let t0: f64;
-        let t1: f64;
         let L = &self.o - &ray.origin; 
         let tca = vector3::dot(&L, &ray.direction);
         if tca < 0.0 {
@@ -39,9 +37,8 @@ impl Intersectable for Sphere {
         }
 
         let thc = (radius2 - d2).sqrt();
-        t0 = tca - thc;
-        t1 = tca + thc;
-
+        let t0: f64 = tca - thc;
+        let t1: f64  = tca + thc;
         let t = f64::min(t0, t1);
 
         let hit = &ray.origin + &(&ray.direction * t);

@@ -1,0 +1,18 @@
+use super::geom::intersectable::{Intersectable, Intersection};
+use super::geom::ray::Ray;
+use super::geom::transform::Transform;
+
+pub struct Primitive {
+    shape: Box<Intersectable>,
+    transform: Box<Transform>
+}
+
+impl Intersectable for Primitive {
+    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
+        let local_ray = self.transform.transform_ray_to_local(&ray);
+        match self.shape.intersect(&local_ray) {
+            Some(intersection) => Some(self.transform.transform_interaction_to_world(&intersection)),
+            None => None
+        }
+    }
+}
