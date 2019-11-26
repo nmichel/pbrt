@@ -187,13 +187,52 @@ impl Matrix4 {
             m: minv
         }
     }
+
+    pub fn transpose(&self) -> Self {
+        Self {
+            m: [
+                [self.m[0][0], self.m[1][0], self.m[2][0], self.m[3][0]],
+                [self.m[0][1], self.m[1][1], self.m[2][1], self.m[3][1]],
+                [self.m[0][2], self.m[1][2], self.m[2][2], self.m[3][2]],
+                [self.m[0][3], self.m[1][3], self.m[2][3], self.m[3][3]]
+            ]
+        }
+    }
+
+    pub fn transform_point(&self, v: &Vector3f) -> Vector3f {
+        let x = self.m[0][0] * v.x + self.m[0][1] * v.y + self.m[0][2] * v.z + self.m[0][3];
+        let y = self.m[1][0] * v.x + self.m[1][1] * v.y + self.m[1][2] * v.z + self.m[1][3];
+        let z = self.m[2][0] * v.x + self.m[2][1] * v.y + self.m[2][2] * v.z + self.m[2][3];
+        let w = self.m[3][0] * v.x + self.m[3][1] * v.y + self.m[3][2] * v.z + self.m[3][3];
+        let res = Vector3f::new(x, y, z);
+        if w != 1.0 {
+             res * (1.0/w)
+        }
+        else {
+            res
+        }
+    }
+
+    pub fn transform_direction(&self, v: &Vector3f) -> Vector3f {
+        let x = self.m[0][0] * v.x + self.m[0][1] * v.y + self.m[0][2] * v.z;
+        let y = self.m[1][0] * v.x + self.m[1][1] * v.y + self.m[1][2] * v.z;
+        let z = self.m[2][0] * v.x + self.m[2][1] * v.y + self.m[2][2] * v.z;
+        Vector3f::new(x, y, z)
+    }
+
+    pub fn transform_normal(&self, v: &Vector3f) -> Vector3f {
+        let x = self.m[0][0] * v.x + self.m[1][0] * v.y + self.m[2][0] * v.z;
+        let y = self.m[0][1] * v.x + self.m[1][1] * v.y + self.m[2][1] * v.z;
+        let z = self.m[0][2] * v.x + self.m[1][2] * v.y + self.m[2][2] * v.z;
+        Vector3f::new(x, y, z)
+    }
 }
 
-impl Mul for Matrix4 {
-    type Output = Self;
+impl Mul for &Matrix4 {
+    type Output = Matrix4;
 
     fn mul(self, o: Self) -> Self::Output {
-        let mut res = Self::zero();
+        let mut res = Matrix4::zero();
         let m = &mut res.m;
         for i in  0..4 {
             for j in 0..4 {
@@ -204,6 +243,15 @@ impl Mul for Matrix4 {
         }
         
         res
+    }
+
+}
+
+impl Mul for Matrix4 {
+    type Output = Self;
+
+    fn mul(self, o: Self) -> Self::Output {
+        &self * &o
     }
 }
 

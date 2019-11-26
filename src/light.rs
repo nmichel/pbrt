@@ -1,5 +1,6 @@
 use super::geom::intersectable::{Intersectable, Intersection};
 use super::geom::ray::Ray;
+use super::geom::transform::Transform;
 use super::geom::vector3::Vector3f;
 use super::scene::Scene;
 use super::spectrum::Spectrum;
@@ -32,25 +33,26 @@ pub trait Light {
 }
 
 pub struct PointLight {
-    p: Vector3f,
+    t: Box<Transform>,
     i: Spectrum 
 }
 
 impl PointLight {
-    pub fn new(p: Vector3f, i: Spectrum) -> Self {
-        PointLight { p, i }
+    pub fn new(t: Box<Transform>, i: Spectrum) -> Self {
+        PointLight { t, i }
     }
 }
 
 impl Light for PointLight {
     fn li(&self, intersection: &Intersection) -> (Spectrum, Vector3f, VisibilityTester) {
-        let mut wi = &self.p - &intersection.p;
+        let w_light_pos = self.t.transform_point_to_world(&Vector3f::new(0.0, 0.0, 0.0));
+        let mut wi = &w_light_pos - &intersection.p;
         wi.normalize();
 
         let squared_dist = wi.squared_length();
         let spectrum = &self.i * (1.0 / squared_dist);
 
-        let tester = VisibilityTester::new(&intersection.p, &self.p);
+        let tester = VisibilityTester::new(&intersection.p, &w_light_pos);
         (spectrum, wi, tester)
     }
 }

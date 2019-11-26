@@ -2,6 +2,7 @@ use pbrt::camera::{Camera, PinHoleCamera};
 use pbrt::config::Config;
 use pbrt::geom::bounds2::Bounds2;
 use pbrt::geom::sphere::Sphere;
+use pbrt::geom::transform::Transform;
 use pbrt::geom::vector2::{Vector2, Vector2u};
 use pbrt::geom::vector3::Vector3f;
 use pbrt::integrators::integrator::Integrator;
@@ -22,7 +23,9 @@ fn main() {
 
     let mut scene = Scene::new();
     scene
-        .add_light(Box::new(PointLight::new(Vector3f::new( 0.0,  5.0,  4.0), Spectrum::new(1.0, 0.0, 0.0))))
+        .add_light(Box::new(PointLight::new(
+            Box::new(Transform::translation(Vector3f::new( 0.0,  5.0,  5.0))),
+            Spectrum::new(1.0, 1.0, 1.0))))
         .add_object(Box::new(Sphere::new(Vector3f::new( -2.0, -2.0, 5.0), 1.)))
         .add_object(Box::new(Sphere::new(Vector3f::new( -2.0,  2.0, 5.0), 1.)))
         .add_object(Box::new(Sphere::new(Vector3f::new(  2.0, -2.0, 5.0), 1.)))
