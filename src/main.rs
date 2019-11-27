@@ -8,6 +8,7 @@ use pbrt::geom::vector3::Vector3f;
 use pbrt::integrators::integrator::Integrator;
 use pbrt::integrators::whitted::WhittedIntegrator;
 use pbrt::light::PointLight;    
+use pbrt::primitives::Primitive;    
 use pbrt::scene::Scene;
 use pbrt::spectrum::Spectrum;
 use std::env;
@@ -24,12 +25,11 @@ fn main() {
     let mut scene = Scene::new();
     scene
         .add_light(Box::new(PointLight::new(
-            Box::new(Transform::translation(Vector3f::new( 0.0,  5.0,  5.0))),
+            Box::new(Transform::translation(Vector3f::new(0.0, 1.5, 0.0))),
             Spectrum::new(1.0, 1.0, 1.0))))
-        .add_object(Box::new(Sphere::new(Vector3f::new( -2.0, -2.0, 5.0), 1.)))
-        .add_object(Box::new(Sphere::new(Vector3f::new( -2.0,  2.0, 5.0), 1.)))
-        .add_object(Box::new(Sphere::new(Vector3f::new(  2.0, -2.0, 5.0), 1.)))
-        .add_object(Box::new(Sphere::new(Vector3f::new(  2.0,  2.0, 5.0), 1.)))
+        .add_object(Box::new(Primitive::new(
+            Box::new(Sphere::new(Vector3f::new(0.0, 0.0, 0.0), 1.2)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0,  2.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)))))
         ;
 
     let image_width = config.output_width as u32;
