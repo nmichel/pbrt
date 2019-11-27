@@ -7,6 +7,14 @@ pub struct Primitive {
     transform: Box<Transform>
 }
 
+impl Primitive {
+    /// Build a new `Primitive` by composing an `Intersectable` and a `Transform`.
+    /// 
+    pub fn new(shape: Box<Intersectable>, transform: Box<Transform>) -> Self {
+        Self { shape, transform }
+    }
+}
+
 impl Intersectable for Primitive {
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
         let local_ray = self.transform.transform_ray_to_local(&ray);
