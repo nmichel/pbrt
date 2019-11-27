@@ -14,7 +14,10 @@ pub struct Intersection {
     pub n: Vector3f,
 
     /// Inverse direction of the `Ray`
-    pub wo: Vector3f
+    pub wo: Vector3f,
+
+    pub u: f64,
+    pub v: f64
 }
 
 pub trait Intersectable {

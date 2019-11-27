@@ -19,11 +19,9 @@ impl WhittedIntegrator {
 
 impl Integrator for WhittedIntegrator {
     fn li(&self, ray: &Ray, scene: &Scene, depth: usize) -> Spectrum {
-        let intersection_opt = scene.intersect(&ray);
-        match intersection_opt {
+        match scene.intersect(&ray) {
             Some(intersection) => {
-                //let s = vector3::dot(&wo, &n);
-                //Spectrum::new(s, s, s);
+                let Intersection { ref n, ref wo, ref u, ref v, .. } = intersection;
 
                 let Intersection { ref n, ref wo, .. } = intersection;
                 let l = Spectrum::new(0.0, 0.0, 0.0);
@@ -31,7 +29,20 @@ impl Integrator for WhittedIntegrator {
                 scene.lights.iter().fold(l, |acc, light| {
                     let (ref li, ref wi, ref tester) = light.li(&intersection);
                     // Spectrum f = isect.bsdf->f(wo, wi);
-                    let f = Spectrum::new(1.0, 0.0, 0.0); // NOTE : HARDCODED RED Spectrum for every object !
+
+                    // NOTE : HARDCODED uv-based checkerboard pattern Spectrum for every object !
+                    let scale_u = (u * 10.0) % 1.0;
+                    let scale_v = (v * 10.0) % 1.0;
+                    let r =
+                        if (scale_u < 0.5 && scale_v < 0.5) ||
+                           (scale_u >= 0.5 && scale_v >= 0.5) {
+                            1.0
+                        }
+                        else {
+                            0.0
+                        };
+                    let f = Spectrum::new(r, 1.0, 1.0);
+
                     if tester.unoccluded(&scene) {
                         acc + f * li * vector3::dot(&wi, n).abs()
                     }

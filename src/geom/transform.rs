@@ -74,7 +74,9 @@ impl Transform {
             d: intersection.d,
             n: self.transform_normal_to_world(&intersection.n),
             p: self.transform_point_to_world(&intersection.p),
-            wo: self.transform_direction_to_world(&intersection.wo)
+            wo: self.transform_direction_to_world(&intersection.wo),
+            u: intersection.u,
+            v: intersection.v
         }
     }
 }
