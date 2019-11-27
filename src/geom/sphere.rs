@@ -7,17 +7,12 @@ use num_traits::clamp;
 const PI: f64 = 3.14159265358979323846;
 
 pub struct Sphere {
-    o: Vector3f,
     r: f64
 }
 
 impl Sphere {
-    pub fn new(o: Vector3f, r: f64) -> Sphere {
-        Sphere { o: o, r: r }
-    }
-
-    pub fn center(&self) -> &Vector3f {
-        &self.o
+    pub fn new(r: f64) -> Sphere {
+        Sphere { r }
     }
 
     pub fn radius(&self) -> f64 {
@@ -27,7 +22,7 @@ impl Sphere {
 
 impl Intersectable for Sphere {
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
-        let l = &self.o - &ray.origin; 
+        let l = &ray.origin * -1.0; 
         let tca = vector3::dot(&l, &ray.direction);
         if tca < 0.0 {
             return None;
@@ -45,7 +40,7 @@ impl Intersectable for Sphere {
         let t = f64::min(t0, t1);
 
         let mut hit = &ray.origin + &(&ray.direction * t);
-        let mut norm = &hit - &self.o;
+        let mut norm = hit;
         norm.normalize();
 
         if hit.x == 0.0 && hit.y == 0.0 {
