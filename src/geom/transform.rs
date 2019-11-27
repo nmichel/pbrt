@@ -1,3 +1,4 @@
+use std::ops::Mul;
 use super::intersectable::Intersection;
 use super::ray::Ray;
 use super::matrix4::Matrix4;
@@ -39,6 +40,31 @@ impl Transform {
         }
     }
 
+    ///  Build a rotation `Transform` around x-axis.
+    ///
+    pub fn rotation_x(a: f64) -> Self {
+        let mat = Matrix4::rotation_x(a);
+        let inv_mat = Matrix4::transpose(&mat);
+        Self { mat, inv_mat }
+
+    }
+
+    ///  Build a rotation `Transform` around y-axis.
+    ///
+    pub fn rotation_y(a: f64) -> Self {
+        let mat = Matrix4::rotation_y(a);
+        let inv_mat = Matrix4::transpose(&mat);
+        Self { mat, inv_mat }
+    }
+
+    ///  Build a rotation `Transform` around z-axis.
+    ///
+    pub fn rotation_z(a: f64) -> Self {
+        let mat = Matrix4::rotation_z(a);
+        let inv_mat = Matrix4::transpose(&mat);
+        Self { mat, inv_mat }
+    }
+
     pub fn transform_point_to_world(&self, p: &Vector3f) -> Vector3f {
         self.mat.transform_point(&p)
     }
@@ -78,5 +104,23 @@ impl Transform {
             u: intersection.u,
             v: intersection.v
         }
+    }
+}
+
+impl Mul for &Transform {
+    type Output = Transform;
+
+    fn mul(self, o: Self) -> Self::Output {
+        let mat = &self.mat * &o.mat;
+        let inv_mat = &o.inv_mat * &self.inv_mat;
+        Transform { mat, inv_mat}
+    }
+}
+
+impl Mul for Transform {
+    type Output = Transform;
+
+    fn mul(self, o: Self) -> Self::Output {
+        &self * &o
     }
 }
