@@ -48,7 +48,7 @@ impl Transform {
     }
 
     pub fn transform_normal_to_world(&self, p: &Vector3f) -> Vector3f {
-        self.mat.transform_normal(&p)
+        self.inv_mat.transform_normal(&p)
     }
 
     pub fn transform_point_to_local(&self, p: &Vector3f) -> Vector3f {
@@ -60,7 +60,7 @@ impl Transform {
     }
 
     pub fn transform_normal_to_local(&self, p: &Vector3f) -> Vector3f {
-        self.inv_mat.transform_normal(&p)
+        self.mat.transform_normal(&p)
     }
 
     pub fn transform_ray_to_local(&self, ray: &Ray) -> Ray {
