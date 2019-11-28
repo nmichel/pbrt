@@ -1,7 +1,6 @@
-use super::intersectable::{Intersectable, Intersection};
-use super::ray::Ray;
-use super::vector3;
-use super::vector3::Vector3f;
+use crate::geom::intersectable::{Intersectable, Intersection};
+use crate::geom::ray::Ray;
+use crate::geom::vector3;
 use num_traits::clamp;
 
 const PI: f64 = 3.14159265358979323846;

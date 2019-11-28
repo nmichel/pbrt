@@ -5,4 +5,5 @@ pub mod integrators;
 pub mod light;
 pub mod primitives;
 pub mod scene;
+pub mod shapes;
 pub mod spectrum;
