@@ -23,30 +23,33 @@ impl Integrator for WhittedIntegrator {
             Some(intersection) => {
                 let Intersection { ref n, ref wo, ref u, ref v, .. } = intersection;
 
-                let Intersection { ref n, ref wo, .. } = intersection;
-                let l = Spectrum::new(0.0, 0.0, 0.0);
-                // L += isect.Le(wo); // Dans le cas ou le material est un emitter
+                // NOTE : HARDCODED uv-based checkerboard pattern Spectrum for every object !
+                let scale = 4.0;
+                let scale_u = (u.abs() * scale) % 1.0;
+                let scale_v = (v.abs() * scale) % 1.0;
+                let use_color = (scale_u < 0.5 && scale_v < 0.5) || (scale_u >= 0.5 && scale_v >= 0.5);
+                let positive_uv_prod = (u.signum() * v.signum()) >= 0.0;
+                let color =
+                    if use_color ^ positive_uv_prod {
+                        1.0
+                    }
+                    else {
+                        0.0
+                    };
+                let f = Spectrum::new(color, 1.0, 1.0);
+
+                // Object may be an emitter
+                let mut l = intersection.le(wo);
+
+                // Add ambiant lighting
+                l = l + &f * &Spectrum::new(0.1, 0.1, 0.1);
+
+                // Add contribution of each light source
                 scene.lights.iter().fold(l, |acc, light| {
                     let (ref li, ref wi, ref tester) = light.li(&intersection);
                     // Spectrum f = isect.bsdf->f(wo, wi);
-
-                    // NOTE : HARDCODED uv-based checkerboard pattern Spectrum for every object !
-                    let scale = 4.0;
-                    let scale_u = (u.abs() * scale) % 1.0;
-                    let scale_v = (v.abs() * scale) % 1.0;
-                    let use_color = (scale_u < 0.5 && scale_v < 0.5) || (scale_u >= 0.5 && scale_v >= 0.5);
-                    let positive_uv_prod = (u.signum() * v.signum()) >= 0.0;
-                    let color =
-                        if use_color ^ positive_uv_prod {
-                            1.0
-                        }
-                        else {
-                            0.0
-                        };
-                    let f = Spectrum::new(color, 1.0, 1.0);
-
                     if tester.unoccluded(&scene) {
-                        acc + f * li * vector3::dot(&wi, n).abs()
+                        acc + (&f * li) * vector3::dot(&wi, n).abs()
                     }
                     else {
                         acc

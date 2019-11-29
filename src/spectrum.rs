@@ -31,10 +31,24 @@ impl Add for Spectrum {
     }
 }
 
+// TODO Avoid copy/pasted code
+
 impl Mul<&Spectrum> for Spectrum {
     type Output = Self;
 
     fn mul(self, other: &Self) -> Self::Output {
+        Spectrum::new(
+            in_bound(self.spectrum[0] * other.spectrum[0]),
+            in_bound(self.spectrum[1] * other.spectrum[1]),
+            in_bound(self.spectrum[2] * other.spectrum[2])
+        )
+    }
+}
+
+impl Mul<&Spectrum> for &Spectrum {
+    type Output = Spectrum;
+
+    fn mul(self, other: &Spectrum) -> Spectrum {
         Spectrum::new(
             in_bound(self.spectrum[0] * other.spectrum[0]),
             in_bound(self.spectrum[1] * other.spectrum[1]),

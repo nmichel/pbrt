@@ -1,3 +1,4 @@
+use crate::spectrum::Spectrum;
 use super::ray::Ray;
 use super::vector3::Vector3f;
 use std::fmt;
@@ -22,6 +23,18 @@ pub struct Intersection {
 
 pub trait Intersectable {
     fn intersect(&self, ray: &Ray) -> Option<Intersection>;
+}
+
+impl Intersection {
+    pub fn le(&self, wo: &Vector3f) -> Spectrum {
+        // match self.primitive.getAreaLight() {
+        //     Some(light) => light.l(self, wo),
+        //     None => Spectrum::new(0.0, 0.0, 0.0)
+        // }
+        // 
+        // Pour l'instant, retourne "rien"
+        Spectrum::new(0.0, 0.0, 0.0)
+    }
 }
 
 impl fmt::Display for Intersection {
