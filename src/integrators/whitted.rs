@@ -1,6 +1,8 @@
-use crate::geom::intersectable::{Intersectable, Intersection};
+use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
+use crate::interaction::Interaction;
+use crate::materials::material::Material;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
 
@@ -20,23 +22,11 @@ impl WhittedIntegrator {
 impl Integrator for WhittedIntegrator {
     fn li(&self, ray: &Ray, scene: &Scene, depth: usize) -> Spectrum {
         match scene.intersect(&ray) {
-            Some(intersection) => {
-                let Intersection { ref n, ref wo, ref u, ref v, .. } = intersection;
+            Some(interaction) => {
+                let Interaction { ref intersection, ref material } = interaction;
+                let Intersection { ref n, ref wo, .. } = intersection;
 
-                // NOTE : HARDCODED uv-based checkerboard pattern Spectrum for every object !
-                let scale = 4.0;
-                let scale_u = (u.abs() * scale) % 1.0;
-                let scale_v = (v.abs() * scale) % 1.0;
-                let use_color = (scale_u < 0.5 && scale_v < 0.5) || (scale_u >= 0.5 && scale_v >= 0.5);
-                let positive_uv_prod = (u.signum() * v.signum()) >= 0.0;
-                let color =
-                    if use_color ^ positive_uv_prod {
-                        1.0
-                    }
-                    else {
-                        0.0
-                    };
-                let f = Spectrum::new(color, 1.0, 1.0);
+                let f = material.shade(&intersection); // isect.bsdf->f(wo, wi);
 
                 // Object may be an emitter
                 let mut l = intersection.le(wo);

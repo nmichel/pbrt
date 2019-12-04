@@ -1,4 +1,4 @@
-use super::geom::intersectable::{Intersectable, Intersection};
+use super::geom::intersectable::Intersection;
 use super::geom::ray::Ray;
 use super::geom::transform::Transform;
 use super::geom::vector3::Vector3f;
@@ -18,9 +18,9 @@ impl VisibilityTester {
     pub fn unoccluded(&self, scene: &Scene) -> bool {
         let ray = Ray::spawn_from_through(&self.from, &self.to);
         match scene.intersect(&ray) {
-            Some(intersection) => {
+            Some(interaction) => {
                 let l = (&self.to - &self.from).squared_length();
-                if (intersection.d * intersection.d) <= l { false } else { true }
+                if (interaction.intersection.d * interaction.intersection.d) <= l { false } else { true }
             },
             None => true
         }

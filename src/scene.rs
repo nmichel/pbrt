@@ -1,20 +1,23 @@
 use super::geom::intersectable::{Intersectable, Intersection};
+use super::interaction::Interaction;
 use super::geom::ray::Ray;
 use super::light::Light;
+use super::materials::material::Material;
+use super::primitives::Primitive;
 use super::spectrum::Spectrum;
 
 pub struct Scene {
-    pub objects: Vec<Box<dyn Intersectable>>,
+    pub primitives: Vec<Box<Primitive>>,
     pub lights: Vec<Box<dyn Light>>
 }
 
 impl Scene {
     pub fn new() -> Scene {
-        Scene { objects: Vec::new(), lights: Vec::new() }
+        Scene { primitives: Vec::new(), lights: Vec::new() }
     }
 
-    pub fn add_object(&mut self, object: Box<Intersectable>) -> &mut Self {
-        self.objects.push(object);
+    pub fn add_object(&mut self, object: Box<Primitive>) -> &mut Self {
+        self.primitives.push(object);
         self
     }
 
@@ -27,24 +30,27 @@ impl Scene {
         self.lights.iter().fold(Spectrum::new(0.0, 0.0, 0.0), |res, light| {
             res + light.le(&ray)
         })
-    }
+    }    
 }
 
-impl Intersectable for Scene {
-    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
-        let res: Option<Intersection> = None;
-        self.objects.iter().fold(res, |acc, item| {
-            match item.intersect(ray) {
+impl Scene {
+    pub fn intersect(&self, ray: &Ray) -> Option<Interaction> {
+        let res: Option<Interaction> = None;
+        self.primitives.iter().fold(res, |acc, primitive| {
+            match primitive.intersect(ray) {
                 Some(intersection) => {
                     match acc {
-                        None =>
-                            Some(intersection),
-                        Some(prev_intersection) => {
-                            if intersection.d < prev_intersection.d {
-                                Some(intersection)
+                        None => {
+                            let material: &Material = &*(primitive.material);
+                            Some(Interaction { intersection, material })
+                        },
+                        Some(prev_interaction) => {
+                            if intersection.d < prev_interaction.intersection.d {
+                                let material: &Material = &*(primitive.material);
+                                Some(Interaction { intersection, material })
                             }
                             else {
-                                Some(prev_intersection)
+                                Some(prev_interaction)
                             }
                         }
                     }

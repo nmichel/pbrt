@@ -1,17 +1,20 @@
+use std::rc::Rc;
 use super::geom::intersectable::{Intersectable, Intersection};
 use super::geom::ray::Ray;
 use super::geom::transform::Transform;
+use super::materials::material::Material;
 
 pub struct Primitive {
-    shape: Box<Intersectable>,
-    transform: Box<Transform>
+    pub shape: Box<Intersectable>,
+    pub transform: Box<Transform>,
+    pub material: Rc<Material>
 }
 
 impl Primitive {
     /// Build a new `Primitive` by composing an `Intersectable` and a `Transform`.
     /// 
-    pub fn new(shape: Box<Intersectable>, transform: Box<Transform>) -> Self {
-        Self { shape, transform }
+    pub fn new(shape: Box<Intersectable>, transform: Box<Transform>, material: Rc<Material>) -> Self {
+        Self { shape, transform, material }
     }
 }
 

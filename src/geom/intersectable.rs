@@ -3,8 +3,7 @@ use super::ray::Ray;
 use super::vector3::Vector3f;
 use std::fmt;
 
-#[derive(Debug)]
-pub struct Intersection {
+pub struct Intersection{
     /// Intersection point
     pub p: Vector3f,
 
@@ -17,6 +16,7 @@ pub struct Intersection {
     /// Inverse direction of the `Ray`
     pub wo: Vector3f,
 
+    /// U/V coordinate of intersection point on the surface
     pub u: f64,
     pub v: f64
 }

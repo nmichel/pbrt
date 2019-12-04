@@ -1,6 +1,6 @@
 use std::ops::{Add, Mul};
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Spectrum {
     spectrum: [f64; 3]
 }

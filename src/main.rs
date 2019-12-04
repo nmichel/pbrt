@@ -6,8 +6,10 @@ use pbrt::geom::vector2::{Vector2, Vector2u};
 use pbrt::geom::vector3::Vector3f;
 use pbrt::integrators::integrator::Integrator;
 use pbrt::integrators::whitted::WhittedIntegrator;
-use pbrt::light::PointLight;    
-use pbrt::primitives::Primitive;    
+use pbrt::materials::material::CheckerBoard;
+use pbrt::materials::material::Material;
+use pbrt::light::PointLight;
+use pbrt::primitives::Primitive;
 use pbrt::scene::Scene;
 use pbrt::shapes::sphere::Sphere;
 use pbrt::shapes::plane::Plane;
@@ -15,6 +17,7 @@ use pbrt::spectrum::Spectrum;
 use std::env;
 use std::f64;
 use std::process;
+use std::rc::Rc;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -23,6 +26,9 @@ fn main() {
         process::exit(1);        
     });
 
+    let material_ball: Rc<Material> = Rc::new(CheckerBoard::new(Spectrum::new(1.0, 0.0, 0.0), Spectrum::new(1.0, 1.0, 1.0), 4.0));
+    let material_wall: Rc<Material> = Rc::new(CheckerBoard::new(Spectrum::new(0.0, 1.0, 0.0), Spectrum::new(0.1, 0.5, 0.0), 0.5));
+
     let mut scene = Scene::new();
     scene
         .add_light(Box::new(PointLight::new(
@@ -30,22 +36,27 @@ fn main() {
             Spectrum::new(0.5, 0.5, 0.5))))
         .add_light(Box::new(PointLight::new(
             Box::new(Transform::translation(Vector3f::new(-2.0, 1.0, 0.0))),
-            Spectrum::new(0.3, 0.0, 0.0))))
+            Spectrum::new(0.3, 0.3, 0.3))))
         .add_object(Box::new(Primitive::new(
             Box::new(Plane::new()),
-            Box::new(Transform::translation(Vector3f::new(0.0, -2.0, 0.0))))))
+            Box::new(Transform::translation(Vector3f::new(0.0, -2.0, 0.0))),
+            Rc::clone(&material_wall))))
+       .add_object(Box::new(Primitive::new(
+            Box::new(Plane::new()),
+            Box::new(Transform::translation(Vector3f::new(0.0, 2.0, 0.0)) * Transform::rotation_x(-3.141016)),
+            Rc::clone(&material_wall))))
         .add_object(Box::new(Primitive::new(
             Box::new(Plane::new()),
-            Box::new(Transform::translation(Vector3f::new(0.0, 2.0, 0.0)) * Transform::rotation_x(-3.141016)))))
-        .add_object(Box::new(Primitive::new(
-            Box::new(Plane::new()),
-            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 3.5)) * Transform::rotation_x(-1.5708)))))
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 3.5)) * Transform::rotation_x(-1.5708)),
+            Rc::clone(&material_wall))))
         .add_object(Box::new(Primitive::new(
             Box::new(Sphere::new(0.5)),
-            Box::new(Transform::translation(Vector3f::new(1.2, 0.0, 2.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)))))
+            Box::new(Transform::translation(Vector3f::new(1.2, 0.0, 2.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
+            Rc::clone(&material_ball))))
         .add_object(Box::new(Primitive::new(
             Box::new(Sphere::new(0.5)),
-            Box::new(Transform::translation(Vector3f::new(-1.2, 0.0, 2.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)))))
+            Box::new(Transform::translation(Vector3f::new(-1.2, 0.0, 2.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
+            Rc::clone(&material_ball))))
         ;
 
     let image_width = config.output_width as u32;
