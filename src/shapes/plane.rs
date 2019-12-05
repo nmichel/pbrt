@@ -30,7 +30,9 @@ impl Intersectable for Plane {
                 n: vector3::Vector3f::new(0.0, 1.0, 0.0),
                 wo: &ray.direction * -1.0,
                 u: p.x,
-                v: p.z
+                v: p.z,
+                dpdu: vector3::Vector3::new(1.0, 0.0, 0.0),
+                dpdv: vector3::Vector3::new(0.0, 0.0, 1.0)
             })
         }
     }

@@ -102,7 +102,9 @@ impl Transform {
             p: self.transform_point_to_world(&intersection.p),
             wo: self.transform_direction_to_world(&intersection.wo),
             u: intersection.u,
-            v: intersection.v
+            v: intersection.v,
+            dpdu: self.transform_direction_to_world(&intersection.dpdu),
+            dpdv: self.transform_direction_to_world(&intersection.dpdv)
         }
     }
 }

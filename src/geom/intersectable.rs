@@ -1,5 +1,6 @@
 use crate::spectrum::Spectrum;
 use super::ray::Ray;
+use super::vector3;
 use super::vector3::Vector3f;
 use std::fmt;
 
@@ -18,7 +19,11 @@ pub struct Intersection{
 
     /// U/V coordinate of intersection point on the surface
     pub u: f64,
-    pub v: f64
+    pub v: f64,
+
+    /// Position derivatives at intersection point
+    pub dpdu: Vector3f,
+    pub dpdv: Vector3f
 }
 
 pub trait Intersectable {
@@ -34,6 +39,63 @@ impl Intersection {
         // 
         // Pour l'instant, retourne "rien"
         Spectrum::new(0.0, 0.0, 0.0)
+    }
+
+    pub fn world_to_local(&self, v: &Vector3f) -> Vector3f {
+        //                  |ss.x ts.x ns.x|
+        // local_to_world = |ss.y ts.y ns.y|
+        //                  |ss.z ts.z ns.z|
+        // 
+        // wp = local_to_world * lp
+        //
+        // world_to_local = inv(local_to_world)
+        // Rotation matrix : inv(local_to_world) == transpose(local_to_world)
+        // 
+        //                  |ss.x ss.y ss.z|
+        // world_to_local = |ts.x ts.y ts.z|
+        //                  |ns.z ns.y ns.z|
+        // 
+        //
+        // lp = world_to_local * wp
+
+        let ns = self.n;
+        let mut ss = self.dpdu;
+        ss.normalize();
+        let ts = vector3::cross(&ns, &ss);
+
+        vector3::Vector3::new(
+            vector3::dot(&ss, &v),
+            vector3::dot(&ts, &v),
+            vector3::dot(&ns, &v))
+    }
+
+    pub fn local_to_world(&self, v: &Vector3f) -> Vector3f {
+        //                  |ss.x ts.x ns.x|
+        // local_to_world = |ss.y ts.y ns.y|
+        //                  |ss.z ts.z ns.z|
+        // 
+        // wp = local_to_world * lp
+        //
+        // world_to_local = inv(local_to_world)
+        // Rotation matrix : inv(local_to_world) == transpose(local_to_world)
+        // 
+        //                  |ss.x ss.y ss.z|
+        // world_to_local = |ts.x ts.y ts.z|
+        //                  |ns.z ns.y ns.z|
+        // 
+        //
+        // lp = world_to_local * wp
+
+        let ns = self.n;
+        let mut ss = self.dpdu;
+        ss.normalize();
+        let ts = vector3::cross(&ns, &ss);
+
+        vector3::Vector3::new(
+            ss.x * v.x + ts.x * v.y + ns.x * v.z,
+            ss.y * v.x + ts.y * v.y + ns.y * v.z,
+            ss.z * v.x + ts.z * v.y + ns.z * v.z
+        )
     }
 }
 

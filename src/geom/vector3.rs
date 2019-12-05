@@ -194,6 +194,12 @@ pub fn cross<T>(u: &Vector3<T>, v: &Vector3<T>) -> Vector3<T>
     Vector3 { x, y, z }
 }
 
+pub fn normalize(v: &Vector3f) -> Vector3f {
+    let mut o = *v;
+    (&mut o).normalize();
+    o
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
