@@ -51,6 +51,13 @@ impl Vector3<f64> {
         let inv_norm = 1.0 / norm.sqrt();
         (*self) *= inv_norm;
         self
+    }
+
+    pub fn saturate(&mut self) -> &mut Self {
+        self.x = num_traits::clamp(self.x, 0.0, 1.0);
+        self.y = num_traits::clamp(self.y, 0.0, 1.0);
+        self.z = num_traits::clamp(self.z, 0.0, 1.0);
+        self
     } 
 }
 
