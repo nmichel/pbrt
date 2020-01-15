@@ -9,3 +9,4 @@ pub mod primitives;
 pub mod scene;
 pub mod shapes;
 pub mod spectrum;
+pub mod textures;

@@ -46,7 +46,7 @@ impl WhittedIntegrator {
         // Add contribution of each light source
         scene.lights.iter().fold(black, |acc, light| {
             let (ref li, ref wi, ref tester) = light.li(&intersection);
-            let f = material.shade(&intersection); // isect.bsdf->f(wo, wi);
+            let f = material.shade(&intersection, wi); // isect.bsdf->f(wo, wi);
             if tester.unoccluded(&scene) {
                 acc + (&f * li) * vector3::dot(&wi, n).abs()
             }
@@ -73,7 +73,7 @@ impl WhittedIntegrator {
         let r = Ray::new(&o, &wi);
         let li = self.li(&r, &scene, depth - 1);
 
-        let f = Spectrum::new(0.2, 0.2, 0.2);
+        let f = Spectrum::new(1.0, 1.0, 1.0);
 
         f * &li * cos_theta.abs()
     }

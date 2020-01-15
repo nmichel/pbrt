@@ -2,8 +2,7 @@ use crate::geom::intersectable::{Intersectable, Intersection};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use num_traits::clamp;
-
-const PI: f64 = 3.14159265358979323846;
+use std::f64::consts::PI;
 
 pub struct Sphere {
     r: f64

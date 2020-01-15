@@ -6,5 +6,5 @@ pub struct Interaction<'a> {
     pub intersection: Intersection,
 
     /// Material at intersection
-    pub  material: &'a (Material + 'a)
+    pub  material: &'a Material
 }
