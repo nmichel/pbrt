@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul};
+use std::ops::{Add, Mul, AddAssign};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Spectrum {
@@ -7,15 +7,21 @@ pub struct Spectrum {
 
 impl Spectrum {
     pub fn new(r: f64, g: f64, b: f64) -> Self {
-        Self { spectrum: [in_bound(r), in_bound(g), in_bound(b)]}
+        Self { spectrum: [r, g, b]}
     }
 
     pub fn to_rgb(&self) -> Vec<u8> {
         let mut res = vec![0, 0, 0, 255];
-        res[0] = (self.spectrum[0] * 255.0) as u8;
-        res[1] = (self.spectrum[1] * 255.0) as u8;
-        res[2] = (self.spectrum[2] * 255.0) as u8;
+        res[0] = (in_bound(self.spectrum[0]) * 255.0) as u8;
+        res[1] = (in_bound(self.spectrum[1]) * 255.0) as u8;
+        res[2] = (in_bound(self.spectrum[2]) * 255.0) as u8;
         res
+    }
+
+    pub fn gamma_correct(&mut self) {
+        self.spectrum[0] = self.spectrum[0].sqrt();
+        self.spectrum[1] = self.spectrum[1].sqrt();
+        self.spectrum[2] = self.spectrum[2].sqrt();
     }
 }
 
@@ -24,10 +30,18 @@ impl Add for Spectrum {
 
     fn add(self, other: Self) -> Self::Output {
         Spectrum::new(
-            in_bound(self.spectrum[0] + other.spectrum[0]),
-            in_bound(self.spectrum[1] + other.spectrum[1]),
-            in_bound(self.spectrum[2] + other.spectrum[2])
+            self.spectrum[0] + other.spectrum[0],
+            self.spectrum[1] + other.spectrum[1],
+            self.spectrum[2] + other.spectrum[2]
         )
+    }
+}
+
+impl AddAssign for Spectrum {
+    fn add_assign(&mut self, other: Self) {
+        self.spectrum[0] += other.spectrum[0];
+        self.spectrum[1] += other.spectrum[1];
+        self.spectrum[2] += other.spectrum[2];
     }
 }
 
@@ -38,9 +52,9 @@ impl Mul<&Spectrum> for Spectrum {
 
     fn mul(self, other: &Self) -> Self::Output {
         Spectrum::new(
-            in_bound(self.spectrum[0] * other.spectrum[0]),
-            in_bound(self.spectrum[1] * other.spectrum[1]),
-            in_bound(self.spectrum[2] * other.spectrum[2])
+            self.spectrum[0] * other.spectrum[0],
+            self.spectrum[1] * other.spectrum[1],
+            self.spectrum[2] * other.spectrum[2]
         )
     }
 }
@@ -50,9 +64,9 @@ impl Mul<&Spectrum> for &Spectrum {
 
     fn mul(self, other: &Spectrum) -> Spectrum {
         Spectrum::new(
-            in_bound(self.spectrum[0] * other.spectrum[0]),
-            in_bound(self.spectrum[1] * other.spectrum[1]),
-            in_bound(self.spectrum[2] * other.spectrum[2])
+            self.spectrum[0] * other.spectrum[0],
+            self.spectrum[1] * other.spectrum[1],
+            self.spectrum[2] * other.spectrum[2]
         )
     }
 }
@@ -62,9 +76,9 @@ impl Mul<f64> for &Spectrum {
 
     fn mul(self, scale: f64) -> Self::Output {
         Spectrum::new(
-            in_bound(self.spectrum[0] * scale),
-            in_bound(self.spectrum[1] * scale),
-            in_bound(self.spectrum[2] * scale)
+            self.spectrum[0] * scale,
+            self.spectrum[1] * scale,
+            self.spectrum[2] * scale
         )
     }
 }
@@ -74,9 +88,9 @@ impl Mul<f64> for Spectrum {
 
     fn mul(self, scale: f64) -> Self::Output {
         Spectrum::new(
-            in_bound(self.spectrum[0] * scale),
-            in_bound(self.spectrum[1] * scale),
-            in_bound(self.spectrum[2] * scale)
+            self.spectrum[0] * scale,
+            self.spectrum[1] * scale,
+            self.spectrum[2] * scale
         )
     }
 }
