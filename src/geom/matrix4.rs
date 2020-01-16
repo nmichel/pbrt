@@ -1,6 +1,7 @@
 use std::f64;
 use std::fmt;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, Div};
+use super::vector3;
 use super::vector3::Vector3f;
 
 /// A 3D vector generic type.
@@ -107,6 +108,25 @@ impl Matrix4 {
                 [0.0,   s,         0.0,               0.0],
                 [0.0, 0.0, f / (f - n),  -f * n / (f - n)],
                 [0.0, 0.0,         1.0,               0.0]
+            ]
+        }
+    }
+
+    pub fn look_at(pos: &Vector3f, look: &Vector3f, up: &Vector3f) -> Self {
+        let mut dir = look - pos;
+        dir.normalize();
+        let mut norm_up: Vector3f = *up;
+        norm_up.normalize();
+        let mut right = vector3::cross(&norm_up, &dir);
+        right.normalize();
+        let real_up = vector3::cross(&dir, &right);
+
+        Self {
+            m: [
+                [right.x, real_up.x, dir.x, pos.x],
+                [right.y, real_up.y, dir.y, pos.y],
+                [right.z, real_up.z, dir.z, pos.z],
+                [    0.0,     0.0,    0.0,   1.0],
             ]
         }
     }

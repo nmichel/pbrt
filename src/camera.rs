@@ -11,11 +11,14 @@ pub trait Camera {
 /// A naive camera implementation
 pub struct PinHoleCamera {
     /// Transform a pixel coordinate to the corresponding point in screen space
-    raster_to_screen: Matrix4
+    raster_to_screen: Matrix4,
+
+    /// Transform from camera space to world space
+    cam_to_world: Matrix4
 }
 
 impl PinHoleCamera {
-    pub fn new(resolution: &Vector2u, fov: f64, near: f64, far: f64) -> Self {
+    pub fn new(resolution: &Vector2u, fov: f64, near: f64, far: f64, cam_to_world: Matrix4) -> Self {
         let image_width = resolution.x;
         let image_height = resolution.y;
         let image_aspect_ratio = (image_width as f64) / (image_height as f64);
@@ -43,7 +46,7 @@ impl PinHoleCamera {
             Matrix4::scale(screen_p_max_x - screen_p_min_x, screen_p_min_y - screen_p_max_y, 1.0) *
             Matrix4::scale(1.0 / (image_width as f64), 1.0 / (image_height as f64), 1.0);
 
-        Self { raster_to_screen: trans }
+        Self { raster_to_screen: trans, cam_to_world }
     }
 }
 
@@ -52,6 +55,6 @@ impl Camera for PinHoleCamera {
         let pixel3d = Vector3f::new(pixel_x, pixel_y, 0.0);
         let mut camera_vector = &self.raster_to_screen * &pixel3d;
         camera_vector.normalize();
-        Ray::new(&Vector3f::new(0.0, 0.0, 0.0), &camera_vector)
+        Ray::new(&self.cam_to_world.transform_point(&Vector3f::new(0.0, 0.0, 0.0)), &self.cam_to_world.transform_direction(&camera_vector))
     }
 }

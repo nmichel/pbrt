@@ -1,6 +1,7 @@
 use pbrt::camera::{Camera, PinHoleCamera};
 use pbrt::config::Config;
 use pbrt::geom::bounds2::Bounds2;
+use pbrt::geom::matrix4::Matrix4;
 use pbrt::geom::transform::Transform;
 use pbrt::geom::vector2::{Vector2, Vector2u};
 use pbrt::geom::vector3::Vector3f;
@@ -60,7 +61,8 @@ fn main() {
     let max_depth = config.max_depth;
 
     let resolution = Vector2u::new(image_width, image_height);
-    let camera = PinHoleCamera::new(&resolution, fov, near, far);
+    let cam_to_world = Matrix4::look_at(&Vector3f::new(1.0, 1.0, 1.0), &Vector3f::new(0.0, 0.0, 2.0), &Vector3f::new(0.0, 1.0, 0.0));
+    let camera = PinHoleCamera::new(&resolution, fov, near, far, cam_to_world);
     let integrator = WhittedIntegrator::new(max_depth);
     let mut pixels:Vec<u8> = Vec::new();
     let patch = Bounds2::new(&Vector2::new(0, 0), &resolution);
