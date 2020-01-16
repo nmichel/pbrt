@@ -5,7 +5,7 @@ use super::geom::vector3::Vector3f;
 
 pub trait Camera {
     /// Returns the `Ray` passing through pixel at coordinates `pixel`
-    fn get_ray(&self, pixel: &Vector2u) -> Ray;
+    fn get_ray(&self, pixel_x: f64, pixel_y: f64) -> Ray;
 }
 
 /// A naive camera implementation
@@ -48,8 +48,8 @@ impl PinHoleCamera {
 }
 
 impl Camera for PinHoleCamera {
-    fn get_ray(&self, pixel: &Vector2u) -> Ray {
-        let pixel3d = Vector3f::new(pixel.x as f64, pixel.y as f64, 0.0);
+    fn get_ray(&self, pixel_x: f64, pixel_y: f64) -> Ray {
+        let pixel3d = Vector3f::new(pixel_x, pixel_y, 0.0);
         let mut camera_vector = &self.raster_to_screen * &pixel3d;
         camera_vector.normalize();
         Ray::new(&Vector3f::new(0.0, 0.0, 0.0), &camera_vector)

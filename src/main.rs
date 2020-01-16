@@ -14,6 +14,7 @@ use pbrt::shapes::sphere::Sphere;
 use pbrt::shapes::plane::Plane;
 use pbrt::spectrum::Spectrum;
 use pbrt::textures::*;
+use rand::distributions::{IndependentSample, Range};    
 use std::env;
 use std::f64;
 use std::process;
@@ -63,10 +64,24 @@ fn main() {
     let integrator = WhittedIntegrator::new(max_depth);
     let mut pixels:Vec<u8> = Vec::new();
     let patch = Bounds2::new(&Vector2::new(0, 0), &resolution);
+    let between = Range::new(0., 1.);
+    let mut rng = rand::thread_rng();
     for pixel_coords in patch.to_iter() {
-        let ray = camera.get_ray(&pixel_coords);
-        let spectrum = integrator.li(&ray, &scene, 3);
-        let mut sample = spectrum.to_rgb();
+        const SAMPLES: u32 = 10;
+        let mut ns: u32 = SAMPLES;
+        let mut res = Spectrum::new(0.0, 0.0, 0.0);
+        while ns > 0 {
+            let dx = between.ind_sample(&mut rng);
+            let dy = between.ind_sample(&mut rng);
+            let pixel_x = pixel_coords.x as f64 + dx;
+            let pixel_y = pixel_coords.y as f64 + dy;
+            let ray = camera.get_ray(pixel_x, pixel_y);
+            res += integrator.li(&ray, &scene, 3);
+
+            ns -= 1;
+        }
+        // res.gamma_correct();
+        let mut sample = (res * (1.0/(SAMPLES as f64))).to_rgb();
         pixels.append(&mut sample);
     }
 
