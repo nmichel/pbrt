@@ -11,8 +11,6 @@ pub struct Primitive {
 }
 
 impl Primitive {
-    /// Build a new `Primitive` by composing an `Intersectable` and a `Transform`.
-    /// 
     pub fn new(shape: Box<Intersectable>, transform: Box<Transform>, material: Rc<Material>) -> Self {
         Self { shape, transform, material }
     }

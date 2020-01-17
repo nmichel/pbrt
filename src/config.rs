@@ -55,8 +55,8 @@ fn default_config() -> Config {
         near: 0.01,
         far: 1000.0,
         fov_deg: 90.0,
-        output_width: 1920,
-        output_height: 1280,
+        output_width: 800,
+        output_height: 600,
         max_depth: 3
     }
 }

@@ -1,20 +1,54 @@
+use rand::distributions::{IndependentSample, Range};    
 use std::rc::Rc;
 use crate::geom::intersectable::Intersection;
+use crate::geom::ray::Ray;
 use crate::geom::vector3::{dot, Vector3f};
+use crate::interaction::Interaction;
 use crate::spectrum::Spectrum;
 use crate::textures::Texture;
 use std::f64::consts::PI;
 
-pub struct Material {
-    pub texture: Rc<Texture>
+pub trait Material {
+    fn scatter(&self, ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)>;
 }
 
-impl Material {
-    pub fn new(texture: Rc<Texture>) -> Self {
-        Self { texture }
+pub struct Lambertian {
+    albedo: Spectrum
+}
+
+impl Lambertian {
+    pub fn new(a: &Spectrum) -> Self {
+        Self { albedo: *a}
     }
 }
 
+impl Material for Lambertian {
+    fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)> {
+        let Interaction { ref intersection, .. } = interaction;
+        let Intersection { ref p, ref n, .. } = intersection;
+        let target = p + n + random_in_unit_sphere();
+        let scattered = Ray::new(p, &(target - *p));
+        let attenuation = self.albedo;
+        return Some((attenuation, scattered));
+    }
+}
+
+fn random_double() -> f64 {
+    let between = Range::new(0., 1.);
+    let mut rng = rand::thread_rng();
+    between.ind_sample(&mut rng)
+}
+
+fn random_in_unit_sphere() -> Vector3f {
+    let one = Vector3f::new(1.0, 1.0, 1.0);
+    loop {
+        let p = Vector3f::new(random_double(),random_double(),random_double()) * 2.0 - one;
+        if p.squared_length() < 1.0 {
+            return p;
+        }
+    } 
+}
+/*
 impl Material {
     pub fn shade(&self, intersection: &Intersection, world_wi: &Vector3f) -> Spectrum {
         let diffuse = self.texture.shade(intersection);
@@ -146,3 +180,4 @@ impl Material {
         r
     }
 }
+*/

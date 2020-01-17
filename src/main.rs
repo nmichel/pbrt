@@ -6,7 +6,8 @@ use pbrt::geom::transform::Transform;
 use pbrt::geom::vector2::{Vector2, Vector2u};
 use pbrt::geom::vector3::Vector3f;
 use pbrt::integrators::integrator::Integrator;
-use pbrt::integrators::whitted::WhittedIntegrator;
+use pbrt::integrators::path::PathIntegrator;
+use pbrt::materials::material::Lambertian;
 use pbrt::materials::material::Material;
 use pbrt::light::PointLight;
 use pbrt::primitives::Primitive;
@@ -28,21 +29,12 @@ fn main() {
         process::exit(1);        
     });
 
-    let text_plain_green: Rc<Texture> = Rc::new(PlainColor::new(Spectrum::new(1.022,0.782,0.344)));
-    let text_check_red: Rc<Texture> = Rc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 4.0));
-    let text_check_green: Rc<Texture> = Rc::new(CheckerBoard::new(Spectrum::new(0.0, 1.0, 0.0), Spectrum::new(0.1, 0.5, 0.0), 0.5));
-    let shiny_ball: Rc<Material> = Rc::new(Material::new(Rc::clone(&text_check_red)));
-    let shiny_ball_gold: Rc<Material> = Rc::new(Material::new(Rc::clone(&text_plain_green)));
-    let material_wall: Rc<Material> = Rc::new(Material::new(Rc::clone(&text_check_green)));
+    // let material_wall: Rc<Material> = Rc::new(Lambertian::new(Rc::clone(&text_check_green)));
+    let material_wall: Rc<Material> = Rc::new(Lambertian::new(&Spectrum::new(1.0, 1.0, 1.0)));
+    let material_ball: Rc<Material> = Rc::new(Lambertian::new(&Spectrum::new(1.0, 0.0, 0.0)));
 
     let mut scene = Scene::new();
     scene
-        .add_light(Box::new(PointLight::new(
-            Box::new(Transform::translation(Vector3f::new(-2.0, 2.0, 0.0))),
-            Spectrum::new(1.0, 1.0, 1.0))))
-        // .add_light(Box::new(PointLight::new(
-        //     Box::new(Transform::translation(Vector3f::new(-2.0, 0.0, 1.0))),
-        //     Spectrum::new(0.5, 0.5, 0.5))))
         .add_object(Box::new(Primitive::new(
             Box::new(Plane::new()),
             Box::new(Transform::translation(Vector3f::new(0.0, -1.0, 0.0))),
@@ -50,7 +42,7 @@ fn main() {
         .add_object(Box::new(Primitive::new(
             Box::new(Sphere::new(0.6)),
             Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 2.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
-            Rc::clone(&shiny_ball_gold))))
+            Rc::clone(&material_ball))))
         ;
 
     let image_width = config.output_width as u32;
@@ -63,13 +55,13 @@ fn main() {
     let resolution = Vector2u::new(image_width, image_height);
     let cam_to_world = Matrix4::look_at(&Vector3f::new(1.0, 1.0, 1.0), &Vector3f::new(0.0, 0.0, 2.0), &Vector3f::new(0.0, 1.0, 0.0));
     let camera = PinHoleCamera::new(&resolution, fov, near, far, cam_to_world);
-    let integrator = WhittedIntegrator::new(max_depth);
+    let integrator = PathIntegrator::new(max_depth);
     let mut pixels:Vec<u8> = Vec::new();
     let patch = Bounds2::new(&Vector2::new(0, 0), &resolution);
     let between = Range::new(0., 1.);
     let mut rng = rand::thread_rng();
     for pixel_coords in patch.to_iter() {
-        const SAMPLES: u32 = 10;
+        const SAMPLES: u32 = 2;
         let mut ns: u32 = SAMPLES;
         let mut res = Spectrum::new(0.0, 0.0, 0.0);
         while ns > 0 {
@@ -82,8 +74,9 @@ fn main() {
 
             ns -= 1;
         }
-        // res.gamma_correct();
-        let mut sample = (res * (1.0/(SAMPLES as f64))).to_rgb();
+        res = res * (1.0/(SAMPLES as f64));
+        res.gamma_correct();
+        let mut sample = res.to_rgb();
         pixels.append(&mut sample);
     }
 
