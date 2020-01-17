@@ -18,7 +18,7 @@ pub struct Lambertian {
 
 impl Lambertian {
     pub fn new(a: &Spectrum) -> Self {
-        Self { albedo: *a}
+        Self { albedo: *a }
     }
 }
 
@@ -26,10 +26,44 @@ impl Material for Lambertian {
     fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)> {
         let Interaction { ref intersection, .. } = interaction;
         let Intersection { ref p, ref n, .. } = intersection;
-        let target = p + n + random_in_unit_sphere();
-        let scattered = Ray::new(p, &(target - *p));
+        let scatter_dir = n + &random_in_unit_sphere();
+        let scattered_ray = Ray::new(p, &scatter_dir);
         let attenuation = self.albedo;
-        return Some((attenuation, scattered));
+        return Some((attenuation, scattered_ray));
+    }
+}
+
+pub struct Metal {
+    albedo: Spectrum,
+    fuzz: f64
+}
+
+impl Metal {
+    pub fn new(a: &Spectrum, fuzz: f64) -> Self {
+        Self { albedo: *a, fuzz }
+    }
+}
+
+impl Material for Metal {
+    fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)> {
+        let Interaction { ref intersection, .. } = interaction;
+        let Intersection { ref p, ref n, ref wo, .. } = intersection;
+
+        let mut local_wo = intersection.world_to_local(&wo);
+        local_wo.normalize();
+        let local_reflected = Vector3f::new(-local_wo.x, -local_wo.y, local_wo.z);
+        let mut local_target = local_reflected + random_in_unit_sphere() * self.fuzz;
+        local_target.normalize();
+
+        if local_target.z > 0.0 { // <=> dot(local_target, n)
+            let target = intersection.local_to_world(&local_target);
+            let scattered_ray = Ray::new(p, &target);
+            let attenuation = self.albedo;
+            Some((attenuation, scattered_ray))
+        }
+        else {
+            None
+        }
     }
 }
 

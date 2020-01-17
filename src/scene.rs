@@ -30,7 +30,7 @@ impl Scene {
         // self.lights.iter().fold(Spectrum::new(0.0, 0.0, 0.0), |res, light| {
         //     res + light.le(&ray)
         // })
-        Spectrum::new(0.5, 0.5, 0.0)
+        Spectrum::new(0.7, 0.7, 0.7)
     }    
 }
 

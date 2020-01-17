@@ -7,8 +7,7 @@ use pbrt::geom::vector2::{Vector2, Vector2u};
 use pbrt::geom::vector3::Vector3f;
 use pbrt::integrators::integrator::Integrator;
 use pbrt::integrators::path::PathIntegrator;
-use pbrt::materials::material::Lambertian;
-use pbrt::materials::material::Material;
+use pbrt::materials::material::{Lambertian, Material, Metal};
 use pbrt::light::PointLight;
 use pbrt::primitives::Primitive;
 use pbrt::scene::Scene;
@@ -30,19 +29,29 @@ fn main() {
     });
 
     // let material_wall: Rc<Material> = Rc::new(Lambertian::new(Rc::clone(&text_check_green)));
-    let material_wall: Rc<Material> = Rc::new(Lambertian::new(&Spectrum::new(1.0, 1.0, 1.0)));
-    let material_ball: Rc<Material> = Rc::new(Lambertian::new(&Spectrum::new(1.0, 0.0, 0.0)));
+    let material_wall: Rc<Material> = Rc::new(Lambertian::new(&Spectrum::new(0.8, 1.0, 0.3)));
+    let material_lambertian: Rc<Material> = Rc::new(Lambertian::new(&Spectrum::new(0.8, 0.3, 0.3)));
+    let material_metal_1: Rc<Material> = Rc::new(Metal::new(&Spectrum::new(0.8, 0.6, 0.2), 1.0));
+    let material_metal_2: Rc<Material> = Rc::new(Metal::new(&Spectrum::new(0.8, 0.8, 0.8), 0.3));
 
     let mut scene = Scene::new();
     scene
         .add_object(Box::new(Primitive::new(
             Box::new(Plane::new()),
-            Box::new(Transform::translation(Vector3f::new(0.0, -1.0, 0.0))),
+            Box::new(Transform::translation(Vector3f::new(0.0, -0.5, 0.0))),
             Rc::clone(&material_wall))))
         .add_object(Box::new(Primitive::new(
-            Box::new(Sphere::new(0.6)),
-            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 2.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
-            Rc::clone(&material_ball))))
+            Box::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(-1.0, 0.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
+            Rc::clone(&material_metal_2))))
+        .add_object(Box::new(Primitive::new(
+            Box::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
+            Rc::clone(&material_lambertian))))
+        .add_object(Box::new(Primitive::new(
+            Box::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(1.0, 0.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
+            Rc::clone(&material_metal_1))))
         ;
 
     let image_width = config.output_width as u32;
@@ -53,7 +62,7 @@ fn main() {
     let max_depth = config.max_depth;
 
     let resolution = Vector2u::new(image_width, image_height);
-    let cam_to_world = Matrix4::look_at(&Vector3f::new(1.0, 1.0, 1.0), &Vector3f::new(0.0, 0.0, 2.0), &Vector3f::new(0.0, 1.0, 0.0));
+    let cam_to_world = Matrix4::look_at(&Vector3f::new(0.0, 0.0, 1.0), &Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(0.0, 1.0, 0.0));
     let camera = PinHoleCamera::new(&resolution, fov, near, far, cam_to_world);
     let integrator = PathIntegrator::new(max_depth);
     let mut pixels:Vec<u8> = Vec::new();
@@ -61,7 +70,7 @@ fn main() {
     let between = Range::new(0., 1.);
     let mut rng = rand::thread_rng();
     for pixel_coords in patch.to_iter() {
-        const SAMPLES: u32 = 2;
+        const SAMPLES: u32 = 100;
         let mut ns: u32 = SAMPLES;
         let mut res = Spectrum::new(0.0, 0.0, 0.0);
         while ns > 0 {
