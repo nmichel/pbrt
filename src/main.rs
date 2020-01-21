@@ -69,9 +69,10 @@ fn main() {
     let patch = Bounds2::new(&Vector2::new(0, 0), &resolution);
     let between = Range::new(0., 1.);
     let mut rng = rand::thread_rng();
+    let pixel_count = image_width * image_height * config.samples_ppx as u32;
+    let mut pixel_done = 0;
     for pixel_coords in patch.to_iter() {
-        const SAMPLES: u32 = 100;
-        let mut ns: u32 = SAMPLES;
+        let mut ns = config.samples_ppx;
         let mut res = Spectrum::new(0.0, 0.0, 0.0);
         while ns > 0 {
             let dx = between.ind_sample(&mut rng);
@@ -79,11 +80,13 @@ fn main() {
             let pixel_x = pixel_coords.x as f64 + dx;
             let pixel_y = pixel_coords.y as f64 + dy;
             let ray = camera.get_ray(pixel_x, pixel_y);
-            res += integrator.li(&ray, &scene, 3);
+            res += integrator.li(&ray, &scene, config.max_depth);
+            pixel_done = pixel_done + 1;
+            print!("done [{:?}]\r", (pixel_done as f64 / pixel_count as f64 * 100.0) as u32);
 
             ns -= 1;
         }
-        res = res * (1.0/(SAMPLES as f64));
+        res = res * (1.0/(config.samples_ppx as f64));
         res.gamma_correct();
         let mut sample = res.to_rgb();
         pixels.append(&mut sample);

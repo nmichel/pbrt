@@ -12,6 +12,7 @@ pub struct Config {
     pub output_width: usize,
     pub output_height: usize,
     pub max_depth: usize,
+    pub samples_ppx: usize,
 }
 
 type OptionParserFn = fn(&mut Config, &String);
@@ -48,6 +49,10 @@ fn parse_max_depth(config: &mut Config, value: &String) {
     config.max_depth = usize::from_str(value).unwrap();
 }
 
+fn parse_samples_ppx(config: &mut Config, value: &String) {
+    config.samples_ppx = usize::from_str(value).unwrap();
+}
+
 fn default_config() -> Config {
     Config {
         input_filename: "input".to_string(),
@@ -57,7 +62,8 @@ fn default_config() -> Config {
         fov_deg: 90.0,
         output_width: 800,
         output_height: 600,
-        max_depth: 3
+        max_depth: 3,
+        samples_ppx: 5
     }
 }
 
@@ -73,7 +79,8 @@ impl Config {
             ("--fov", parse_fov as OptionParserFn),
             ("--output_width", parse_output_width as OptionParserFn),
             ("--output_height", parse_output_height as OptionParserFn),
-            ("--max_depth", parse_max_depth as OptionParserFn)
+            ("--max_depth", parse_max_depth as OptionParserFn),
+            ("--samples_ppx", parse_samples_ppx as OptionParserFn)
         ].iter().cloned().collect();
 
         let pairs_iter: ChunksExact<_> = args[1..].chunks_exact(2);
