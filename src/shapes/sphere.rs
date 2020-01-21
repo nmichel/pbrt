@@ -112,7 +112,9 @@ impl Intersectable for Sphere {
         let thc = (r2 - d2).sqrt();
         let t0: f64 = tca - thc;
         let t1: f64 = tca + thc;
-        let t = f64::min(t0, t1);
+        let tmin = f64::min(t0, t1);
+        let tmax = f64::max(t0, t1);
+        let t = if tmin < 0.0 { tmax } else { tmin };
 
         let mut hit = &ray.origin + &(&ray.direction * t);
         let mut norm = hit;
