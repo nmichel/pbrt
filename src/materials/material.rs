@@ -6,18 +6,19 @@ use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::spectrum::Spectrum;
+use crate::textures::*;
 
 pub trait Material {
     fn scatter(&self, ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)>;
 }
 
 pub struct Lambertian {
-    albedo: Spectrum
+    albedo: Rc<Texture>
 }
 
 impl Lambertian {
-    pub fn new(a: &Spectrum) -> Self {
-        Self { albedo: *a }
+    pub fn new(albedo: Rc<Texture>) -> Self {
+        Self { albedo }
     }
 }
 
@@ -27,7 +28,7 @@ impl Material for Lambertian {
         let Intersection { ref p, ref n, .. } = intersection;
         let scatter_dir = n + &random_in_unit_sphere();
         let scattered_ray = Ray::new(p, &scatter_dir);
-        let attenuation = self.albedo;
+        let attenuation = self.albedo.shade(intersection);
         return Some((attenuation, scattered_ray));
     }
 }

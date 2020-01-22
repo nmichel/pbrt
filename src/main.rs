@@ -28,9 +28,10 @@ fn main() {
         process::exit(1);        
     });
 
+    let text_check_red: Rc<Texture> = Rc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 1000.0));
     // let material_wall: Rc<Material> = Rc::new(Lambertian::new(Rc::clone(&text_check_green)));
-    let material_wall: Rc<Material> = Rc::new(Lambertian::new(&Spectrum::new(0.5, 0.5, 0.5)));
-    let material_lambertian: Rc<Material> = Rc::new(Lambertian::new(&Spectrum::new(0.4, 0.2, 0.1)));
+    let material_wall: Rc<Material> = Rc::new(Lambertian::new(Rc::clone(&text_check_red)));
+    let material_lambertian: Rc<Material> = Rc::new(Lambertian::new(Rc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1)))));
     let material_dielectric: Rc<Material> = Rc::new(Dielectric::new(1.5));
     let material_metal_2: Rc<Material> = Rc::new(Metal::new(&Spectrum::new(0.7, 0.6, 0.5), 0.0));
 
