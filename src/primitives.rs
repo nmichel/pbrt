@@ -3,16 +3,17 @@ use super::geom::intersectable::{Intersectable, Intersection};
 use super::geom::ray::Ray;
 use super::geom::transform::Transform;
 use super::materials::material::Material;
+use std::sync::Arc;
 
 pub struct Primitive {
     pub shape: Box<Intersectable>,
     pub transform: Box<Transform>,
-    pub material: Rc<Material>
+    pub material: Arc<Material>
 }
 
 impl Primitive {
-    pub fn new(shape: Box<Intersectable>, transform: Box<Transform>, material: Rc<Material>) -> Self {
-        Self { shape, transform, material }
+    pub fn new(shape: Box<Intersectable>, transform: Box<Transform>, material: Arc<Material>) -> Self {
+        Self { shape, transform, material: Arc::clone(&material) }
     }
 }
 

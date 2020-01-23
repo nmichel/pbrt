@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::slice::ChunksExact;
 use std::str::FromStr;
 
@@ -13,6 +14,7 @@ pub struct Config {
     pub output_height: usize,
     pub max_depth: usize,
     pub samples_ppx: usize,
+    pub threads: usize
 }
 
 type OptionParserFn = fn(&mut Config, &String);
@@ -53,6 +55,10 @@ fn parse_samples_ppx(config: &mut Config, value: &String) {
     config.samples_ppx = usize::from_str(value).unwrap();
 }
 
+fn parse_threads(config: &mut Config, value: &String) {
+    config.threads = usize::from_str(value).unwrap();
+}
+
 fn default_config() -> Config {
     Config {
         input_filename: "input".to_string(),
@@ -63,7 +69,8 @@ fn default_config() -> Config {
         output_width: 800,
         output_height: 600,
         max_depth: 3,
-        samples_ppx: 5
+        samples_ppx: 5,
+        threads: 1
     }
 }
 
@@ -80,7 +87,8 @@ impl Config {
             ("--output_width", parse_output_width as OptionParserFn),
             ("--output_height", parse_output_height as OptionParserFn),
             ("--max_depth", parse_max_depth as OptionParserFn),
-            ("--samples_ppx", parse_samples_ppx as OptionParserFn)
+            ("--samples_ppx", parse_samples_ppx as OptionParserFn),
+            ("--threads", parse_threads as OptionParserFn)
         ].iter().cloned().collect();
 
         let pairs_iter: ChunksExact<_> = args[1..].chunks_exact(2);
@@ -103,3 +111,19 @@ impl Config {
     }
 }
 
+impl fmt::Display for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f,
+        "input_filename : {:?}\n
+        output_filename : {:?}\n
+        near : {:?}\n
+        far : {:?}\n
+        fov_deg : {:?}\n
+        output_width : {:?}\n
+        output_height : {:?}\n
+        max_depth : {:?}\n
+        samples_ppx : {:?}\n
+        threads : {:?}\n",
+        self.input_filename, self.output_filename, self.near, self.far, self.fov_deg, self.output_width, self.output_height, self.max_depth, self.samples_ppx, self.threads)
+    }
+}

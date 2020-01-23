@@ -4,7 +4,7 @@ use super::vector3;
 use super::vector3::Vector3f;
 use std::fmt;
 
-pub struct Intersection{
+pub struct Intersection {
     /// Intersection point
     pub p: Vector3f,
 
@@ -26,7 +26,7 @@ pub struct Intersection{
     pub dpdv: Vector3f
 }
 
-pub trait Intersectable {
+pub trait Intersectable : Send + Sync {
     fn intersect(&self, ray: &Ray) -> Option<Intersection>;
 }
 

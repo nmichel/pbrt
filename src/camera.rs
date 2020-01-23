@@ -3,7 +3,7 @@ use super::geom::matrix4::Matrix4;
 use super::geom::vector2::Vector2u;
 use super::geom::vector3::Vector3f;
 
-pub trait Camera {
+pub trait Camera : Send + Sync {
     /// Returns the `Ray` passing through pixel at coordinates `pixel`
     fn get_ray(&self, pixel_x: f64, pixel_y: f64) -> Ray;
 }

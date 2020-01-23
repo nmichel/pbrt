@@ -18,8 +18,19 @@ use pbrt::textures::*;
 use rand::distributions::{IndependentSample, Range};    
 use std::env;
 use std::f64;
+use std::mem;
 use std::process;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::mpsc;
+use std::thread;
+
+enum Request {
+    Compute { coords: Vector2u },
+    Quit
+}
+
+struct Response { coords: Vector2u, spectrum: Spectrum }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -28,12 +39,12 @@ fn main() {
         process::exit(1);        
     });
 
-    let text_check_red: Rc<Texture> = Rc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 1000.0));
-    // let material_wall: Rc<Material> = Rc::new(Lambertian::new(Rc::clone(&text_check_green)));
-    let material_wall: Rc<Material> = Rc::new(Lambertian::new(Rc::clone(&text_check_red)));
-    let material_lambertian: Rc<Material> = Rc::new(Lambertian::new(Rc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1)))));
-    let material_dielectric: Rc<Material> = Rc::new(Dielectric::new(1.5));
-    let material_metal_2: Rc<Material> = Rc::new(Metal::new(&Spectrum::new(0.7, 0.6, 0.5), 0.0));
+    let text_check_red: Arc<Texture> = Arc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 1000.0));
+    // let material_wall: Arc<Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_green)));
+    let material_wall: Arc<Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_red)));
+    let material_lambertian: Arc<Material> = Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1)))));
+    let material_dielectric: Arc<Material> = Arc::new(Dielectric::new(1.5));
+    let material_metal_2: Arc<Material> = Arc::new(Metal::new(&Spectrum::new(0.7, 0.6, 0.5), 0.0));
 
     let mut scene = Scene::new();
     scene
@@ -41,22 +52,22 @@ fn main() {
         //     Box::new(Plane::new()),
         //     Box::new(Transform::translation(Vector3f::new(0.0, -1.5, 0.0))),
         //     Rc::clone(&material_wall))))
-        .add_object(Box::new(Primitive::new(
+        .add_object(Arc::new(Primitive::new(
             Box::new(Sphere::new(1000.0)),
             Box::new(Transform::translation(Vector3f::new(0.0, -1000.0, 0.0))),
-            Rc::clone(&material_wall))))
-        .add_object(Box::new(Primitive::new(
+            Arc::clone(&material_wall))))
+        .add_object(Arc::new(Primitive::new(
             Box::new(Sphere::new(1.0)),
             Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
-            Rc::clone(&material_dielectric))))
-        .add_object(Box::new(Primitive::new(
+            Arc::clone(&material_dielectric))))
+        .add_object(Arc::new(Primitive::new(
             Box::new(Sphere::new(1.0)),
             Box::new(Transform::translation(Vector3f::new(-4.0, 1.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
-            Rc::clone(&material_lambertian))))
-        .add_object(Box::new(Primitive::new(
+            Arc::clone(&material_lambertian))))
+        .add_object(Arc::new(Primitive::new(
             Box::new(Sphere::new(1.0)),
             Box::new(Transform::translation(Vector3f::new(4.0, 1.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
-            Rc::clone(&material_metal_2))))
+            Arc::clone(&material_metal_2))))
         ;
 
     let image_width = config.output_width as u32;
@@ -70,34 +81,117 @@ fn main() {
     let cam_to_world = Matrix4::look_at(&Vector3f::new(13.0, 2.0, 3.0), &Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(0.0, 1.0, 0.0));
     let camera = PinHoleCamera::new(&resolution, fov, near, far, cam_to_world);
     let integrator = PathIntegrator::new(max_depth);
-    let mut pixels:Vec<u8> = Vec::new();
+
+    let mut pixels:Vec<u8> = Vec::with_capacity((image_width * image_height * 4) as usize);
+    for _ in 0..(image_width * image_height * 4) {
+        pixels.push(0);
+    }
+
     let patch = Bounds2::new(&Vector2::new(0, 0), &resolution);
     let between = Range::new(0., 1.);
     let mut rng = rand::thread_rng();
-    let pixel_count = image_width * image_height * config.samples_ppx as u32;
-    let mut pixel_done = 0;
-    for pixel_coords in patch.to_iter() {
-        let mut ns = config.samples_ppx;
-        let mut res = Spectrum::new(0.0, 0.0, 0.0);
-        while ns > 0 {
-            let dx = between.ind_sample(&mut rng);
-            let dy = between.ind_sample(&mut rng);
-            let pixel_x = pixel_coords.x as f64 + dx;
-            let pixel_y = pixel_coords.y as f64 + dy;
-            let ray = camera.get_ray(pixel_x, pixel_y);
-            res += integrator.li(&ray, &scene, config.max_depth);
-            pixel_done = pixel_done + 1;
-            print!("done [{:?}]\r", (pixel_done as f64 / pixel_count as f64 * 100.0) as u32);
+    let pixel_count = image_width * image_height as u32;
 
-            ns -= 1;
-        }
-        res = res * (1.0/(config.samples_ppx as f64));
-        res.gamma_correct();
-        let mut sample = res.to_rgb();
-        pixels.append(&mut sample);
+    let config_ptr_transmuted = unsafe { mem::transmute::<&Config, &'static Config>(&config) };
+    let integrator_ptr_transmuted = unsafe { mem::transmute::<&dyn Integrator, &'static dyn Integrator>(&integrator) };
+    let scene_ptr_transmuted = unsafe { mem::transmute::<&Scene, &'static Scene>(&scene) };
+    let camera_ptr_transmuted = unsafe { mem::transmute::<&dyn Camera, &'static dyn Camera>(&camera) };
+
+    let (upstream_tx, upstream_rx):(mpsc::Sender<Response>, mpsc::Receiver<Response>) = mpsc::channel();
+    let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
+    let mut senders: Vec<mpsc::Sender<Request>> = Vec::new();
+
+    for i in 0..(config.threads) {
+        let (tx, rx):(mpsc::Sender<Request>, mpsc::Receiver<Request>) = mpsc::channel();
+        let upstream_tx = upstream_tx.clone();
+
+        let config_ptr_transmuted = config_ptr_transmuted;
+        let scene_ptr_transmuted = scene_ptr_transmuted;
+        let integrator_ptr_transmuted = integrator_ptr_transmuted;
+        let camera_ptr_transmuted = camera_ptr_transmuted;
+
+        let handle = thread::spawn(move || {
+            println!("Start thread {:?}", i);
+
+            let rx = rx;
+            let mut run = true;
+            while run {
+                match rx.recv().unwrap() {
+                    Request::Quit => {
+                        println!("[{:?}] QUIT !", i);
+                        run = false;
+                    }
+
+                    Request::Compute { coords } => {
+                        // println!("[{:?}] Compute !", i);
+                        let spectrum = compute_pixel(&config_ptr_transmuted, integrator_ptr_transmuted, coords, camera_ptr_transmuted, scene_ptr_transmuted);
+                        let response = Response { coords, spectrum };
+                        upstream_tx.send(response).unwrap();
+                    }
+                }
+
+            }
+            println!("End thread {:?}", i);
+        });
+        handles.push(handle);
+        senders.push(tx);
     }
 
+    let mut pixel_iter = patch.to_iter();
+    let mut pixel_computed = 0;
+    let mut tid = 0;
+    while pixel_computed < image_width * image_height {
+        match pixel_iter.next() {
+            None => {}
+            Some(coords) => {
+                senders[tid].send(Request::Compute{coords}).unwrap();
+                tid = (tid + 1) % config.threads;
+            }
+        }
+
+        match upstream_rx.try_recv() {
+            Ok(Response{ coords, spectrum }) => {
+                let mut res = spectrum;
+                res.gamma_correct();
+                let sample = res.to_rgb();
+                let pixel_index = ((coords.y * image_width + coords.x) * 4) as usize;
+                pixels[pixel_index] = sample[0];
+                pixels[pixel_index+1] = sample[1];
+                pixels[pixel_index+2] = sample[2];
+                pixels[pixel_index+3] = sample[3];
+                pixel_computed = pixel_computed + 1;
+
+                print!("done [{:?}]\r", (pixel_computed as f64 / pixel_count as f64 * 100.0) as u32);
+            }
+            Err(_) => {}
+        }
+    }
+
+    for i in 0..(config.threads) {
+        println!("Sending QUIT order to [{:?}]", i);
+        senders[i].send(Request::Quit).unwrap();
+    }
+
+    handles.drain(..).for_each(|handle| { handle.join().unwrap(); () });
+
     image_write(&config.output_filename, &resolution, &pixels);
+}
+
+fn compute_pixel(config: &Config, integrator: &Integrator, pixel_coords: Vector2<u32>, camera: &Camera, scene: &Scene) -> Spectrum {
+    let between = Range::new(0., 1.);
+    let mut rng = rand::thread_rng();
+    let mut ns = config.samples_ppx;
+    let mut res = Spectrum::new(0.0, 0.0, 0.0);
+    while ns > 0 {
+        let dx = between.ind_sample(&mut rng);
+        let dy = between.ind_sample(&mut rng);
+        let pixel_x = pixel_coords.x as f64 + dx;
+        let pixel_y = pixel_coords.y as f64 + dy;
+        let ray = camera.get_ray(pixel_x, pixel_y);
+        res += integrator.li(&ray, &scene, config.max_depth);
+        ns -= 1;
+    }
+    res * (1.0/(config.samples_ppx as f64))
 }
 
 fn image_write(filename: &str, resolution: &Vector2u, data: &Vec<u8>) {

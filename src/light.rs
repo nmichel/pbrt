@@ -27,7 +27,7 @@ impl VisibilityTester {
     }
 }
 
-pub trait Light {
+pub trait Light : Send + Sync {
     fn le(&self, _ray: &Ray) -> Spectrum {
         Spectrum::new(0.0, 0.0, 0.0)
     }

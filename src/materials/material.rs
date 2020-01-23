@@ -1,5 +1,3 @@
-use rand::distributions::{IndependentSample, Range};    
-use std::rc::Rc;
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
@@ -7,17 +5,19 @@ use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::spectrum::Spectrum;
 use crate::textures::*;
+use rand::distributions::{IndependentSample, Range};    
+use std::sync::Arc;
 
-pub trait Material {
+pub trait Material : Send + Sync {
     fn scatter(&self, ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)>;
 }
 
 pub struct Lambertian {
-    albedo: Rc<Texture>
+    albedo: Arc<Texture>
 }
 
 impl Lambertian {
-    pub fn new(albedo: Rc<Texture>) -> Self {
+    pub fn new(albedo: Arc<Texture>) -> Self {
         Self { albedo }
     }
 }
