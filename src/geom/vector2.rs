@@ -10,6 +10,7 @@ pub struct Vector2<T> {
 }
 
 pub type Vector2u = Vector2<u32>;
+pub type Vector2f = Vector2<f64>;
 
 impl<T> Vector2<T> {
     /// Constructs a new `Vector2` initialized from parameters.
@@ -66,6 +67,12 @@ impl<T> Vector2<T>
         self.x += v.x;
         self.y += v.y;
         self
+    }
+}
+
+impl From<Vector2u> for Vector2f {
+    fn from(v : Vector2u) -> Vector2f {
+        Vector2f { x: v.x as f64, y: v.y as f64 }
     }
 }
 

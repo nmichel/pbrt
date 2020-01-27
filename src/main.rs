@@ -3,7 +3,7 @@ use pbrt::config::Config;
 use pbrt::geom::bounds2::Bounds2;
 use pbrt::geom::matrix4::Matrix4;
 use pbrt::geom::transform::Transform;
-use pbrt::geom::vector2::{Vector2, Vector2u};
+use pbrt::geom::vector2::{Vector2, Vector2u, Vector2f};
 use pbrt::geom::vector3::Vector3f;
 use pbrt::integrators::integrator::Integrator;
 use pbrt::integrators::path::PathIntegrator;
@@ -15,7 +15,7 @@ use pbrt::shapes::sphere::Sphere;
 use pbrt::shapes::plane::Plane;
 use pbrt::spectrum::Spectrum;
 use pbrt::textures::*;
-use rand::distributions::{IndependentSample, Range};    
+use rand::distributions::{IndependentSample, Range};
 use std::env;
 use std::f64;
 use std::mem;
@@ -38,6 +38,8 @@ fn main() {
         eprintln!("Problem parsing arguments: {}", err);
         process::exit(1);        
     });
+
+    println!("Redering with configuration settings: {:?}", &config);
 
     let text_check_red: Arc<Texture> = Arc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 1000.0));
     // let material_wall: Arc<Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_green)));
@@ -88,8 +90,6 @@ fn main() {
     }
 
     let patch = Bounds2::new(&Vector2::new(0, 0), &resolution);
-    let between = Range::new(0., 1.);
-    let mut rng = rand::thread_rng();
     let pixel_count = image_width * image_height as u32;
 
     let config_ptr_transmuted = unsafe { mem::transmute::<&Config, &'static Config>(&config) };
@@ -115,6 +115,8 @@ fn main() {
 
             let rx = rx;
             let mut run = true;
+            let mut sample = Sampler2::new();
+        
             while run {
                 match rx.recv().unwrap() {
                     Request::Quit => {
@@ -124,7 +126,7 @@ fn main() {
 
                     Request::Compute { coords } => {
                         // println!("[{:?}] Compute !", i);
-                        let spectrum = compute_pixel(&config_ptr_transmuted, integrator_ptr_transmuted, coords, camera_ptr_transmuted, scene_ptr_transmuted);
+                        let spectrum = compute_pixel(&config_ptr_transmuted, integrator_ptr_transmuted, coords, camera_ptr_transmuted, scene_ptr_transmuted, &mut sample);
                         let response = Response { coords, spectrum };
                         upstream_tx.send(response).unwrap();
                     }
@@ -177,21 +179,34 @@ fn main() {
     image_write(&config.output_filename, &resolution, &pixels);
 }
 
-fn compute_pixel(config: &Config, integrator: &Integrator, pixel_coords: Vector2<u32>, camera: &Camera, scene: &Scene) -> Spectrum {
-    let between = Range::new(0., 1.);
-    let mut rng = rand::thread_rng();
+fn compute_pixel(config: &Config, integrator: &Integrator, pixel_coords: Vector2<u32>, camera: &Camera, scene: &Scene, sampler: &mut Sampler2) -> Spectrum {
     let mut ns = config.samples_ppx;
     let mut res = Spectrum::new(0.0, 0.0, 0.0);
+    let pixel_coords = Vector2f::from(pixel_coords);
     while ns > 0 {
-        let dx = between.ind_sample(&mut rng);
-        let dy = between.ind_sample(&mut rng);
-        let pixel_x = pixel_coords.x as f64 + dx;
-        let pixel_y = pixel_coords.y as f64 + dy;
-        let ray = camera.get_ray(pixel_x, pixel_y);
+        let pixel_coords = pixel_coords + sampler.sample();
+        let ray = camera.get_ray(pixel_coords.x, pixel_coords.y);
         res += integrator.li(&ray, &scene, config.max_depth);
         ns -= 1;
     }
     res * (1.0/(config.samples_ppx as f64))
+}
+
+pub struct Sampler2 {
+    rng: rand::ThreadRng,
+    range: rand::distributions::Range<f64>
+}
+
+impl Sampler2 {
+    pub fn new() -> Self {
+        Sampler2 { range: Range::new(0., 1.), rng: rand::thread_rng()}
+    }
+
+    pub fn sample(&mut self) -> Vector2f {
+        let x = self.range.ind_sample(&mut self.rng);
+        let y = self.range.ind_sample(&mut self.rng);
+        Vector2f { x, y }
+    }
 }
 
 fn image_write(filename: &str, resolution: &Vector2u, data: &Vec<u8>) {
