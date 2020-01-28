@@ -34,13 +34,13 @@ impl Material for Lambertian {
 }
 
 pub struct Metal {
-    albedo: Spectrum,
-    fuzz: f64
+    fuzz: f64,
+    albedo: Arc<Texture>
 }
 
 impl Metal {
-    pub fn new(a: &Spectrum, fuzz: f64) -> Self {
-        Self { albedo: *a, fuzz }
+    pub fn new(fuzz: f64, albedo: Arc<Texture>) -> Self {
+        Self { fuzz, albedo }
     }
 }
 
@@ -58,7 +58,7 @@ impl Material for Metal {
         if local_target.z > 0.0 { // <=> dot(local_target, n)
             let target = intersection.local_to_world(&local_target);
             let scattered_ray = Ray::new(p, &target);
-            let attenuation = self.albedo;
+            let attenuation = self.albedo.shade(intersection);
             Some((attenuation, scattered_ray))
         }
         else {
@@ -69,12 +69,13 @@ impl Material for Metal {
 
 
 pub struct Dielectric {
-    ref_idx: f64
+    ref_idx: f64,
+    albedo: Arc<Texture>
 }
 
 impl Dielectric {
-    pub fn new(ref_idx: f64) -> Self {
-        Self { ref_idx }
+    pub fn new(ref_idx: f64, albedo: Arc<Texture>) -> Self {
+        Self { ref_idx, albedo }
     }
 }
 
@@ -87,7 +88,7 @@ impl Material for Dielectric {
         local_wo.normalize();
         let local_reflected = Vector3f::new(-local_wo.x, -local_wo.y, local_wo.z);
 
-        let attenuation = Spectrum::new(1.0, 1.0, 1.0);
+        let attenuation = self.albedo.shade(intersection);       
         let local_outward_normal: Vector3f;
         let ni_over_nt: f64;
 

@@ -45,8 +45,8 @@ fn main() {
     // let material_wall: Arc<Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_green)));
     let material_wall: Arc<Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_red)));
     let material_lambertian: Arc<Material> = Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1)))));
-    let material_dielectric: Arc<Material> = Arc::new(Dielectric::new(1.5));
-    let material_metal_2: Arc<Material> = Arc::new(Metal::new(&Spectrum::new(0.7, 0.6, 0.5), 0.0));
+    let material_dielectric: Arc<Material> = Arc::new(Dielectric::new(1.5, Arc::new(PlainColor::new(Spectrum::new(0.5, 0.6, 0.1)))));
+    let material_metal_2: Arc<Material> = Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(Spectrum::new(0.95, 0.6, 0.5)))));
 
     let mut scene = Scene::new();
     scene
