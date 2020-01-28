@@ -11,18 +11,18 @@ impl Plane {
 }
 
 impl Intersectable for Plane {
-    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection> {
         if ray.direction.y == 0.0 {
             None
         }
         else {
             let d = (ray.origin.y * -1.0) / ray.direction.y;
-            if d <= 0.0 {
+            if d < near || d > far {
                 return None;
             }
 
             let mut p = ray.origin + ray.direction * d;
-            p.y = 0.00001;
+            p.y = 0.0;
 
             Some(Intersection {
                 p,

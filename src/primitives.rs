@@ -18,9 +18,9 @@ impl Primitive {
 }
 
 impl Intersectable for Primitive {
-    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection> {
         let local_ray = self.transform.transform_ray_to_local(&ray);
-        match self.shape.intersect(&local_ray) {
+        match self.shape.intersect(&local_ray, near, far) {
             Some(intersection) => Some(self.transform.transform_interaction_to_world(&intersection)),
             None => None
         }

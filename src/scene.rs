@@ -39,10 +39,10 @@ impl Scene {
 }
 
 impl Scene {
-    pub fn intersect(&self, ray: &Ray) -> Option<Interaction> {
+    pub fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
         let res: Option<Interaction> = None;
         self.primitives.iter().fold(res, |acc, primitive| {
-            match primitive.intersect(ray) {
+            match primitive.intersect(ray, near, far) {
                 Some(intersection) => {
                     match acc {
                         None => {

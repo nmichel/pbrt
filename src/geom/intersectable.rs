@@ -27,7 +27,7 @@ pub struct Intersection {
 }
 
 pub trait Intersectable : Send + Sync {
-    fn intersect(&self, ray: &Ray) -> Option<Intersection>;
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection>;
 }
 
 impl Intersection {

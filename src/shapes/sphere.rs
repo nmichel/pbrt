@@ -96,7 +96,7 @@ impl Intersectable for Sphere {
     /// δp/δv = π(z cos(φ), z sin(φ), -r sin(θ))
     ///       = π(zx/r, zy/r, -r sin(θ))   [4][5]
     /// 
-    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection> {
         let l = &ray.origin * -1.0; 
         let tca = vector3::dot(&l, &ray.direction);
         if tca < 0.0 {
@@ -114,7 +114,14 @@ impl Intersectable for Sphere {
         let t1: f64 = tca + thc;
         let tmin = f64::min(t0, t1);
         let tmax = f64::max(t0, t1);
-        let t = if tmin < 0.0 { tmax } else { tmin };
+        if tmax < near || tmin > far {
+            return None;
+        }
+
+        let t = if tmin < near { tmax } else { tmin };
+        if t > far {
+            return None;
+        }
 
         let mut hit = &ray.origin + &(&ray.direction * t);
         let mut norm = hit;

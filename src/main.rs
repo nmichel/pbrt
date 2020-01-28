@@ -186,7 +186,7 @@ fn compute_pixel(config: &Config, integrator: &Integrator, pixel_coords: Vector2
     while ns > 0 {
         let pixel_coords = pixel_coords + sampler.sample();
         let ray = camera.get_ray(pixel_coords.x, pixel_coords.y);
-        res += integrator.li(&ray, &scene, config.max_depth);
+        res += integrator.li(&ray, &scene, config.max_depth, config.near, config.far);
         ns -= 1;
     }
     res * (1.0/(config.samples_ppx as f64))

@@ -20,8 +20,8 @@ impl WhittedIntegrator {
 }
 
 impl Integrator for WhittedIntegrator {
-    fn li(&self, ray: &Ray, scene: &Scene, depth: usize) -> Spectrum {
-        match scene.intersect(&ray) {
+    fn li(&self, ray: &Ray, scene: &Scene, depth: usize, near: f64, far: f64) -> Spectrum {
+        match scene.intersect(&ray, near, far) {
             Some(interaction) => {
                 let Interaction { ref intersection, .. } = interaction;
                 let Intersection { ref n, ref wo, .. } = intersection;

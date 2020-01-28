@@ -63,7 +63,7 @@ fn default_config() -> Config {
     Config {
         input_filename: "input".to_string(),
         output_filename: "output.png".to_string(),
-        near: 0.01,
+        near: 0.0001,
         far: 1000.0,
         fov_deg: 90.0,
         output_width: 800,

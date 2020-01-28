@@ -17,7 +17,7 @@ impl VisibilityTester {
 
     pub fn unoccluded(&self, scene: &Scene) -> bool {
         let ray = Ray::spawn_from_through(&self.from, &self.to);
-        match scene.intersect(&ray) {
+        match scene.intersect(&ray, 0.00001, std::f64::MAX) {
             Some(interaction) => {
                 let l = (&self.to - &self.from).squared_length();
                 if (interaction.intersection.d * interaction.intersection.d) <= l { false } else { true }
