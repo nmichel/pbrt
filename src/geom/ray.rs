@@ -18,4 +18,8 @@ impl Ray {
         direction.normalize();
         Self::new(from, &direction)
     }
+
+    pub fn point_at(&self, d: f64) -> Vector3f {
+        self.origin + self.direction * d
+    }
 }

@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Mul, Sub};
 use std::marker::Copy;
 
 /// A 2D vector generic type.
@@ -26,6 +26,14 @@ impl<T> Vector2<T> {
     pub fn new(x: T, y: T) -> Self {
         Vector2 { x, y }
     }
+
+    /// Returns the squared length of a `Vector2`.
+    /// 
+    pub fn squared_length(&self) -> T
+        where T: Mul<Output = T> + Add<Output = T> + Copy {
+
+        dot(self, self)
+    }
 }
 
 impl <T: Add<Output = T>> Add for Vector2<T> {
@@ -33,6 +41,26 @@ impl <T: Add<Output = T>> Add for Vector2<T> {
 
     fn add(self, other: Self) -> Self::Output {
         Self::new(self.x + other.x, self.y + other.y)
+    }
+}
+
+impl<T> Sub for Vector2<T>
+    where T: Sub<Output = T> {
+
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self::Output::new(self.x - other.x, self.y - other.y)
+    }
+}
+
+impl<T> Mul<T> for Vector2<T>
+    where T: Mul<Output = T> + Copy {
+
+    type Output = Vector2<T>;
+
+    fn mul(self, other: T) -> Self::Output {
+        Self::Output::new(self.x * other, self.y * other)
     }
 }
 
@@ -57,6 +85,12 @@ impl<T> AddAssign<&Vector2<T>> for Vector2<T>
 pub fn add<T>(u: &Vector2<T>, v: &Vector2<T>) -> Vector2<T> 
     where T: Add<Output = T> + Copy {
     Vector2 { x: u.x + v.x, y: u.y + v.y }
+}
+
+pub fn dot<T>(u: &Vector2<T>, v: &Vector2<T>) -> T
+    where T: Mul<Output = T> + Add<Output = T> + Copy {
+
+    u.x * v.x + u.y * v.y
 }
 
 impl<T> Vector2<T>

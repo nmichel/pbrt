@@ -14,7 +14,9 @@ pub struct Config {
     pub output_height: usize,
     pub max_depth: usize,
     pub samples_ppx: usize,
-    pub threads: usize
+    pub threads: usize,
+    pub lens_radius: f64,
+    pub focal_distance: f64
 }
 
 type OptionParserFn = fn(&mut Config, &String);
@@ -59,6 +61,14 @@ fn parse_threads(config: &mut Config, value: &String) {
     config.threads = usize::from_str(value).unwrap();
 }
 
+fn parse_lens_radius(config: &mut Config, value: &String) {
+    config.lens_radius = f64::from_str(value).unwrap();
+}
+
+fn parse_focal_distance(config: &mut Config, value: &String) {
+    config.focal_distance = f64::from_str(value).unwrap();
+}
+
 fn default_config() -> Config {
     Config {
         input_filename: "input".to_string(),
@@ -70,7 +80,9 @@ fn default_config() -> Config {
         output_height: 600,
         max_depth: 3,
         samples_ppx: 5,
-        threads: 1
+        threads: 1,
+        lens_radius: 0.0,
+        focal_distance: 1.0
     }
 }
 
@@ -88,7 +100,9 @@ impl Config {
             ("--output_height", parse_output_height as OptionParserFn),
             ("--max_depth", parse_max_depth as OptionParserFn),
             ("--samples_ppx", parse_samples_ppx as OptionParserFn),
-            ("--threads", parse_threads as OptionParserFn)
+            ("--threads", parse_threads as OptionParserFn),
+            ("--lens_radius", parse_lens_radius as OptionParserFn),
+            ("--focal_distance", parse_focal_distance as OptionParserFn)
         ].iter().cloned().collect();
 
         let pairs_iter: ChunksExact<_> = args[1..].chunks_exact(2);
@@ -123,7 +137,9 @@ impl fmt::Display for Config {
         output_height : {:?}\n
         max_depth : {:?}\n
         samples_ppx : {:?}\n
-        threads : {:?}\n",
-        self.input_filename, self.output_filename, self.near, self.far, self.fov_deg, self.output_width, self.output_height, self.max_depth, self.samples_ppx, self.threads)
+        threads : {:?}\n
+        lens_radius : {:?}\n
+        focal_distance : {:?}\n",
+        self.input_filename, self.output_filename, self.near, self.far, self.fov_deg, self.output_width, self.output_height, self.max_depth, self.samples_ppx, self.threads, self.lens_radius, self.focal_distance)
     }
 }

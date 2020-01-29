@@ -5,7 +5,7 @@ use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::spectrum::Spectrum;
 use crate::textures::*;
-use rand::distributions::{IndependentSample, Range};    
+use crate::utils::random_double;
 use std::sync::Arc;
 
 pub trait Material : Send + Sync {
@@ -150,12 +150,6 @@ fn schlick(cosine: f64, ref_idx: f64) -> f64 {
     let r = (1.0 - ref_idx) / (1.0 + ref_idx);
     let r2 = r * r;
     return r2 + (1.0 - r2)*(1.0 - cosine).powf(5.0);
-}
-
-fn random_double() -> f64 {
-    let between = Range::new(0., 1.);
-    let mut rng = rand::thread_rng();
-    between.ind_sample(&mut rng)
 }
 
 fn random_in_unit_sphere() -> Vector3f {

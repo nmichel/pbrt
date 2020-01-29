@@ -1,4 +1,4 @@
-use pbrt::camera::{Camera, PinHoleCamera};
+use pbrt::camera::{Camera, PinHoleCamera, ThinLensCamera};
 use pbrt::config::Config;
 use pbrt::geom::bounds2::Bounds2;
 use pbrt::geom::matrix4::Matrix4;
@@ -80,8 +80,8 @@ fn main() {
     let max_depth = config.max_depth;
 
     let resolution = Vector2u::new(image_width, image_height);
-    let cam_to_world = Matrix4::look_at(&Vector3f::new(13.0, 2.0, 3.0), &Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(0.0, 1.0, 0.0));
-    let camera = PinHoleCamera::new(&resolution, fov, near, far, cam_to_world);
+    let cam_to_world = Matrix4::look_at(&Vector3f::new(13.0, 2.0, 3.0), &Vector3f::new(0.0, 1.0, 0.0), &Vector3f::new(0.0, 1.0, 0.0));
+    let camera: Box<dyn Camera> = if config.lens_radius > 0.0 { Box::new(ThinLensCamera::new(&resolution, fov, near, far, config.lens_radius, config.focal_distance, cam_to_world)) } else { Box::new(PinHoleCamera::new(&resolution, fov, near, far, cam_to_world)) };
     let integrator = PathIntegrator::new(max_depth);
 
     let mut pixels:Vec<u8> = Vec::with_capacity((image_width * image_height * 4) as usize);
@@ -95,7 +95,7 @@ fn main() {
     let config_ptr_transmuted = unsafe { mem::transmute::<&Config, &'static Config>(&config) };
     let integrator_ptr_transmuted = unsafe { mem::transmute::<&dyn Integrator, &'static dyn Integrator>(&integrator) };
     let scene_ptr_transmuted = unsafe { mem::transmute::<&Scene, &'static Scene>(&scene) };
-    let camera_ptr_transmuted = unsafe { mem::transmute::<&dyn Camera, &'static dyn Camera>(&camera) };
+    let camera_ptr_transmuted = unsafe { mem::transmute::<&dyn Camera, &'static dyn Camera>(&*camera) };
 
     let (upstream_tx, upstream_rx):(mpsc::Sender<Response>, mpsc::Receiver<Response>) = mpsc::channel();
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
