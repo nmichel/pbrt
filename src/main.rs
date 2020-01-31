@@ -19,7 +19,6 @@ use std::env;
 use std::f64;
 use std::mem;
 use std::process;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
@@ -40,35 +39,7 @@ fn main() {
 
     println!("Redering with configuration settings: {:?}", &config);
 
-    let text_check_red: Arc<Texture> = Arc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 1000.0));
-    let material_wall: Arc<Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_red)));
-    let material_lambertian: Arc<Material> = Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1)))));
-    let material_dielectric: Arc<Material> = Arc::new(Dielectric::new(1.5, Arc::new(PlainColor::new(Spectrum::new(0.5, 0.6, 0.1)))));
-    let material_metal_2: Arc<Material> = Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(Spectrum::new(0.95, 0.6, 0.5)))));
-
-    let mut scene = Scene::new();
-    scene
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Rectangle::new(4.0, 4.0)),
-            Box::new(Transform::translation(Vector3f::new(0.0, 4.0, 0.0))),
-            Arc::new(DiffuseLight::new(Arc::new(PlainColor::new(Spectrum::new(4.0, 4.0, 4.0))))))))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(1000.0)),
-            Box::new(Transform::translation(Vector3f::new(0.0, -1000.0, 0.0))),
-            Arc::clone(&material_wall))))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(1.0)),
-            Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
-            Arc::clone(&material_dielectric))))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(1.0)),
-            Box::new(Transform::translation(Vector3f::new(-4.0, 1.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
-            Arc::clone(&material_lambertian))))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(1.0)),
-            Box::new(Transform::translation(Vector3f::new(4.0, 1.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
-            Arc::clone(&material_metal_2))))
-        ;
+    let scene = build_my_balls();
 
     let image_width = config.output_width as u32;
     let image_height = config.output_height as u32;
@@ -224,4 +195,38 @@ fn image_write(filename: &str, resolution: &Vector2u, data: &Vec<u8>) {
     let mut writer = encoder.write_header().unwrap();
 
     writer.write_image_data(&data[..]).unwrap();
+}
+
+fn build_my_balls() -> Scene {
+    let text_check_red: Arc<Texture> = Arc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 1000.0));
+    let material_wall: Arc<Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_red)));
+    let material_lambertian: Arc<Material> = Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1)))));
+    let material_dielectric: Arc<Material> = Arc::new(Dielectric::new(1.5, Arc::new(PlainColor::new(Spectrum::new(0.5, 0.6, 0.1)))));
+    let material_metal_2: Arc<Material> = Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(Spectrum::new(0.95, 0.6, 0.5)))));
+
+    let mut scene = Scene::new();
+    scene
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Rectangle::new(4.0, 4.0)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 4.0, 0.0))),
+            Arc::new(DiffuseLight::new(Arc::new(PlainColor::new(Spectrum::new(4.0, 4.0, 4.0))))))))
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Sphere::new(1000.0)),
+            Box::new(Transform::translation(Vector3f::new(0.0, -1000.0, 0.0))),
+            Arc::clone(&material_wall))))
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Sphere::new(1.0)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
+            Arc::clone(&material_dielectric))))
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Sphere::new(1.0)),
+            Box::new(Transform::translation(Vector3f::new(-4.0, 1.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
+            Arc::clone(&material_lambertian))))
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Sphere::new(1.0)),
+            Box::new(Transform::translation(Vector3f::new(4.0, 1.0, 0.0)) * Transform::rotation_x(0.3) * Transform::rotation_y(0.3)),
+            Arc::clone(&material_metal_2))))
+        ;
+
+    scene
 }
