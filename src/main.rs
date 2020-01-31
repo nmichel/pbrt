@@ -7,8 +7,7 @@ use pbrt::geom::vector2::{Vector2, Vector2u, Vector2f};
 use pbrt::geom::vector3::Vector3f;
 use pbrt::integrators::integrator::Integrator;
 use pbrt::integrators::path::PathIntegrator;
-use pbrt::materials::material::{Dielectric, Lambertian, Material, Metal};
-use pbrt::materials::DiffuseLight;
+use pbrt::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal};
 use pbrt::light::PointLight;
 use pbrt::primitives::Primitive;
 use pbrt::scene::Scene;
@@ -42,7 +41,6 @@ fn main() {
     println!("Redering with configuration settings: {:?}", &config);
 
     let text_check_red: Arc<Texture> = Arc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 1000.0));
-    // let material_wall: Arc<Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_green)));
     let material_wall: Arc<Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_red)));
     let material_lambertian: Arc<Material> = Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1)))));
     let material_dielectric: Arc<Material> = Arc::new(Dielectric::new(1.5, Arc::new(PlainColor::new(Spectrum::new(0.5, 0.6, 0.1)))));
