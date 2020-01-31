@@ -9,7 +9,13 @@ use crate::utils::random_double;
 use std::sync::Arc;
 
 pub trait Material : Send + Sync {
-    fn scatter(&self, ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)>;
+    fn scatter(&self, _ray: &Ray, _interaction: &Interaction) -> Option<(Spectrum, Ray)> {
+        None
+    }
+
+    fn emit(&self, _ray: &Ray, _interaction: &Interaction) -> Option<Spectrum> {
+        None
+    }
 }
 
 pub struct Lambertian {

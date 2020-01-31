@@ -17,6 +17,13 @@ impl WhittedIntegrator {
     pub fn new(max_depth: usize) -> Self {
         Self { max_depth }
     }
+
+    fn background_radiance(&self, _ray: &Ray, _scene: &Scene) -> Spectrum {
+        // scene.lights.iter().fold(Spectrum::new(0.0, 0.0, 0.0), |res, light| {
+        //     res + light.le(&ray)
+        // })
+        Spectrum::new(0.7, 0.7, 0.7)
+    }    
 }
 
 impl Integrator for WhittedIntegrator {
@@ -31,7 +38,7 @@ impl Integrator for WhittedIntegrator {
                 + self.compute_indirect_lighting(scene, &interaction, depth) // Add indirect contribution
             },
             None => {
-                scene.background_radiance(&ray) // In the book, part of the integrator
+                self.background_radiance(&ray, &scene) // In the book, part of the integrator
             }
         }
     }

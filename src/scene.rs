@@ -29,13 +29,6 @@ impl Scene {
         self.lights.push(light);
         self
     }
-
-    pub fn background_radiance(&self, ray: &Ray) -> Spectrum {
-        // self.lights.iter().fold(Spectrum::new(0.0, 0.0, 0.0), |res, light| {
-        //     res + light.le(&ray)
-        // })
-        Spectrum::new(0.7, 0.7, 0.7)
-    }    
 }
 
 impl Scene {

@@ -8,11 +8,11 @@ use pbrt::geom::vector3::Vector3f;
 use pbrt::integrators::integrator::Integrator;
 use pbrt::integrators::path::PathIntegrator;
 use pbrt::materials::material::{Dielectric, Lambertian, Material, Metal};
+use pbrt::materials::DiffuseLight;
 use pbrt::light::PointLight;
 use pbrt::primitives::Primitive;
 use pbrt::scene::Scene;
-use pbrt::shapes::sphere::Sphere;
-use pbrt::shapes::plane::Plane;
+use pbrt::shapes::{Plane, Rectangle, Sphere};
 use pbrt::spectrum::Spectrum;
 use pbrt::textures::*;
 use rand::distributions::{IndependentSample, Range};
@@ -50,10 +50,10 @@ fn main() {
 
     let mut scene = Scene::new();
     scene
-        // .add_object(Box::new(Primitive::new(
-        //     Box::new(Plane::new()),
-        //     Box::new(Transform::translation(Vector3f::new(0.0, -1.5, 0.0))),
-        //     Rc::clone(&material_wall))))
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Rectangle::new(4.0, 4.0)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 4.0, 0.0))),
+            Arc::new(DiffuseLight::new(Arc::new(PlainColor::new(Spectrum::new(4.0, 4.0, 4.0))))))))
         .add_object(Arc::new(Primitive::new(
             Box::new(Sphere::new(1000.0)),
             Box::new(Transform::translation(Vector3f::new(0.0, -1000.0, 0.0))),

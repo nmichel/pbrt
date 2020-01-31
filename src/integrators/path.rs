@@ -17,6 +17,10 @@ impl PathIntegrator {
     pub fn new(max_depth: usize) -> Self {
         Self { max_depth }
     }
+
+    fn background_radiance(&self, _ray: &Ray, _scene: &Scene) -> Spectrum {
+        Spectrum::new(0.0, 0.0, 0.0)
+    }
 }
 
 impl Integrator for PathIntegrator {
@@ -24,20 +28,22 @@ impl Integrator for PathIntegrator {
         match scene.intersect(&ray, near, far) {
             Some(interaction) => {
                 let Interaction { ref material, .. } = interaction;
+                let emitted = match material.emit(&ray, &interaction) {
+                    Some(emitted) => emitted,
+                    None => Spectrum::new(0.0, 0.0, 0.0)
+                };
                 if depth > 0 {
                     match material.scatter(ray, &interaction) {
-                        Some((attenuation, scattered)) => 
-                            attenuation * &self.li(&scattered, scene, depth-1, near, far),
-                        None =>
-                           Spectrum::new(0.0, 0.0, 0.0)
+                        Some((attenuation, scattered)) => emitted + attenuation * &self.li(&scattered, scene, depth-1, near, far),
+                        None => emitted
                     }
                 }
                 else {
-                    Spectrum::new(0.0, 0.0, 0.0)
+                    emitted
                 }
             },
             None => {
-                scene.background_radiance(&ray)
+                self.background_radiance(&ray, &scene)
             }
         }
     }
