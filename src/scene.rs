@@ -2,7 +2,7 @@ use super::geom::intersectable::{Intersectable, Intersection};
 use super::interaction::Interaction;
 use super::geom::ray::Ray;
 use super::light::Light;
-use super::materials::material::Material;
+use super::materials::Material;
 use super::primitives::Primitive;
 use super::spectrum::Spectrum;
 use std::sync::Arc;

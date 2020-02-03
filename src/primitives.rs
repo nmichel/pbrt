@@ -1,8 +1,7 @@
-use std::rc::Rc;
 use super::geom::intersectable::{Intersectable, Intersection};
 use super::geom::ray::Ray;
 use super::geom::transform::Transform;
-use super::materials::material::Material;
+use super::materials::Material;
 use std::sync::Arc;
 
 pub struct Primitive {

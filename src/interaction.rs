@@ -1,5 +1,5 @@
 use super::geom::intersectable::Intersection;
-use super::materials::material::Material;
+use super::materials::Material;
 
 pub struct Interaction<'a> {
     /// Geometry of the interaction

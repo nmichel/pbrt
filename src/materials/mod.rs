@@ -1,9 +1,9 @@
+mod dielectric;
 mod diffuse_light;
+mod lambertian;
+mod material;
+mod metal;
 
-pub mod dielectric;
-pub mod lambertian;
-pub mod material;
-pub mod metal;
 pub use self::dielectric::Dielectric;
 pub use self::diffuse_light::DiffuseLight;
 pub use self::lambertian::Lambertian;

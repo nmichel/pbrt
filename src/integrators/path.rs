@@ -2,7 +2,7 @@ use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::interaction::Interaction;
-use crate::materials::material::Material;
+use crate::materials::Material;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
 
