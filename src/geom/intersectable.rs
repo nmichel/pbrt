@@ -28,6 +28,7 @@ pub struct Intersection {
 
 pub trait Intersectable : Send + Sync {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection>;
+    fn contain_point(&self, point: &Vector3f) -> bool;
 }
 
 impl Intersection {

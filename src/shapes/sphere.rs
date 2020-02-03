@@ -1,6 +1,7 @@
 use crate::geom::intersectable::{Intersectable, Intersection};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
+use crate::geom::vector3::Vector3f;
 use num_traits::clamp;
 use std::f64::consts::PI;
 
@@ -157,5 +158,9 @@ impl Intersectable for Sphere {
             dpdu,
             dpdv
         })
+    }
+
+    fn contain_point(&self, point: &Vector3f) -> bool {
+        vector3::dot(&point, &point) < self.r * self.r
     }
 }
