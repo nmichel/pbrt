@@ -23,7 +23,7 @@ impl Intersectable for Union {
                     current,
                 Some(intersection) => {
                     let new_intersection = e.transform.transform_interaction_to_world(&intersection); // transform intersection back in world frame
-                    if self.is_inside(&new_intersection, e.shape.as_ref()) {
+                    if self.is_inside(&new_intersection, e.as_ref()) {
                         current
                     }
                     else {
@@ -57,9 +57,9 @@ impl Intersectable for Union {
 }
 
 impl Union {
-    fn is_inside(&self, intersection: &Intersection, exclude: &Intersectable) -> bool {
+    fn is_inside(&self, intersection: &Intersection, exclude: &Elem) -> bool {
         for elem in &self.elements {
-            let current: *const Intersectable = elem.shape.as_ref();
+            let current = elem.as_ref() as *const Elem;
             if current == exclude {
                 continue;
             }

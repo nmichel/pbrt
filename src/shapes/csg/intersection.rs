@@ -24,15 +24,10 @@ impl Intersectable for CSGIntersection {
                     current,
                 Some(local_intersection) => {
                     let new_intersection = e.transform.transform_interaction_to_world(&local_intersection); // transform intersection back in world frame
-                    // println!("* local_intersection) pos {:?}", &local_intersection.p);
-                    // println!("* new_intersection pos {:?}", &new_intersection.p);
-                    let s: *const &Intersectable = &e.shape.as_ref();
-                    // println!("* s {:?}", &s);
-                    if ! self.is_inside(&new_intersection, s) {                        
+                    if ! self.is_inside(&new_intersection, e.as_ref()) {
                         current
                     }
                     else {
-                        // println!("* intersection is INSIDE");
                         match &current {
                             None =>
                                 Some(new_intersection),
@@ -63,18 +58,14 @@ impl Intersectable for CSGIntersection {
 }
 
 impl CSGIntersection {
-    fn is_inside(&self, intersection: &Intersection, exclude: *const &Intersectable) -> bool {
-        // println!("* exluded is {:?}", exclude);
+    fn is_inside(&self, intersection: &Intersection, exclude: &Elem) -> bool {
         for elem in &self.elements {
-            let current = &elem.shape.as_ref() as *const &Intersectable;
-            // println!("* testing current {:?}", current);
+            let current = elem.as_ref() as *const Elem;
             if current == exclude {
-                // println!("* exclude {:?}", &(elem.as_ref() as *const Elem));
                 continue;
             }
 
             let local_p = elem.transform.transform_point_to_local(&intersection.p);
-            // println!("Local P {:?}", &local_p);
             if ! elem.shape.contain_point(&local_p) {
                 return false;
             }
@@ -97,8 +88,8 @@ mod tests {
     #[test]
     fn test_intersect() {
         let elements = vec![
-            Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(0.0, 2.0, 0.0))) }), // top
             Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(2.0, 0.0, 0.0)) * Transform::rotation_z(-std::f64::consts::PI/2.0)) }), // left
+            Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(0.0, 2.0, 0.0))) }), // top
             ];
 
         let o = CSGIntersection::new(elements);
