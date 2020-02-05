@@ -11,7 +11,7 @@ use pbrt::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal};
 use pbrt::light::PointLight;
 use pbrt::primitives::Primitive;
 use pbrt::scene::Scene;
-use pbrt::shapes::{Elem, Plane, Rectangle, Sphere, Union};
+use pbrt::shapes::{csg, Plane, Rectangle, Sphere};
 use pbrt::spectrum::Spectrum;
 use pbrt::textures::*;
 use rand::distributions::{IndependentSample, Range};
@@ -39,6 +39,8 @@ fn main() {
 
     println!("Redering with configuration settings: {:?}", &config);
 
+    // let scene = build_block_scene();
+    // let scene = build_intersection_scene();
     let scene = build_union_scene();
     // let scene = build_my_balls();
     // let scene = build_cornel_box();
@@ -51,7 +53,9 @@ fn main() {
     let max_depth = config.max_depth;
 
     let resolution = Vector2u::new(image_width, image_height);
-    let cam_to_world = Matrix4::look_at(&Vector3f::new(1.0, 2.0, 3.0), &Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(0.0, 1.0, 0.0));
+    // let cam_to_world = Matrix4::look_at(&Vector3f::new(6.0, 8.0, 15.0), &Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(0.0, 1.0, 0.0)); // CSG box
+    // let cam_to_world = Matrix4::look_at(&Vector3f::new(1.0, 1.0, 1.0), &Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(0.0, 1.0, 0.0)); // CSG intersection
+    let cam_to_world = Matrix4::look_at(&Vector3f::new(1.0, 2.0, 3.0), &Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(0.0, 1.0, 0.0)); // CSG union
     // let cam_to_world = Matrix4::look_at(&Vector3f::new(13.0, 2.0, 3.0), &Vector3f::new(0.0, 1.0, 0.0), &Vector3f::new(0.0, 1.0, 0.0)); // balls
     // let cam_to_world = Matrix4::look_at(&Vector3f::new(0.0, 0.0, 1178.0), &Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(0.0, 1.0, 0.0)); // Cornell
     let camera: Box<dyn Camera> = if config.lens_radius > 0.0 { Box::new(ThinLensCamera::new(&resolution, fov, near, far, config.lens_radius, config.focal_distance, cam_to_world)) } else { Box::new(PinHoleCamera::new(&resolution, fov, near, far, cam_to_world)) };
@@ -98,7 +102,6 @@ fn main() {
                     }
 
                     Request::Compute { coords } => {
-                        // println!("[{:?}] Compute !", i);
                         let spectrum = compute_pixel(&config_ptr_transmuted, integrator_ptr_transmuted, coords, camera_ptr_transmuted, scene_ptr_transmuted, &mut sample);
                         let response = Response { coords, spectrum };
                         upstream_tx.send(response).unwrap();
@@ -292,15 +295,15 @@ fn build_cornel_box() -> Scene {
 fn build_union_scene() -> Scene {
     let mut scene = Scene::new();
     let elements = vec![
-        Box::new(Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, -0.5))) }),
-        Box::new(Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -0.5))) }),
-        Box::new(Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, -0.5))) }),
-        Box::new(Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.0))) }),
-        Box::new(Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))) }),
-        Box::new(Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))) }),
-        Box::new(Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.5))) }),
-        Box::new(Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.5))) }),
-        Box::new(Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.5))) }),
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, -0.5))) }),
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -0.5))) }),
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, -0.5))) }),
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.0))) }),
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))) }),
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))) }),
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.5))) }),
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.5))) }),
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.5))) }),
         ];
     
     scene
@@ -309,7 +312,7 @@ fn build_union_scene() -> Scene {
             Box::new(Transform::translation(Vector3f::new(0.0, 4.0, 0.0))),
             Arc::new(DiffuseLight::new(Arc::new(PlainColor::new(Spectrum::new(4.0, 4.0, 4.0))))))))
         .add_object(Arc::new(Primitive::new(
-            Box::new(Union::new(elements)),
+            Box::new(csg::Union::new(elements)),
             Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
             // Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1))))))))
             Arc::new(Dielectric::new(1.5, Arc::new(PlainColor::new(Spectrum::new(0.95, 0.95, 1.0))))))))
@@ -317,6 +320,71 @@ fn build_union_scene() -> Scene {
             Box::new(Rectangle::new(3.0, 3.0)),
             Box::new(Transform::translation(Vector3f::new(0.0, -1.0, 0.0))),
             Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 2.0)))))))
+        ;
+
+    scene
+}
+
+fn build_intersection_scene() -> Scene {
+    let mut scene = Scene::new();
+    let elements = vec![
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(-0.2, 0.0, 0.0))) }),
+        Box::new(csg::Elem { shape: Box::new(Sphere::new(0.4)), transform: Box::new(Transform::translation(Vector3f::new(0.2, 0.0, 0.0))) }),
+        ];
+    
+    scene
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Rectangle::new(4.0, 4.0)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 4.0, 0.0))),
+            Arc::new(DiffuseLight::new(Arc::new(PlainColor::new(Spectrum::new(4.0, 4.0, 4.0))))))))
+        .add_object(Arc::new(Primitive::new(
+            Box::new(csg::Intersection::new(elements)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+            // Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1))))))))
+            Arc::new(Dielectric::new(1.5, Arc::new(PlainColor::new(Spectrum::new(0.95, 0.95, 1.0))))))))
+        // .add_object(Arc::new(Primitive::new(
+        //     Box::new(Sphere::new(0.4)),
+        //     Box::new(Transform::translation(Vector3f::new(-0.2, 0.0, 0.0))),
+        //     // Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1))))))))
+        //     Arc::new(Dielectric::new(1.5, Arc::new(PlainColor::new(Spectrum::new(0.95, 0.95, 1.0))))))))
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Rectangle::new(3.0, 3.0)),
+            Box::new(Transform::translation(Vector3f::new(0.0, -1.0, 0.0))),
+            Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 2.0)))))))
+        ;
+
+    scene
+}
+
+
+
+fn build_block_scene() -> Scene {
+    let mut scene = Scene::new();
+    let elements = vec![
+        Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(0.0, 2.0, 0.0))) }), // top
+        Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(0.0, -2.0, 0.0)) * Transform::rotation_x(-std::f64::consts::PI)) }), // bottom
+
+        Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(2.0, 0.0, 0.0)) * Transform::rotation_z(-std::f64::consts::PI/2.0)) }), // left
+        Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(-2.0, 0.0, 0.0)) * Transform::rotation_z(std::f64::consts::PI/2.0)) }), // right
+
+        Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -2.0)) * Transform::rotation_x(-std::f64::consts::PI/2.0)) }), // front
+        Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 2.0)) * Transform::rotation_x(std::f64::consts::PI/2.0)) }), // back
+        ];
+    
+    scene
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Rectangle::new(5.0, 5.0)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 10.0, 0.0))),
+            Arc::new(DiffuseLight::new(Arc::new(PlainColor::new(Spectrum::new(4.0, 4.0, 4.0))))))))
+        .add_object(Arc::new(Primitive::new(
+            Box::new(csg::Intersection::new(elements)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+            // Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.6, 0.4, 0.1))))))))
+            Arc::new(Dielectric::new(1.5, Arc::new(PlainColor::new(Spectrum::new(0.95, 0.95, 1.0))))))))
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Plane::new()),
+            Box::new(Transform::translation(Vector3f::new(0.0, -3.0, 0.0))),
+            Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 0.5)))))))
         ;
 
     scene
