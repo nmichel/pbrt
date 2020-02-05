@@ -1,21 +1,21 @@
-use crate::geom::intersectable::{Intersectable, Intersection};
+use crate::geom::intersectable::Intersectable;
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 
 use super::Elem;
 
-pub struct CSGIntersection {
+pub struct Intersection {
     elements: Vec<Box<Elem>>
 }
 
-impl CSGIntersection {
-    pub fn new(elements: Vec<Box<Elem>>) -> CSGIntersection {
+impl Intersection {
+    pub fn new(elements: Vec<Box<Elem>>) -> Intersection {
         Self { elements }
     }
 }
 
-impl Intersectable for CSGIntersection {
-    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection> {
+impl Intersectable for Intersection {
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<crate::geom::intersectable::Intersection> {
         self.elements.iter().fold(None, |current, e| {
             let local_ray = e.transform.transform_ray_to_local(&ray); // transform ray in the tested elem frame
             let new = e.shape.intersect(&local_ray, near, far);
@@ -57,8 +57,8 @@ impl Intersectable for CSGIntersection {
     }
 }
 
-impl CSGIntersection {
-    fn is_inside(&self, intersection: &Intersection, exclude: &Elem) -> bool {
+impl Intersection {
+    fn is_inside(&self, intersection: &crate::geom::intersectable::Intersection, exclude: &Elem) -> bool {
         for elem in &self.elements {
             let current = elem.as_ref() as *const Elem;
             if current == exclude {
@@ -92,7 +92,7 @@ mod tests {
             Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(0.0, 2.0, 0.0))) }), // top
             ];
 
-        let o = CSGIntersection::new(elements);
+        let o = Intersection::new(elements);
         let position = Vector3f::new(0.0, 3.0, 30.0);
         let look_at = Vector3f::new(3.0, 3.0, 0.0);
         let direction = vector3::normalize(&(&look_at - &position));

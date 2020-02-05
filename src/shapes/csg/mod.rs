@@ -10,4 +10,4 @@ mod intersection;
 mod union;
 
 pub use self::union::Union;
-pub use self::intersection::CSGIntersection;
+pub use self::intersection::Intersection;
