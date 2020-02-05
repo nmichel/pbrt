@@ -1,12 +1,7 @@
 use crate::geom::intersectable::{Intersectable, Intersection};
 use crate::geom::ray::Ray;
-use crate::geom::transform::Transform;
 use crate::geom::vector3::Vector3f;
-
-pub struct Elem {
-    pub shape: Box<Intersectable>,
-    pub transform: Box<Transform>
-}
+use super::Elem;
 
 pub struct Union {
     elements: Vec<Box<Elem>>
