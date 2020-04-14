@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul, AddAssign};
+use std::ops::{Add, Div, Mul, AddAssign};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Spectrum {
@@ -91,6 +91,18 @@ impl Mul<f64> for Spectrum {
             self.spectrum[0] * scale,
             self.spectrum[1] * scale,
             self.spectrum[2] * scale
+        )
+    }
+}
+
+impl Div<f64> for Spectrum {
+    type Output = Spectrum;
+
+    fn div(self, scale: f64) -> Self::Output {
+        Spectrum::new(
+            self.spectrum[0] / scale,
+            self.spectrum[1] / scale,
+            self.spectrum[2] / scale
         )
     }
 }
