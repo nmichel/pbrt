@@ -1,5 +1,5 @@
 pub mod config;
-pub mod camera;
+pub mod cameras;
 pub mod geom;
 pub mod integrators;
 pub mod interaction;

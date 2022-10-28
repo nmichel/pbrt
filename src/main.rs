@@ -1,4 +1,4 @@
-use pbrt::camera::{Camera, PinHoleCamera, ThinLensCamera};
+use pbrt::cameras::{Camera, PinHoleCamera, ThinLensCamera};
 use pbrt::config::Config;
 use pbrt::geom::bounds2::Bounds2;
 use pbrt::geom::matrix4::Matrix4;
@@ -37,7 +37,7 @@ fn main() {
         process::exit(1);        
     });
 
-    println!("Redering with configuration settings: {:?}", &config);
+    println!("Redering with configuration settings: {:#?}", &config);
 
     // let scene = build_block_scene();
     // let scene = build_intersection_scene();
