@@ -6,13 +6,13 @@ use super::materials::Material;
 use std::sync::Arc;
 
 pub struct Primitive {
-    pub shape: Box<Intersectable>,
+    pub shape: Box<dyn Intersectable>,
     pub transform: Box<Transform>,
-    pub material: Arc<Material>
+    pub material: Arc<dyn Material>
 }
 
 impl Primitive {
-    pub fn new(shape: Box<Intersectable>, transform: Box<Transform>, material: Arc<Material>) -> Self {
+    pub fn new(shape: Box<dyn Intersectable>, transform: Box<Transform>, material: Arc<dyn Material>) -> Self {
         Self { shape, transform, material: Arc::clone(&material) }
     }
 }

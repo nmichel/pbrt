@@ -11,11 +11,11 @@ use super::material::Material;
 
 pub struct Dielectric {
     ref_idx: f64,
-    albedo: Arc<Texture>
+    albedo: Arc<dyn Texture>
 }
 
 impl Dielectric {
-    pub fn new(ref_idx: f64, albedo: Arc<Texture>) -> Self {
+    pub fn new(ref_idx: f64, albedo: Arc<dyn Texture>) -> Self {
         Self { ref_idx, albedo }
     }
 }
@@ -23,7 +23,7 @@ impl Dielectric {
 impl Material for Dielectric {
     fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)> {
         let Interaction { ref intersection, .. } = interaction;
-        let Intersection { ref p, ref n, ref wo, .. } = intersection;
+        let Intersection { ref p, n: _, ref wo, .. } = intersection;
 
         let mut local_wo = intersection.world_to_local(&wo);
         local_wo.normalize();

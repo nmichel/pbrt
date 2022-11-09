@@ -10,11 +10,11 @@ use super::material::Material;
 
 pub struct Metal {
     fuzz: f64,
-    albedo: Arc<Texture>
+    albedo: Arc<dyn Texture>
 }
 
 impl Metal {
-    pub fn new(fuzz: f64, albedo: Arc<Texture>) -> Self {
+    pub fn new(fuzz: f64, albedo: Arc<dyn Texture>) -> Self {
         Self { fuzz, albedo }
     }
 }
@@ -22,7 +22,7 @@ impl Metal {
 impl Material for Metal {
     fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)> {
         let Interaction { ref intersection, .. } = interaction;
-        let Intersection { ref p, ref n, ref wo, .. } = intersection;
+        let Intersection { ref p, n: _, ref wo, .. } = intersection;
 
         let mut local_wo = intersection.world_to_local(&wo);
         local_wo.normalize();

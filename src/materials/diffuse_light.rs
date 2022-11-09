@@ -6,11 +6,11 @@ use std::sync::Arc;
 use super::material::Material;
 
 pub struct DiffuseLight {
-    emitted: Arc<Texture>
+    emitted: Arc<dyn Texture>
 }
 
 impl DiffuseLight {
-    pub fn new(emitted: Arc<Texture>) -> Self {
+    pub fn new(emitted: Arc<dyn Texture>) -> Self {
         Self {
             emitted
         }

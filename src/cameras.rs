@@ -1,4 +1,3 @@
-use crate::geom::matrix4::Matrix4;
 use crate::geom::ray::Ray;
 
 pub trait Camera : Send + Sync {

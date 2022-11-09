@@ -1,10 +1,9 @@
-use super::geom::intersectable::{Intersectable, Intersection};
+use super::geom::intersectable::Intersectable;
 use super::interaction::Interaction;
 use super::geom::ray::Ray;
 use super::light::Light;
 use super::materials::Material;
 use super::primitives::Primitive;
-use super::spectrum::Spectrum;
 use std::sync::Arc;
 
 pub struct Scene {
@@ -24,7 +23,7 @@ impl Scene {
         self
     }
 
-    pub fn add_light(&mut self, light: Arc<Light>) -> &mut Self {
+    pub fn add_light(&mut self, light: Arc<dyn Light>) -> &mut Self {
         // Arc::get_mut(&mut self.lights).unwrap().push(light);
         self.lights.push(light);
         self
@@ -39,12 +38,12 @@ impl Scene {
                 Some(intersection) => {
                     match acc {
                         None => {
-                            let material: &Material = &*(primitive.material);
+                            let material: &dyn Material = &*(primitive.material);
                             Some(Interaction { intersection, material })
                         },
                         Some(prev_interaction) => {
                             if intersection.d < prev_interaction.intersection.d {
-                                let material: &Material = &*(primitive.material);
+                                let material: &dyn Material = &*(primitive.material);
                                 Some(Interaction { intersection, material })
                             }
                             else {

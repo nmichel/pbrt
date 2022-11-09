@@ -32,7 +32,7 @@ pub trait Intersectable : Send + Sync {
 }
 
 impl Intersection {
-    pub fn le(&self, wo: &Vector3f) -> Spectrum {
+    pub fn le(&self, _wo: &Vector3f) -> Spectrum {
         // match self.primitive.getAreaLight() {
         //     Some(light) => light.l(self, wo),
         //     None => Spectrum::new(0.0, 0.0, 0.0)

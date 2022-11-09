@@ -2,7 +2,7 @@ use crate::geom::intersectable::Intersectable;
 use crate::geom::transform::Transform;
 
 pub struct Elem {
-    pub shape: Box<Intersectable>,
+    pub shape: Box<dyn Intersectable>,
     pub transform: Box<Transform>
 }
 

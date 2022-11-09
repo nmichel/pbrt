@@ -8,11 +8,11 @@ use std::sync::Arc;
 use super::material::Material;
 
 pub struct Lambertian {
-    albedo: Arc<Texture>
+    albedo: Arc<dyn Texture>
 }
 
 impl Lambertian {
-    pub fn new(albedo: Arc<Texture>) -> Self {
+    pub fn new(albedo: Arc<dyn Texture>) -> Self {
         Self { albedo }
     }
 }

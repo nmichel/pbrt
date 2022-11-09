@@ -1,5 +1,5 @@
 use num_traits::{Num, NumAssign};
-use super::vector2::{Vector2, Vector2u};
+use super::vector2::Vector2;
 use std::iter::Iterator;
 
 pub struct Bounds2<T> where T: Num {
