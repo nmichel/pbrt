@@ -7,7 +7,7 @@ use crate::spectrum::Spectrum;
 use crate::textures::*;
 use crate::utils::random_double;
 use std::sync::Arc;
-use super::material::Material;
+use super::Material;
 
 pub struct Dielectric {
     ref_idx: f64,

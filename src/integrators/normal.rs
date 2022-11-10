@@ -1,5 +1,5 @@
 use crate::geom::ray::Ray;
-use crate::geom::vector3::{Vector3f, Vector3};
+use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;

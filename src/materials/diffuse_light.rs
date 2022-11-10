@@ -3,7 +3,7 @@ use crate::interaction::Interaction;
 use crate::spectrum::Spectrum;
 use crate::textures::*;
 use std::sync::Arc;
-use super::material::Material;
+use super::Material;
 
 pub struct DiffuseLight {
     emitted: Arc<dyn Texture>

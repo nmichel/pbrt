@@ -6,7 +6,7 @@ use crate::spectrum::Spectrum;
 use crate::textures::*;
 use crate::utils::random_in_unit_sphere;
 use std::sync::Arc;
-use super::material::Material;
+use super::Material;
 
 pub struct Metal {
     fuzz: f64,
