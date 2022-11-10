@@ -1,6 +1,6 @@
 use crate::geom::intersectable::Intersection;
 use crate::spectrum::Spectrum;
-use super::texture::Texture;
+use super::Texture;
 
 pub struct CheckerBoard {
     c1: Spectrum,
