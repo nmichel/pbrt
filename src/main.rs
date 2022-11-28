@@ -4,8 +4,8 @@ use pbrt::geom::matrix4::Matrix4;
 use pbrt::geom::transform::Transform;
 use pbrt::geom::vector2::Vector2u;
 use pbrt::geom::vector3::Vector3f;
-use pbrt::integrators::{PathIntegrator, NormalIntegrator};
-use pbrt::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal};
+use pbrt::integrators::{NormalIntegrator, PathIntegrator};
+use pbrt::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal, RefractionIndices};
 use pbrt::primitives::Primitive;
 use pbrt::renderers;
 use pbrt::scene::Scene;
@@ -37,17 +37,11 @@ fn main() {
 
     let resolution = Vector2u::new(image_width, image_height);
     let cam_to_world = Matrix4::look_at(
-        &Vector3f::new(1.0, 2.0, 4.0),
-        &Vector3f::new(0.0, 1.0, 0.0),
+        &Vector3f::new(0.0, 0.3, 0.0),
+        &Vector3f::new(0.0, 0.0, -1.0),
         &Vector3f::new(0.0, 1.0, 0.0),
     );
-    let camera = PinHoleCamera::new(
-        &resolution,
-        fov,
-        near,
-        far,
-        cam_to_world,
-    );
+    let camera = PinHoleCamera::new(&resolution, fov, near, far, cam_to_world);
     let integrator = PathIntegrator::new(max_depth);
     // let integrator = NormalIntegrator::new();
 
@@ -62,36 +56,47 @@ fn build_scene() -> Scene {
     ));
     let material_wall: Arc<dyn Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_red)));
     let material_lambertian: Arc<dyn Material> = Arc::new(Lambertian::new(Arc::new(
-        PlainColor::new(Spectrum::new(0.4, 0.2, 0.1)),
+        PlainColor::new(Spectrum::new(0.8, 0.8, 0.1)),
     )));
     let material_dielectric: Arc<dyn Material> = Arc::new(Dielectric::new(
-        1.5,
-        Arc::new(PlainColor::new(Spectrum::new(0.5, 0.6, 0.1))),
+        RefractionIndices::GLASS,
+        Arc::new(PlainColor::new(Spectrum::new(1.0, 1.0, 1.0))),
     ));
     let material_metal_2: Arc<dyn Material> = Arc::new(Metal::new(
         0.0,
-        Arc::new(PlainColor::new(Spectrum::new(0.95, 0.6, 0.5))),
+        Arc::new(PlainColor::new(Spectrum::new(1.0, 1.0, 1.0))),
     ));
 
     let mut scene = Scene::new();
     scene
+        // .add_object(Arc::new(Primitive::new(
+        //     Box::new(Rectangle::new(4.0, 4.0)),
+        //     Box::new(Transform::translation(Vector3f::new(0.0, 4.0, 0.0))),
+        //     Arc::new(DiffuseLight::new(Arc::new(PlainColor::new(Spectrum::new(
+        //         2.0, 2.0, 2.0,
+        //     ))))),
+        // )))
         .add_object(Arc::new(Primitive::new(
-            Box::new(Rectangle::new(4.0, 4.0)),
-            Box::new(Transform::translation(Vector3f::new(0.0, 4.0, 0.0))),
-            Arc::new(DiffuseLight::new(Arc::new(PlainColor::new(Spectrum::new(
-                2.0, 2.0, 2.0,
-            ))))),
+            Box::new(Sphere::new(100.0)),
+            Box::new(Transform::translation(Vector3f::new(0.0, -100.5, -1.0))),
+            Arc::clone(&material_wall),
         )))
         .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(1000.0)),
-            Box::new(Transform::translation(Vector3f::new(0.0, -1000.0, 0.0))),
+            Box::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(-1.0, 0.0, -1.0))),
+            Arc::clone(&material_metal_2),
+        )))
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -1.0))),
             Arc::clone(&material_lambertian),
         )))
         .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(1.0)),
-            Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0))),
-            Arc::clone(&material_lambertian),
-        )));
+            Box::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(1.0, 0.0, -1.0))),
+            Arc::clone(&material_dielectric),
+        )))
+        ;
 
     scene
 }

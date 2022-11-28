@@ -27,3 +27,9 @@ pub fn random_in_unit_sphere() -> Vector3f {
         }
     } 
 }
+
+pub fn random_unit_vector() -> Vector3f {
+    let mut v = random_in_unit_sphere();
+    v.normalize();
+    v
+}

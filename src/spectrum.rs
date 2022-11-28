@@ -10,6 +10,10 @@ impl Spectrum {
         Self { spectrum: [r, g, b]}
     }
 
+    pub fn zero() -> Self {
+        Self { spectrum: [0.0, 0.0, 0.0]}
+    }
+
     pub fn to_rgb(&self) -> Vec<u8> {
         let mut res = vec![0, 0, 0, 255];
         res[0] = (in_bound(self.spectrum[0]) * 255.0) as u8;

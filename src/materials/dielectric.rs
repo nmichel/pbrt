@@ -9,6 +9,16 @@ use crate::utils::random_double;
 use std::sync::Arc;
 use super::Material;
 
+#[non_exhaustive]
+pub struct RefractionIndices;
+
+impl RefractionIndices {
+    pub const WATER: f64 = 1.333;
+    pub const GLASS: f64 = 1.517;
+    pub const DIAMOND: f64 = 2.417;
+}
+
+
 pub struct Dielectric {
     ref_idx: f64,
     albedo: Arc<dyn Texture>
@@ -22,36 +32,57 @@ impl Dielectric {
 
 impl Material for Dielectric {
     fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)> {
+        // see https://graphics.stanford.edu/courses/cs148-10-summer/docs/2006--degreve--reflection_refraction.pdf
+
         let Interaction { ref intersection, .. } = interaction;
         let Intersection { ref p, n: _, ref wo, .. } = intersection;
 
         let mut local_wo = intersection.world_to_local(&wo);
         local_wo.normalize();
+
+        // Always compute the reflected vector (in local frame), as it is likely to be used (though not 
+        // certain)
         let local_reflected = Vector3f::new(-local_wo.x, -local_wo.y, local_wo.z);
 
-        let attenuation = self.albedo.shade(intersection);       
+        let attenuation = self.albedo.shade(intersection);
         let local_outward_normal: Vector3f;
-        let ni_over_nt: f64;
+        let ni: f64;
+        let nt: f64;
 
-        let mut cosine: f64;
-
+        // The cosine of incident ray and the local normal tells us
+        // if we are entering of leaving the volume.
+        //
+        // In local frame where n = z = (0, 0, 1), pointing outward the volume,
+        // this cosine is the z coord of the incident ray.
+        //
         if local_wo.z <= 0.0 {
             // Ray's leaving volume
+
+            // Use reverted normal such as it lies in the same half-space as the incident ray.
             local_outward_normal = Vector3f::new(0.0, 0.0, -1.0);
-            ni_over_nt = self.ref_idx;
-            cosine = -local_wo.z;
-            cosine = (1.0 - self.ref_idx * self.ref_idx * (1.0 - cosine*cosine)).sqrt();
+
+            // We are leaving the volume. Adjust ni and nt.
+            ni = self.ref_idx;
+            nt = 1.0;
         }
         else {
             // Ray's entering volume
+
+            // Use the local normal (as it already pertains to the spame half-space thant
+            // the incident ray)
             local_outward_normal = Vector3f::new(0.0, 0.0, 1.0);
-            ni_over_nt = 1.0 / self.ref_idx;
-            cosine = local_wo.z;
+
+            // We are entering the volume. Adjust ni and nt.
+            ni = 1.0;
+            nt = self.ref_idx;
         }
+
+        let ni_over_nt = ni / nt;
+
         match refract(&local_wo, &local_outward_normal, ni_over_nt) {
             Some(local_refracted) => {
-                let reflect_prob = schlick(cosine, self.ref_idx);
-                let local_scatter_direction = if random_double() < reflect_prob {
+                let reflectance = schlick(local_wo, local_outward_normal, ni, nt);
+                let local_scatter_direction = if random_double() < reflectance {
                     local_reflected
                 }
                 else {
@@ -71,24 +102,88 @@ impl Material for Dielectric {
     }
 }
 
-fn refract(wi: &Vector3f, n: &Vector3f, ni_over_nt: f64) -> Option<Vector3f> {
-    let cos_theta_i = vector3::dot(&wi, n);
+fn refract(wo: &Vector3f, n: &Vector3f, ni_over_nt: f64) -> Option<Vector3f> {
+    // sin² ϴₜ = (ηᵢ / ηₜ)² sin² ϴᵢ
+    // sin² ϴᵢ = 1 - cos² ϴᵢ
+    // cos² ϴᵢ = i.n
+    let cos_theta_i = vector3::dot(&wo, n); // in local frame <=> wo.z * n.z
     let sin2_theta_i = 1.0 - cos_theta_i * cos_theta_i;
     let sin2_theta_t = ni_over_nt * ni_over_nt * sin2_theta_i;
     let discriminant = 1.0 - sin2_theta_t;
     if discriminant > 0.0 {
+        // sin² ϴₜ + cos² ϴₜ = 1
+        // cos² ϴₜ = 1 - sin² ϴₜ = discrimant
+        // cos ϴₜ = √discrimant
         let cos_theta_t = discriminant.sqrt();
-        let mut t = wi * -ni_over_nt + n * (ni_over_nt * cos_theta_i - cos_theta_t);
+
+        // Refraction formula needs incident vector pointing at the intersection point
+        // whereas wo points the opposite direction.
+        let wi = wo * -1.0;
+
+        // t = (ηᵢ / ηₜ)i + [(ηᵢ / ηₜ) cos ϴᵢ - √(1 - sin² ϴₜ)]
+        // <=> t = (ηᵢ / ηₜ)i + [(ηᵢ / ηₜ) cos ϴᵢ - cos ϴₜ]
+        let mut t = wi * ni_over_nt + n * (ni_over_nt * cos_theta_i - cos_theta_t);
         t.normalize();
         Some(t)
     }
     else {
+        // Total internal reflection
         None
     }
 }
 
-fn schlick(cosine: f64, ref_idx: f64) -> f64 {
-    let r = (1.0 - ref_idx) / (1.0 + ref_idx);
-    let r2 = r * r;
-    return r2 + (1.0 - r2)*(1.0 - cosine).powf(5.0);
+/// Compute reflectance using refectance equations.
+/// 
+/// # Arguments
+/// 
+/// * `wo` - Opposite of incident ray direction (i.e. points outward the intersection point)
+/// * `normal` - Normal vector to the interface, pointing in the same direction as `wo` 
+/// * `n1`- Refractive index of the material the incident ray comes from
+/// * `n2`- Refractive index of the material the refracted ray goes into
+///
+fn fresnel(wo: Vector3f, normal: Vector3f, n1: f64, n2: f64) -> f64 {
+    let n1_over_n2 = n1 / n2;
+    let cos_theta_i = wo.z * normal.z;
+    let cos_theta_t = (1.0 - n1_over_n2 * n1_over_n2 * (1.0 - cos_theta_i*cos_theta_i)).sqrt();
+
+    // (27a)
+    let r_ortho_root = (n1 * cos_theta_i - n2 * cos_theta_t) / (n1 * cos_theta_i + n2 * cos_theta_t);
+    let r_ortho = r_ortho_root * r_ortho_root;
+
+    // (27b)
+    let r_parallel_root = (n2 * cos_theta_i - n1 * cos_theta_t) / (n2 * cos_theta_i + n1 * cos_theta_t);
+    let r_parallel = r_parallel_root * r_parallel_root;
+
+    (r_ortho + r_parallel) * 0.5 // (29a)
+}
+
+/// Use Schlick's approximation to compute reflectance.
+/// 
+/// # Arguments
+/// 
+/// * `wo` - Opposite of incident ray direction (i.e. points outward the intersection point)
+/// * `normal` - Normal vector to the interface, pointing in the same direction as `wo` 
+/// * `n1`- Refractive index of the material the incident ray comes from
+/// * `n2`- Refractive index of the material the refracted ray goes into
+///
+fn schlick(wo: Vector3f, normal: Vector3f, n1: f64, n2: f64) -> f64 {
+    let r0 = (n1 - n2) / (n1 + n2);
+    let r0_2 = r0 * r0;
+    let cos_theta_i = wo.z * normal.z;
+    let cosine =
+        if n1 <= n2 {
+            // cosine = cos ϴᵢ    (32)
+            cos_theta_i
+        }
+        else {
+            // cosine = cos ϴₜ    (32)
+            // 
+            // cos² ϴₜ + sin² ϴₜ = 1
+            // cos² ϴₜ = 1 - sin² ϴₜ
+            // cos² ϴₜ = 1 - (ηᵢ / ηₜ)²(1 - cos² ϴᵢ)     (23)
+            // cos ϴₜ = √(1 - (ηᵢ / ηₜ)²(1 - cos² ϴᵢ))
+            let n1_over_n2 = n1 / n2;
+            (1.0 - n1_over_n2 * n1_over_n2 * (1.0 - cos_theta_i*cos_theta_i)).sqrt()
+        };
+    return r0_2 + (1.0 - r0_2)*(1.0 - cosine).powf(5.0);
 }

@@ -46,6 +46,11 @@ impl<T> Vector3<T> {
 }
 
 impl Vector3<f64> {
+    pub fn length(&self) -> f64 {
+        let norm: f64 = dot(self, self);
+        norm.sqrt()
+    }
+
     pub fn normalize(&mut self) -> &mut Self {
         let norm: f64 = self.squared_length();
         let inv_norm = 1.0 / norm.sqrt();
@@ -58,7 +63,13 @@ impl Vector3<f64> {
         self.y = num_traits::clamp(self.y, 0.0, 1.0);
         self.z = num_traits::clamp(self.z, 0.0, 1.0);
         self
-    } 
+    }
+
+    pub fn near_zero(&self) -> bool {
+        // Return true if the vector is close to zero in all dimensions.
+        let s = 1e-8;
+        return (self.x.abs() < s) && (self.y.abs() < s) && (self.z.abs() < s);
+    }    
 }
 
 impl<T> Add for Vector3<T>

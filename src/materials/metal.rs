@@ -21,12 +21,23 @@ impl Metal {
 
 impl Material for Metal {
     fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)> {
+        // (1) wo is the opposite of incoming ray (i.e. wo "goes away" from the intersection point),
+        // so, wi = -wo.
+        // 
+        // local_wo is expressed in a space where the up vector is 'z' and is also the normal vector to
+        // the surface at the intersection point.
+        // 
+        // So, computing the reflection of the wi vector (wi - 2*dot(wi, n)*n) where n is [0, 0, 1]
+        // leads to [wix, wiy, -wiz]
+        // with wi = -wo the end result is [-wox, -woy, woz]
+
         let Interaction { ref intersection, .. } = interaction;
         let Intersection { ref p, n: _, ref wo, .. } = intersection;
 
         let mut local_wo = intersection.world_to_local(&wo);
         local_wo.normalize();
-        let local_reflected = Vector3f::new(-local_wo.x, -local_wo.y, local_wo.z);
+
+        let local_reflected = Vector3f::new(-local_wo.x, -local_wo.y, local_wo.z); // (1)
         let mut local_target = local_reflected + random_in_unit_sphere() * self.fuzz;
         local_target.normalize();
 

@@ -7,7 +7,7 @@ use super::integrator::Integrator;
 
 pub struct PathIntegrator {
     /// Max recursion depth
-    max_depth: usize
+    max_depth: usize,
 }
 
 impl PathIntegrator {
@@ -15,33 +15,35 @@ impl PathIntegrator {
         Self { max_depth }
     }
 
-    fn background_radiance(&self, _ray: &Ray, _scene: &Scene) -> Spectrum {
-        Spectrum::new(0.0, 0.0, 0.0)
+    fn background_radiance(&self, ray: &Ray, _scene: &Scene) -> Spectrum {
+        let mut unit_direction = ray.direction;
+        unit_direction.normalize();
+        let t = 0.5*(unit_direction.y + 1.0);
+        return Spectrum::new(1.0, 1.0, 1.0)*(1.0-t) + Spectrum::new(0.5, 0.7, 1.0) * t;
     }
 }
 
 impl Integrator for PathIntegrator {
     fn li(&self, ray: &Ray, scene: &Scene, depth: usize, near: f64, far: f64) -> Spectrum {
+        if depth <= 0 {
+            return Spectrum::zero();
+        }
         match scene.intersect(&ray, near, far) {
             Some(interaction) => {
                 let Interaction { material, .. } = interaction;
                 let emitted = match material.emit(&ray, &interaction) {
                     Some(emitted) => emitted,
-                    None => Spectrum::new(0.0, 0.0, 0.0)
+                    None => Spectrum::new(0.0, 0.0, 0.0),
                 };
-                if depth > 0 {
-                    match material.scatter(ray, &interaction) {
-                        Some((attenuation, scattered)) => emitted + attenuation * &self.li(&scattered, scene, depth-1, near, far),
-                        None => emitted
+                match material.scatter(ray, &interaction) {
+                    Some((attenuation, scattered)) => {
+                        emitted
+                            + attenuation * &self.li(&scattered, scene, depth - 1, near, far)
                     }
+                    None => emitted,
                 }
-                else {
-                    emitted
-                }
-            },
-            None => {
-                self.background_radiance(&ray, &scene)
             }
+            None => self.background_radiance(&ray, &scene),
         }
     }
 }

@@ -54,6 +54,7 @@ impl<'a, T> Bounds2<T> where T: Num + Copy {
 
 #[cfg(test)]
 mod tests {
+    use crate::geom::vector2::Vector2u;
     use super::*;
 
     #[test]

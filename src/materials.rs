@@ -17,6 +17,7 @@ mod diffuse_light;
 mod lambertian;
 mod metal;
 
+pub use self::dielectric::RefractionIndices;
 pub use self::dielectric::Dielectric;
 pub use self::diffuse_light::DiffuseLight;
 pub use self::lambertian::Lambertian;

@@ -30,7 +30,7 @@ impl Intersectable for Sphere {
     /// ---
     /// 
     /// φ = atan2(y, x)
-    /// θ = z/r
+    /// θ = acos(z/r)
     /// 
     /// x = r sin(θ) cos(φ)   [1]
     /// y = r sin(θ) sin(φ)   [2]
@@ -98,6 +98,9 @@ impl Intersectable for Sphere {
     ///       = π(zx/r, zy/r, -r sin(θ))   [4][5]
     /// 
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection> {
+        // Compute intersection point (geometric solution):
+        // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
+        
         let l = &ray.origin * -1.0; 
         let tca = vector3::dot(&l, &ray.direction);
         if tca < 0.0 {
@@ -124,13 +127,11 @@ impl Intersectable for Sphere {
             return None;
         }
 
-        let mut hit = &ray.origin + &(&ray.direction * t);
+        let hit = &ray.origin + &(&ray.direction * t);
         let mut norm = hit;
         norm.normalize();
 
-        if hit.x == 0.0 && hit.y == 0.0 {
-            hit.x = 1.0e-5 * self.r;
-        }
+        // Compute UV coords (<=> polar coords)
 
         let mut phi = hit.y.atan2(hit.x);
         if phi < 0.0 {
@@ -140,6 +141,8 @@ impl Intersectable for Sphere {
 
         let theta = clamp(hit.z / self.r, -1.0, 1.0).acos();
         let v = theta / PI;
+
+        // Compute UV derivatives
 
         let z_radius = (hit.x * hit.x + hit.y * hit.y).sqrt();
         let inv_z_r = 1.0 / z_radius;

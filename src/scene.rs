@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 pub struct Scene {
     pub primitives: Vec<Arc<Primitive>>,
-    // pub lights: Arc<Vec<Arc<dyn Light>>>
     pub lights: Vec<Arc<dyn Light>>
 }
 
