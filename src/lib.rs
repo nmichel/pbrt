@@ -1,5 +1,6 @@
 pub mod config;
 pub mod cameras;
+pub mod demos;
 pub mod geom;
 pub mod integrators;
 pub mod interaction;
