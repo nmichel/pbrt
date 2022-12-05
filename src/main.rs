@@ -1,4 +1,4 @@
-use pbrt::cameras::PinHoleCamera;
+use pbrt::cameras::{Camera, PinHoleCamera};
 use pbrt::config::Config;
 use pbrt::geom::matrix4::Matrix4;
 use pbrt::geom::transform::Transform;
@@ -26,14 +26,27 @@ fn main() {
 
     println!("Redering with configuration settings: {:#?}", &config);
 
-    let scene = build_scene();
+    let (scene, camera) = build_scene(&config);
 
+    let integrator = PathIntegrator::new(config.max_depth);
+    // let integrator = NormalIntegrator::new();
+
+    renderers::mt::render(&config, &scene, camera.as_ref(), &integrator);
+}
+
+fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
+    // Sphere refléchissante
+    // Cube transparent
+    // Sphere jaune
+    // Sol sphere damier
+
+    // Camera
+    // 
     let image_width = config.output_width as u32;
     let image_height = config.output_height as u32;
     let fov = config.fov_deg * f64::consts::PI / 180.0;
     let near = config.near;
     let far = config.far;
-    let max_depth = config.max_depth;
 
     let resolution = Vector2u::new(image_width, image_height);
     let cam_to_world = Matrix4::look_at(
@@ -41,14 +54,11 @@ fn main() {
         &Vector3f::new(0.0, 0.0, -1.0),
         &Vector3f::new(0.0, 1.0, 0.0),
     );
+
     let camera = PinHoleCamera::new(&resolution, fov, near, far, cam_to_world);
-    let integrator = PathIntegrator::new(max_depth);
-    // let integrator = NormalIntegrator::new();
 
-    renderers::mt::render(&config, &scene, &camera, &integrator);
-}
-
-fn build_scene() -> Scene {
+    // Scene
+    // 
     let text_check_red: Arc<dyn Texture> = Arc::new(CheckerBoard::new(
         Spectrum::new(0.65, 0.0, 0.0),
         Spectrum::new(0.65, 0.65, 0.65),
@@ -106,5 +116,5 @@ fn build_scene() -> Scene {
         )))
         ;
 
-    scene
+    (scene, Box::new(camera))
 }
