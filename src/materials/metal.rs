@@ -32,7 +32,7 @@ impl Material for Metal {
         // with wi = -wo the end result is [-wox, -woy, woz]
 
         let Interaction { ref intersection, .. } = interaction;
-        let Intersection { ref p, n: _, ref wo, .. } = intersection;
+        let Intersection { ref p, ref n, ref wo, .. } = intersection;
 
         let mut local_wo = intersection.world_to_local(&wo);
         local_wo.normalize();
@@ -43,7 +43,8 @@ impl Material for Metal {
 
         if local_target.z > 0.0 { // <=> dot(local_target, n)
             let target = intersection.local_to_world(&local_target);
-            let scattered_ray = Ray::new(p, &target);
+            let shift_avoid_acne = n * 0.001;
+            let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
             let attenuation = self.albedo.shade(intersection);
             Some((attenuation, scattered_ray))
         }

@@ -32,7 +32,7 @@ impl<T> Vector3<T> {
     /// assert_eq!(v.y, 2);
     /// assert_eq!(v.z, 3);
     /// ```
-    pub fn new(x: T, y: T, z: T) -> Self {
+    pub const fn new(x: T, y: T, z: T) -> Self {
         Vector3 { x, y, z }
     }
 
@@ -46,6 +46,10 @@ impl<T> Vector3<T> {
 }
 
 impl Vector3<f64> {
+    pub const fn zero() -> Self {
+        Self { x: 0.0, y: 0.0, z: 0.0 }
+    }
+
     pub fn length(&self) -> f64 {
         let norm: f64 = dot(self, self);
         norm.sqrt()
@@ -69,7 +73,7 @@ impl Vector3<f64> {
         // Return true if the vector is close to zero in all dimensions.
         let s = 1e-8;
         return (self.x.abs() < s) && (self.y.abs() < s) && (self.z.abs() < s);
-    }    
+    }
 }
 
 impl<T> Add for Vector3<T>

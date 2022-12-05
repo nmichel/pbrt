@@ -3,7 +3,7 @@ use super::ray::Ray;
 use super::vector3;
 use super::vector3::Vector3f;
 use std::fmt;
-
+#[derive(Debug)]
 pub struct Intersection {
     /// Intersection point
     pub p: Vector3f,

@@ -35,7 +35,7 @@ impl Material for Dielectric {
         // see https://graphics.stanford.edu/courses/cs148-10-summer/docs/2006--degreve--reflection_refraction.pdf
 
         let Interaction { ref intersection, .. } = interaction;
-        let Intersection { ref p, n: _, ref wo, .. } = intersection;
+        let Intersection { ref p, ref n, ref wo, .. } = intersection;
 
         let mut local_wo = intersection.world_to_local(&wo);
         local_wo.normalize();
@@ -46,6 +46,7 @@ impl Material for Dielectric {
 
         let attenuation = self.albedo.shade(intersection);
         let local_outward_normal: Vector3f;
+        let world_outward_normal: Vector3f;
         let ni: f64;
         let nt: f64;
 
@@ -60,6 +61,7 @@ impl Material for Dielectric {
 
             // Use reverted normal such as it lies in the same half-space as the incident ray.
             local_outward_normal = Vector3f::new(0.0, 0.0, -1.0);
+            world_outward_normal = n * -1.0;
 
             // We are leaving the volume. Adjust ni and nt.
             ni = self.ref_idx;
@@ -71,6 +73,7 @@ impl Material for Dielectric {
             // Use the local normal (as it already pertains to the spame half-space thant
             // the incident ray)
             local_outward_normal = Vector3f::new(0.0, 0.0, 1.0);
+            world_outward_normal = *n;
 
             // We are entering the volume. Adjust ni and nt.
             ni = 1.0;
@@ -82,20 +85,27 @@ impl Material for Dielectric {
         match refract(&local_wo, &local_outward_normal, ni_over_nt) {
             Some(local_refracted) => {
                 let reflectance = schlick(local_wo, local_outward_normal, ni, nt);
-                let local_scatter_direction = if random_double() < reflectance {
-                    local_reflected
+                let local_scatter_direction: Vector3f;
+                let scattered_ray_origin: Vector3f;
+                if random_double() < reflectance {
+                    local_scatter_direction = local_reflected;
+                    let shift_avoid_acne = world_outward_normal * 0.001;
+                    scattered_ray_origin = p + &shift_avoid_acne;
                 }
                 else {
-                    local_refracted
+                    local_scatter_direction = local_refracted;
+                    let shift_avoid_acne = world_outward_normal * -0.001;
+                    scattered_ray_origin = p + &shift_avoid_acne;
                 };
                 let scatter_direction = intersection.local_to_world(&local_scatter_direction);
-                let scattered_ray = Ray::new(&(p + &(&scatter_direction * 0.001)), &scatter_direction);
+                let scattered_ray = Ray::new(&scattered_ray_origin, &scatter_direction);
                 Some((attenuation, scattered_ray))
             },
             None => {
                 // Total reflection
                 let target = intersection.local_to_world(&local_reflected);
-                let scattered_ray = Ray::new(p, &target);
+                let shift_avoid_acne = world_outward_normal * 0.001;
+                let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
                 Some((attenuation, scattered_ray))
             }
         }

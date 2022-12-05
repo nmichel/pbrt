@@ -6,12 +6,8 @@ pub struct Spectrum {
 }
 
 impl Spectrum {
-    pub fn new(r: f64, g: f64, b: f64) -> Self {
+    pub const fn new(r: f64, g: f64, b: f64) -> Self {
         Self { spectrum: [r, g, b]}
-    }
-
-    pub fn zero() -> Self {
-        Self { spectrum: [0.0, 0.0, 0.0]}
     }
 
     pub fn to_rgb(&self) -> Vec<u8> {
@@ -27,6 +23,18 @@ impl Spectrum {
         self.spectrum[1] = self.spectrum[1].sqrt();
         self.spectrum[2] = self.spectrum[2].sqrt();
     }
+}
+
+impl Spectrum {
+    pub const BLACK: Spectrum = Spectrum::new(0.0, 0.0, 0.0);
+    pub const BLUE: Spectrum = Spectrum::new(0.0, 0.0, 1.0);
+    pub const GREEN: Spectrum = Spectrum::new(0.0, 1.0, 0.0);
+    pub const LIGHT_PINK: Spectrum = Spectrum::new(1.0, 0.714, 0.757);
+    pub const HOT_PINK: Spectrum = Spectrum::new(1.0, 0.412, 0.706);
+    pub const ORANGE: Spectrum = Spectrum::new(1.0, 0.5, 0.0);
+    pub const RED: Spectrum = Spectrum::new(1.0, 0.0, 0.0);
+    pub const YELLOW: Spectrum = Spectrum::new(1.0, 1.0, 0.0);
+    pub const WHITE: Spectrum = Spectrum::new(1.0, 1.0, 1.0);
 }
 
 impl Add for Spectrum {

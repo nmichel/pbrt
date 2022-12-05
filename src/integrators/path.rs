@@ -26,7 +26,7 @@ impl PathIntegrator {
 impl Integrator for PathIntegrator {
     fn li(&self, ray: &Ray, scene: &Scene, depth: usize, near: f64, far: f64) -> Spectrum {
         if depth <= 0 {
-            return Spectrum::zero();
+            return Spectrum::BLACK;
         }
         match scene.intersect(&ray, near, far) {
             Some(interaction) => {

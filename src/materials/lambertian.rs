@@ -25,11 +25,13 @@ impl Material for Lambertian {
 
         let mut scatter_direction: Vector3f = *n + random_unit_vector();
         // Catch degenerate scatter direction
+        scatter_direction.normalize();
         if scatter_direction.near_zero() {
             scatter_direction = *n;
         }
 
-        let scattered_ray = Ray::new(p, &scatter_direction);
+        let shift_avoid_acne = n * 0.001;
+        let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &scatter_direction);
         let attenuation = self.albedo.shade(intersection);
         return Some((attenuation, scattered_ray));
     }
