@@ -1,4 +1,5 @@
 use crate::cameras::{Camera, PinHoleCamera};
+use crate::colors;
 use crate::config::Config;
 use crate::geom::matrix4::Matrix4;
 use crate::geom::transform::Transform;
@@ -45,18 +46,18 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
   ));
   let material_wall: Arc<dyn Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_red)));
   let material_lambertian: Arc<dyn Material> = Arc::new(Lambertian::new(Arc::new(
-      PlainColor::new(Spectrum::ORANGE),
+      PlainColor::new(colors::ORANGE),
   )));
   let material_lambertian_white: Arc<dyn Material> = Arc::new(Lambertian::new(Arc::new(
-      PlainColor::new(Spectrum::WHITE),
+      PlainColor::new(colors::WHITE),
   )));
   let material_dielectric: Arc<dyn Material> = Arc::new(Dielectric::new(
       RefractionIndices::WATER,
-      Arc::new(PlainColor::new(Spectrum::WHITE)),
+      Arc::new(PlainColor::new(colors::WHITE)),
   ));
   let material_metal_white: Arc<dyn Material> = Arc::new(Metal::new(
       0.0,
-      Arc::new(PlainColor::new(Spectrum::WHITE)),
+      Arc::new(PlainColor::new(colors::WHITE)),
   ));
 
   let mut scene = Scene::new();

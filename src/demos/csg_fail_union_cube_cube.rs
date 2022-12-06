@@ -8,14 +8,17 @@ use crate::geom::vector3::Vector3f;
 use crate::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal, RefractionIndices};
 use crate::primitives::Primitive;
 use crate::scene::Scene;
-use crate::shapes::{csg, Rectangle, Sphere};
+use crate::shapes::{csg, Rectangle, Sphere, AABox};
 use crate::spectrum::Spectrum;
 use crate::textures::*;
 use std::f64;
 use std::sync::Arc;
 
 pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
-    // CSG Union of 9 orange spheres
+    // CSG Union of 2 identical cubes
+    // Overlapping sections disappear because a point of the surface of ine box 
+    // belongss to the volume of the other, and so is not considered a valid surface point
+    // for the union.
 
     // Camera
     //
@@ -27,7 +30,7 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
 
     let resolution = Vector2u::new(image_width, image_height);
     let cam_to_world = Matrix4::look_at(
-        &Vector3f::new(1.0, 1.3, 1.8),
+        &Vector3f::new(1.5, 1.1, 1.8),
         &Vector3f::new(0.0, -1.0, 0.0),
         &Vector3f::new(0.0, 1.0, 0.0),
     );
@@ -37,53 +40,28 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     // Scene
     //
     let mut scene = Scene::new();
-    let elements = vec![
+
+    let union_cube_cube = csg::Union::new(vec![
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
-            transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, -0.5))),
-        }),
-        Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -0.5))),
-        }),
-        Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, -0.5))),
-        }),
-        Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
-            transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Box::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Box::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
             transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
         }),
-        Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
-            transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.5))),
-        }),
-        Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.5))),
-        }),
-        Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.5))),
-        }),
-    ];
+    ]);
 
     scene
         .add_object(Arc::new(Primitive::new(
-            Box::new(csg::Union::new(elements)),
-            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+            Box::new(union_cube_cube),
+            Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
             Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE))))
-        )))
+        )));
+    
+    scene
         .add_object(Arc::new(Primitive::new(
-            Box::new(Rectangle::new(3.0, 3.0)),
+            Box::new(Rectangle::new(6.0, 6.0)),
             Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
             Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
                 Spectrum::new(0.65, 0.0, 0.0),

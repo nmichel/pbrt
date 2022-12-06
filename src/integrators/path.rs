@@ -1,3 +1,4 @@
+use crate::colors;
 use crate::geom::ray::Ray;
 use crate::interaction::Interaction;
 use crate::scene::Scene;
@@ -26,7 +27,7 @@ impl PathIntegrator {
 impl Integrator for PathIntegrator {
     fn li(&self, ray: &Ray, scene: &Scene, depth: usize, near: f64, far: f64) -> Spectrum {
         if depth <= 0 {
-            return Spectrum::BLACK;
+            return colors::BLACK;
         }
         match scene.intersect(&ray, near, far) {
             Some(interaction) => {

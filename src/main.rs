@@ -13,7 +13,7 @@ fn main() {
 
     println!("Redering with configuration settings: {:#?}", &config);
 
-    let (scene, camera) = pbrt::demos::csg_union_spheres::build_scene(&config);
+    let (scene, camera) = pbrt::demos::csg_bowl::build_scene(&config);
 
     let integrator = PathIntegrator::new(config.max_depth);
     // let integrator = NormalIntegrator::new();

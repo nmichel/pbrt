@@ -1,5 +1,6 @@
 pub mod config;
 pub mod cameras;
+pub mod colors;
 pub mod demos;
 pub mod geom;
 pub mod integrators;
