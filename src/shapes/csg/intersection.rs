@@ -17,21 +17,32 @@ impl Intersection {
 impl Intersectable for Intersection {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<crate::geom::intersectable::Intersection> {
         self.elements.iter().fold(None, |current, e| {
-            let local_ray = e.transform.transform_ray_to_local(&ray); // transform ray in the tested elem frame
+            // transform ray in the tested elem frame
+            let local_ray = e.transform.transform_ray_to_local(&ray);
+
+            // Test the current element for intersection with the ray 
             let new = e.shape.intersect(&local_ray, near, far);
             match new {
                 None =>
                     current,
                 Some(local_intersection) => {
-                    let new_intersection = e.transform.transform_interaction_to_world(&local_intersection); // transform intersection back in world frame
+                    // transform intersection back in world frame
+                    let new_intersection = e.transform.transform_interaction_to_world(&local_intersection);
+
+                    // If the intersection point is not inside ALL OTHER elements, ignore it
                     if ! self.is_inside(&new_intersection, e.as_ref()) {
                         current
                     }
                     else {
                         match &current {
                             None =>
+                                // No collision had been found until now
                                 Some(new_intersection),
+
                             Some(current_intersection) =>
+                                // A collision has already been found
+                                // Compare the distance to ray origin of the new collision.
+                                // If nearer, keep it; otherwise keep the current one.
                                 if new_intersection.d < current_intersection.d {
                                     Some(new_intersection)
                                 }

@@ -11,6 +11,7 @@ pub mod csg_union_spheres;
 
 // CSG Intersection
 // 
+pub mod csg_intersection_spheres;
 pub mod csg_intersection_sphere_sphere;
 
 // CSG Combo
