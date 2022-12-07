@@ -1,5 +1,6 @@
 use pbrt::config::Config;
-use pbrt::integrators::{NormalIntegrator, PathIntegrator};
+use pbrt::integrators::integrator::Integrator;
+use pbrt::integrators::{NormalIntegrator, PathIntegrator, self};
 use pbrt::renderers;
 use std::env;
 use std::process;
@@ -15,8 +16,15 @@ fn main() {
 
     let (scene, camera) = pbrt::demos::csg_bowl::build_scene(&config);
 
-    let integrator = PathIntegrator::new(config.max_depth);
-    // let integrator = NormalIntegrator::new();
+    let integrator: Box<dyn Integrator> = 
+        match config.integrator {
+            integrators::Type::NORMAL => {
+                Box::new(NormalIntegrator::new())
+            }
+            integrators::Type::PATH => {
+                Box::new(PathIntegrator::new(config.max_depth))
+            }
+        };
 
-    renderers::mt::render(&config, &scene, camera.as_ref(), &integrator);
+    renderers::st::render(&config, &scene, camera.as_ref(), &*integrator);
 }

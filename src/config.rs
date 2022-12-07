@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::slice::ChunksExact;
 use std::str::FromStr;
+use crate::integrators;
 
 #[derive(Debug)]
 pub struct Config {
@@ -16,7 +17,8 @@ pub struct Config {
     pub samples_ppx: usize,
     pub threads: usize,
     pub lens_radius: f64,
-    pub focal_distance: f64
+    pub focal_distance: f64,
+    pub integrator: integrators::Type
 }
 
 type OptionParserFn = fn(&mut Config, &String);
@@ -69,6 +71,20 @@ fn parse_focal_distance(config: &mut Config, value: &String) {
     config.focal_distance = f64::from_str(value).unwrap();
 }
 
+fn parse_integrator(config: &mut Config, value: &String) {
+    match value.as_str() {
+        "path" => {
+            config.integrator = integrators::Type::PATH;
+        }
+        "normal" => {
+            config.integrator = integrators::Type::NORMAL;
+        }
+        _ => {
+            config.integrator = integrators::Type::PATH;
+        }
+    }
+}
+
 fn default_config() -> Config {
     Config {
         input_filename: "input".to_string(),
@@ -82,7 +98,8 @@ fn default_config() -> Config {
         samples_ppx: 5,
         threads: 1,
         lens_radius: 0.0,
-        focal_distance: 1.0
+        focal_distance: 1.0,
+        integrator: integrators::Type::PATH
     }
 }
 
@@ -102,7 +119,8 @@ impl Config {
             ("--samples_ppx", parse_samples_ppx as OptionParserFn),
             ("--threads", parse_threads as OptionParserFn),
             ("--lens_radius", parse_lens_radius as OptionParserFn),
-            ("--focal_distance", parse_focal_distance as OptionParserFn)
+            ("--focal_distance", parse_focal_distance as OptionParserFn),
+            ("--integrator", parse_integrator as OptionParserFn)
         ].iter().cloned().collect();
 
         let pairs_iter: ChunksExact<_> = args[1..].chunks_exact(2);
@@ -139,7 +157,8 @@ impl fmt::Display for Config {
         samples_ppx : {:?}\n
         threads : {:?}\n
         lens_radius : {:?}\n
-        focal_distance : {:?}\n",
-        self.input_filename, self.output_filename, self.near, self.far, self.fov_deg, self.output_width, self.output_height, self.max_depth, self.samples_ppx, self.threads, self.lens_radius, self.focal_distance)
+        focal_distance : {:?}\n
+        integrator : {:?}\n",
+        self.input_filename, self.output_filename, self.near, self.far, self.fov_deg, self.output_width, self.output_height, self.max_depth, self.samples_ppx, self.threads, self.lens_radius, self.focal_distance, self.integrator)
     }
 }
