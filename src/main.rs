@@ -1,6 +1,5 @@
 use pbrt::config::Config;
-use pbrt::integrators::integrator::Integrator;
-use pbrt::integrators::{NormalIntegrator, PathIntegrator, self};
+use pbrt::integrators::{Integrator, NormalIntegrator, PathIntegrator, self};
 use pbrt::renderers;
 use std::env;
 use std::process;

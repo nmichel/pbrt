@@ -4,7 +4,7 @@ use crate::interaction::Interaction;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
 
-use super::integrator::Integrator;
+use super::Integrator;
 
 pub struct PathIntegrator {
     /// Max recursion depth

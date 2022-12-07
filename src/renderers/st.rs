@@ -2,7 +2,7 @@ use crate::cameras::Camera;
 use crate::config::Config;
 use crate::geom::bounds2::Bounds2;
 use crate::geom::vector2::{Vector2, Vector2f, Vector2u};
-use crate::integrators::integrator::Integrator;
+use crate::integrators::Integrator;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
 use rand::distributions::{IndependentSample, Range};
