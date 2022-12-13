@@ -1,4 +1,4 @@
-use crate::geom::intersectable::{Intersectable, Intersection};
+use crate::geom::intersectable::{IntersectionResult, Intersectable, Intersection};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
@@ -63,8 +63,9 @@ impl AABox {
 }
 
 impl Intersectable for AABox {
-  // See https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-AABox-intersection
-  fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection> {
+  fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
+    // Borrowed from  https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-AABox-intersection
+
     let ref ray_origin = ray.origin;
     let ref ray_direction = ray.direction;
     let inv_dir = Vector3f::new(1.0 / ray_direction.x, 1.0 / ray_direction.y, 1.0 / ray_direction.z);
@@ -73,10 +74,7 @@ impl Intersectable for AABox {
     let mut normal_min: &NormalAndDerivatives;
     let mut normal_max: &NormalAndDerivatives;
 
-    // println!("Origin : {:?} Direction: {:?}", &ray_origin, &ray_direction);
-    // println!("MIN : {:?} MAX: {:?}", &self.min, &self.max);
-  
-    if (inv_dir.x >= 0.0) { 
+    if inv_dir.x >= 0.0 { 
         tmin = (self.min.x - ray_origin.x) * inv_dir.x; 
         tmax = (self.max.x - ray_origin.x) * inv_dir.x;
         normal_min = &AABox::X_NEG;
@@ -108,23 +106,19 @@ impl Intersectable for AABox {
       normal_ymin = &AABox::Y_POS;
       normal_ymax = &AABox::Y_NEG;
     } 
- 
-    // println!("tymin {:?} | tymax {:?}", tymin, tymax);
 
     if (tmin > tymax) || (tymin > tmax)  {
-      return None; 
+      return IntersectionResult::new(); 
     }
  
     if tymin > tmin {
       tmin = tymin; 
       normal_min = normal_ymin;
-      // println!("Change for tymin");
     } 
  
     if tymax < tmax {
       tmax = tymax;
       normal_max = normal_ymax;
-      // println!("Change for tymax");
     }
  
     let tzmin: f64;
@@ -145,50 +139,57 @@ impl Intersectable for AABox {
       normal_zmax = &AABox::Z_NEG;
     } 
  
-    // println!("tzmin {:?} | tzmax {:?}", tzmin, tzmax);
-
     if (tmin > tzmax) || (tzmin > tmax) {
-      return None;
+      return IntersectionResult::new();
     }
  
-    if (tzmin > tmin) {
+    if tzmin > tmin {
       tmin = tzmin;
       normal_min = normal_zmin;
-      // println!("Change for tzmin");
     }
  
-    if (tzmax < tmax) {
+    if tzmax < tmax {
       tmax = tzmax; 
       normal_max = normal_zmax;
-      // println!("Change for tzmax");
     }
 
-    // println!("tmin {:?} | tmax {:?}", tmin, tmax);
+    let mut res = IntersectionResult::new();
 
-    let mut t = tmin;
-    let mut normal = normal_min;
-    if t < 0.0 {
-      t = tmax;
-      normal = normal_max;
-    };
-    if t < 0.0 {
-      return None;
+    if tmax < near || tmin > far {
+      return IntersectionResult::new();
     }
 
-    //println!("Normal {:?}", &normal);
+    if tmin > near {
+      let p = ray.origin + ray.direction * tmin;
 
-    let p = ray.origin + ray.direction * t;
+      res.push(Intersection {
+          p,
+          d: tmin,
+          n: normal_min.normal,
+          wo: &ray.direction * -1.0,
+          u: vector3::dot(&p, &normal_min.du),
+          v: vector3::dot(&p, &normal_min.dv),
+          dpdu: normal_min.du,
+          dpdv: normal_min.dv
+      })
+    }
 
-    Some(Intersection {
+    if tmax < far {
+      let p = ray.origin + ray.direction * tmax;
+
+      res.push(Intersection {
         p,
-        d: t,
-        n: normal.normal,
+        d: tmax,
+        n: normal_max.normal,
         wo: &ray.direction * -1.0,
-        u: vector3::dot(&p, &normal.du),
-        v: vector3::dot(&p, &normal.dv),
-        dpdu: normal.du,
-        dpdv: normal.dv
-    })
+        u: vector3::dot(&p, &normal_max.du),
+        v: vector3::dot(&p, &normal_max.dv),
+        dpdu: normal_max.du,
+        dpdv: normal_max.dv
+      });
+    }
+
+    res
   }
 
 

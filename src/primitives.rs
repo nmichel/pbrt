@@ -1,4 +1,4 @@
-use super::geom::intersectable::{Intersectable, Intersection};
+use super::geom::intersectable::{IntersectionResult, Intersectable, Intersection};
 use super::geom::ray::Ray;
 use super::geom::transform::Transform;
 use super::geom::vector3::Vector3f;
@@ -18,12 +18,15 @@ impl Primitive {
 }
 
 impl Intersectable for Primitive {
-    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection> {
-        let local_ray = self.transform.transform_ray_to_local(&ray);
-        match self.shape.intersect(&local_ray, near, far) {
-            Some(intersection) => Some(self.transform.transform_interaction_to_world(&intersection)),
-            None => None
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
+        let local_ray: Ray = self.transform.transform_ray_to_local(&ray);
+        let mut res: IntersectionResult = IntersectionResult::new();
+
+        for intersection in self.shape.intersect(&local_ray, near, far).iter() {
+            res.push(self.transform.transform_interaction_to_world(&intersection));
         }
+
+        res
     }
 
     fn contain_point(&self, point: &Vector3f) -> bool {

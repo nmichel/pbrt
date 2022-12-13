@@ -3,7 +3,7 @@ use super::ray::Ray;
 use super::vector3;
 use super::vector3::Vector3f;
 use std::fmt;
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Intersection {
     /// Intersection point
     pub p: Vector3f,
@@ -26,8 +26,10 @@ pub struct Intersection {
     pub dpdv: Vector3f
 }
 
+pub type IntersectionResult = Vec<Intersection>;
+
 pub trait Intersectable : Send + Sync {
-    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection>;
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult;
     fn contain_point(&self, point: &Vector3f) -> bool;
 }
 

@@ -1,4 +1,4 @@
-use crate::geom::intersectable::{Intersectable, Intersection};
+use crate::geom::intersectable::{IntersectionResult, Intersectable, Intersection};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
@@ -97,20 +97,20 @@ impl Intersectable for Sphere {
     /// δp/δv = π(z cos(φ), z sin(φ), -r sin(θ))
     ///       = π(zx/r, zy/r, -r sin(θ))   [4][5]
     /// 
-    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection> {
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
         // Compute intersection point (geometric solution):
         // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
         
         let l = &ray.origin * -1.0; 
         let tca = vector3::dot(&l, &ray.direction);
         if tca < 0.0 {
-            return None;
+            return IntersectionResult::new();
         }
 
         let r2 = self.r * self.r;
         let d2 = vector3::dot(&l, &l) - tca * tca;
         if d2 > r2 {
-            return None;
+            return IntersectionResult::new();
         }
 
         let thc = (r2 - d2).sqrt();
@@ -119,14 +119,29 @@ impl Intersectable for Sphere {
         let tmin = f64::min(t0, t1);
         let tmax = f64::max(t0, t1);
         if tmax < near || tmin > far {
-            return None;
+            return IntersectionResult::new();
         }
 
-        let t = if tmin < near { tmax } else { tmin };
-        if t > far {
-            return None;
+        let mut res = IntersectionResult::new();
+
+        if tmin > near {
+            res.push(self.compute_interection_details(ray, tmin))
         }
 
+        if tmax > near && tmax < far {
+            res.push(self.compute_interection_details(ray, tmax))
+        }
+
+        res
+    }
+
+    fn contain_point(&self, point: &Vector3f) -> bool {
+        vector3::dot(&point, &point) < self.r * self.r
+    }
+}
+
+impl Sphere {
+    fn compute_interection_details(&self, ray: &Ray, t: f64) -> Intersection {
         let hit = &ray.origin + &(&ray.direction * t);
         let mut norm = hit;
         norm.normalize();
@@ -151,7 +166,7 @@ impl Intersectable for Sphere {
         let dpdu = vector3::Vector3::new(-hit.y, hit.x, 0.0) * (2.0 * PI);
         let dpdv = vector3::Vector3::new(hit.z * cos_phi, hit.z * sin_phi, -self.r * theta.sin()) * PI;
 
-        Some(Intersection {
+        Intersection {
             p: hit,
             d: t,
             n: norm,
@@ -160,10 +175,6 @@ impl Intersectable for Sphere {
             v,
             dpdu,
             dpdv
-        })
-    }
-
-    fn contain_point(&self, point: &Vector3f) -> bool {
-        vector3::dot(&point, &point) < self.r * self.r
+        }
     }
 }

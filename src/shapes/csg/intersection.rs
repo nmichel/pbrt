@@ -1,4 +1,4 @@
-use crate::geom::intersectable::Intersectable;
+use crate::geom::intersectable::{IntersectionResult, Intersectable};
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 
@@ -15,44 +15,26 @@ impl Intersection {
 }
 
 impl Intersectable for Intersection {
-    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<crate::geom::intersectable::Intersection> {
-        self.elements.iter().fold(None, |current, e| {
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
+        self.elements.iter().fold(IntersectionResult::new(), |mut current, e| {
             // transform ray in the tested elem frame
             let local_ray = e.transform.transform_ray_to_local(&ray);
 
-            // Test the current element for intersection with the ray 
-            let new = e.shape.intersect(&local_ray, near, far);
-            match new {
-                None =>
-                    current,
-                Some(local_intersection) => {
-                    // transform intersection back in world frame
-                    let new_intersection = e.transform.transform_interaction_to_world(&local_intersection);
+            // Search intersections with the current element
+            let element_collisions = e.shape.intersect(&local_ray, near, far);
 
-                    // If the intersection point is not inside ALL OTHER elements, ignore it
-                    if ! self.is_inside(&new_intersection, e.as_ref()) {
-                        current
-                    }
-                    else {
-                        match &current {
-                            None =>
-                                // No collision had been found until now
-                                Some(new_intersection),
+            for collision in element_collisions.iter() {
+                // Transform collision back in world frame
+               let collision_in_world_space = e.transform.transform_interaction_to_world(&collision);
 
-                            Some(current_intersection) =>
-                                // A collision has already been found
-                                // Compare the distance to ray origin of the new collision.
-                                // If nearer, keep it; otherwise keep the current one.
-                                if new_intersection.d < current_intersection.d {
-                                    Some(new_intersection)
-                                }
-                                else {
-                                    current
-                                }
-                        }
-                    }
-                }
-            }
+               // Each collision that lies inside all other element's volume is kept in the result set
+               if self.is_inside(&collision_in_world_space, e.as_ref()) {
+                   current.push(collision_in_world_space)
+               }
+           }
+
+           current.sort_by(|a, b| a.d.partial_cmp(&b.d).unwrap());
+           current
         })
     }
 
@@ -109,9 +91,9 @@ mod tests {
         let direction = vector3::normalize(&(&look_at - &position));
         let ray = Ray::new(&position, &direction);
 
-        match o.intersect(&ray, 0.0, 1000.0) {
-            None => println!("NONE"),
-            Some(interaction) =>  println!("Point : {:?} {:?}", &interaction.p, &interaction.d)
+        match o.intersect(&ray, 0.0, 1000.0).as_slice() {
+            [] => println!("NONE"),
+            [ref interaction, ..] =>  println!("Point : {:?} {:?}", &interaction.p, &interaction.d)
        }
     }
 }

@@ -1,4 +1,4 @@
-use crate::geom::intersectable::{Intersectable, Intersection};
+use crate::geom::intersectable::{IntersectionResult, Intersectable, Intersection};
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 use super::Elem;
@@ -14,33 +14,26 @@ impl Union {
 }
 
 impl Intersectable for Union {
-    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection> {
-        self.elements.iter().fold(None, |current, e| {
-            let local_ray = e.transform.transform_ray_to_local(&ray); // transform ray in the tested elem frame
-            let new = e.shape.intersect(&local_ray, near, far);
-            match new {
-                None =>
-                    current,
-                Some(intersection) => {
-                    let new_intersection = e.transform.transform_interaction_to_world(&intersection); // transform intersection back in world frame
-                    if self.is_inside(&new_intersection, e.as_ref()) {
-                        current
-                    }
-                    else {
-                        match &current {
-                            None =>
-                                Some(new_intersection),
-                            Some(current_intersection) =>
-                                if new_intersection.d < current_intersection.d {
-                                    Some(new_intersection)
-                                }
-                                else {
-                                    current
-                                }
-                        }
-                    }
-                }
-            }
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
+        self.elements.iter().fold(IntersectionResult::new(), |mut current, e| {
+            // transform ray in the tested elem frame
+            let local_ray = e.transform.transform_ray_to_local(&ray);
+
+            // Search intersections with the current element
+            let element_collisions = e.shape.intersect(&local_ray, near, far);
+
+            for collision in element_collisions.iter() {
+                // Transform collision back in world frame
+               let collision_in_world_space = e.transform.transform_interaction_to_world(&collision);
+
+               // Each collision that doesn't lie inside any other element's volume is kept in the result set
+               if !self.is_inside(&collision_in_world_space, e.as_ref()) {
+                   current.push(collision_in_world_space)
+               }
+           }
+
+           current.sort_by(|a, b| a.d.partial_cmp(&b.d).unwrap());
+           current
         })
     }
 

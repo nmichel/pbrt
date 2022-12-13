@@ -1,3 +1,5 @@
+use crate::geom::intersectable;
+
 use super::geom::intersectable::Intersectable;
 use super::interaction::Interaction;
 use super::geom::ray::Ray;
@@ -33,25 +35,29 @@ impl Scene {
     pub fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
         let res: Option<Interaction> = None;
         self.primitives.iter().fold(res, |acc, primitive| {
-            match primitive.intersect(ray, near, far) {
-                Some(intersection) => {
+            let res = primitive.intersect(ray, near, far);
+            // println!("Collisions {:?}\n", &res);
+            let slice: &[intersectable::Intersection] = res.as_slice();
+            match slice {
+                [intersection, ..] => {
                     match acc {
                         None => {
+                            let inter = *intersection;
                             let material: &dyn Material = &*(primitive.material);
-                            Some(Interaction { intersection, material })
+                            Some(Interaction { intersection: inter, material })
                         },
-                        Some(prev_interaction) => {
+                        Some(ref prev_interaction) => {
                             if intersection.d < prev_interaction.intersection.d {
                                 let material: &dyn Material = &*(primitive.material);
-                                Some(Interaction { intersection, material })
+                                Some(Interaction { intersection: *intersection, material })
                             }
                             else {
-                                Some(prev_interaction)
+                                acc
                             }
                         }
                     }
                 },
-                None =>
+                _ =>
                     acc
             }
         })

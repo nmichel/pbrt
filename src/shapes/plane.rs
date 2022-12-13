@@ -1,4 +1,4 @@
-use crate::geom::intersectable::{Intersectable, Intersection};
+use crate::geom::intersectable::{IntersectionResult, Intersectable, Intersection};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
@@ -12,26 +12,30 @@ impl Plane {
 }
 
 impl Intersectable for Plane {
-    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Intersection> {
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
+        let mut res = IntersectionResult::new();
         let inv_dir = 1.0 / ray.direction.y; // Will be set to +INF if ray.direction.y is 0
         let d = (ray.origin.y * -1.0) / inv_dir;
         if d < near || d > far {
-            return None;
+            return res;
         }
 
         let mut p = ray.origin + ray.direction * d;
         p.y = 0.0;
 
-        Some(Intersection {
-            p,
-            d,
-            n: vector3::Vector3f::new(0.0, 1.0, 0.0),
-            wo: &ray.direction * -1.0,
-            u: p.x,
-            v: p.z,
-            dpdu: vector3::Vector3::new(1.0, 0.0, 0.0),
-            dpdv: vector3::Vector3::new(0.0, 0.0, 1.0)
-        })
+        res.push(
+            Intersection {
+                p,
+                d,
+                n: vector3::Vector3f::new(0.0, 1.0, 0.0),
+                wo: &ray.direction * -1.0,
+                u: p.x,
+                v: p.z,
+                dpdu: vector3::Vector3::new(1.0, 0.0, 0.0),
+                dpdv: vector3::Vector3::new(0.0, 0.0, 1.0)
+            });
+
+        res
     }
 
     fn contain_point(&self, point: &Vector3f) -> bool {
