@@ -7,7 +7,9 @@ pub struct Elem {
 }
 
 mod intersection;
+mod substraction;
 mod union;
 
-pub use self::union::Union;
 pub use self::intersection::Intersection;
+pub use self::substraction::Substraction;
+pub use self::union::Union;

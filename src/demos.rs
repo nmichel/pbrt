@@ -3,6 +3,10 @@
 // 
 pub mod two_pheres_one_cube;
 
+// CSG Substraction
+// 
+pub mod csg_substraction_cube_sphere;
+
 // CSG Union
 // 
 pub mod csg_fail_union_cube_cube;

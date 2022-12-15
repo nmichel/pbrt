@@ -13,7 +13,7 @@ fn main() {
 
     println!("Redering with configuration settings: {:#?}", &config);
 
-    let (scene, camera) = pbrt::demos::csg_intersection_spheres::build_scene(&config);
+    let (scene, camera) = pbrt::demos::csg_substraction_cube_sphere::build_scene(&config);
 
     let integrator: Box<dyn Integrator> = 
         match config.integrator {
