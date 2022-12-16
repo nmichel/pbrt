@@ -1,18 +1,20 @@
 use std::fmt;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub};
 use std::marker::Copy;
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub};
 
 /// A 3D vector generic type.
-/// 
+///
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Vector3<T> {
     pub x: T,
     pub y: T,
-    pub z: T
+    pub z: T,
 }
 
 impl<T> fmt::Display for Vector3<T>
-    where T: fmt::Display {
+where
+    T: fmt::Display,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[{} {} {}]", self.x, self.y, self.z)
     }
@@ -22,9 +24,9 @@ pub type Vector3f = Vector3<f64>;
 
 impl<T> Vector3<T> {
     /// Constructs a new `Vector3` initialized from parameters.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// # use pbrt::geom::vector3::Vector3;
     /// let v = Vector3::new(1, 2, 3);
@@ -37,10 +39,11 @@ impl<T> Vector3<T> {
     }
 
     /// Returns the squared length of a `Vector3`.
-    /// 
+    ///
     pub fn squared_length(&self) -> T
-        where T: Mul<Output = T> + Add<Output = T> + Copy {
-
+    where
+        T: Mul<Output = T> + Add<Output = T> + Copy,
+    {
         dot(self, self)
     }
 }
@@ -77,8 +80,9 @@ impl Vector3<f64> {
 }
 
 impl<T> Add for Vector3<T>
-    where T: Add<Output = T> {
-
+where
+    T: Add<Output = T>,
+{
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
@@ -87,8 +91,9 @@ impl<T> Add for Vector3<T>
 }
 
 impl<T> Add for &Vector3<T>
-    where T: Add<Output = T> + Copy {
-
+where
+    T: Add<Output = T> + Copy,
+{
     type Output = Vector3<T>;
 
     fn add(self, other: Self) -> Self::Output {
@@ -97,8 +102,9 @@ impl<T> Add for &Vector3<T>
 }
 
 impl<T> Sub for Vector3<T>
-    where T: Sub<Output = T> {
-
+where
+    T: Sub<Output = T>,
+{
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
@@ -107,8 +113,9 @@ impl<T> Sub for Vector3<T>
 }
 
 impl<T> Sub for &Vector3<T>
-    where T: Sub<Output = T> + Copy {
-
+where
+    T: Sub<Output = T> + Copy,
+{
     type Output = Vector3<T>;
 
     fn sub(self, other: Self) -> Self::Output {
@@ -117,8 +124,9 @@ impl<T> Sub for &Vector3<T>
 }
 
 impl<T> Mul<T> for Vector3<T>
-    where T: Mul<Output = T> + Copy {
-
+where
+    T: Mul<Output = T> + Copy,
+{
     type Output = Vector3<T>;
 
     fn mul(self, other: T) -> Self::Output {
@@ -127,8 +135,9 @@ impl<T> Mul<T> for Vector3<T>
 }
 
 impl<T> Mul<T> for &Vector3<T>
-    where T: Mul<Output = T> + Copy {
-
+where
+    T: Mul<Output = T> + Copy,
+{
     type Output = Vector3<T>;
 
     fn mul(self, other: T) -> Self::Output {
@@ -137,8 +146,9 @@ impl<T> Mul<T> for &Vector3<T>
 }
 
 impl<T> AddAssign for Vector3<T>
-    where T: Add<Output = T> + AddAssign {
-
+where
+    T: Add<Output = T> + AddAssign,
+{
     fn add_assign(&mut self, other: Self) {
         self.x += other.x;
         self.y += other.y;
@@ -147,8 +157,9 @@ impl<T> AddAssign for Vector3<T>
 }
 
 impl<T> AddAssign<&Vector3<T>> for Vector3<T>
-    where T: AddAssign + Copy {
-
+where
+    T: AddAssign + Copy,
+{
     fn add_assign(&mut self, rhs: &Vector3<T>) {
         self.x += rhs.x;
         self.y += rhs.y;
@@ -157,8 +168,9 @@ impl<T> AddAssign<&Vector3<T>> for Vector3<T>
 }
 
 impl<T> Vector3<T>
-    where T: AddAssign + Copy {
-
+where
+    T: AddAssign + Copy,
+{
     pub fn add_to_me(self: &mut Self, v: &Self) -> &mut Self {
         self.x += v.x;
         self.y += v.y;
@@ -168,8 +180,9 @@ impl<T> Vector3<T>
 }
 
 impl<T> MulAssign<T> for Vector3<T>
-    where T: MulAssign + Copy {
-
+where
+    T: MulAssign + Copy,
+{
     fn mul_assign(&mut self, rhs: T) {
         self.x *= rhs;
         self.y *= rhs;
@@ -178,8 +191,9 @@ impl<T> MulAssign<T> for Vector3<T>
 }
 
 impl<T> Vector3<T>
-    where T: MulAssign + Copy {
-
+where
+    T: MulAssign + Copy,
+{
     pub fn mul_to_me(self: &mut Self, v: T) -> &mut Self {
         self.x *= v;
         self.y *= v;
@@ -194,21 +208,28 @@ impl Vector3<f64> {
     }
 }
 
-pub fn add<T>(u: &Vector3<T>, v: &Vector3<T>) -> Vector3<T> 
-    where T: Add<Output = T> + Copy {
-
-    Vector3 { x: u.x + v.x, y: u.y + v.y, z: u.z + v.z }
+pub fn add<T>(u: &Vector3<T>, v: &Vector3<T>) -> Vector3<T>
+where
+    T: Add<Output = T> + Copy,
+{
+    Vector3 {
+        x: u.x + v.x,
+        y: u.y + v.y,
+        z: u.z + v.z,
+    }
 }
 
 pub fn dot<T>(u: &Vector3<T>, v: &Vector3<T>) -> T
-    where T: Mul<Output = T> + Add<Output = T> + Copy {
-
+where
+    T: Mul<Output = T> + Add<Output = T> + Copy,
+{
     u.x * v.x + u.y * v.y + u.z * v.z
 }
 
 pub fn cross<T>(u: &Vector3<T>, v: &Vector3<T>) -> Vector3<T>
-    where T: Mul<Output = T> + Sub<Output = T> + Copy {
-
+where
+    T: Mul<Output = T> + Sub<Output = T> + Copy,
+{
     let x = u.y * v.z - u.z * v.y;
     let y = u.z * v.x - u.x * v.z;
     let z = u.x * v.y - u.y * v.x;
@@ -232,8 +253,8 @@ mod tests {
             ($ident: ident, $expr: expr) => {
                 let mut $ident = $expr;
                 $ident.normalize();
-                assert!($ident.squared_length() >= 0.9999) ;
-                assert!($ident.squared_length() <= 1.0001) ;
+                assert!($ident.squared_length() >= 0.9999);
+                assert!($ident.squared_length() <= 1.0001);
             };
         }
         test_axis!(ux, Vector3::new(1.0, 0.0, 0.0));
@@ -246,9 +267,7 @@ mod tests {
         let mut a = Vector3::new(1.0, 2.0, 3.0);
         let fb = 2.0;
         let fc = -1.5;
-        a
-            .mul_to_me(fb)
-            .mul_to_me(fc);
+        a.mul_to_me(fb).mul_to_me(fc);
         assert_eq!(Vector3::new(-3.0, -6.0, -9.0), a);
     }
 
@@ -257,7 +276,7 @@ mod tests {
         let mut a = Vector3::new(1.0, 2.0, 3.0);
         a *= 2.0;
         assert_eq!(Vector3::new(2.0, 4.0, 6.0), a);
-        a *= 1.0/(2.0);
+        a *= 1.0 / (2.0);
         assert_eq!(Vector3::new(1.0, 2.0, 3.0), a);
     }
 
@@ -323,9 +342,7 @@ mod tests {
         let mut a = Vector3::new(1.0, 2.0, 3.0);
         let b = Vector3::new(3.0, 2.0, 1.0);
         let c = Vector3::new(-3.0, -2.0, -1.0);
-        a
-            .add_to_me(&b)
-            .add_to_me(&c);
+        a.add_to_me(&b).add_to_me(&c);
         assert_eq!(Vector3::new(1.0, 2.0, 3.0), a);
 
         assert_eq!(b, b);

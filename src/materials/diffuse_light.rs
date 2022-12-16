@@ -1,19 +1,17 @@
+use super::Material;
 use crate::geom::ray::Ray;
 use crate::interaction::Interaction;
 use crate::spectrum::Spectrum;
 use crate::textures::*;
 use std::sync::Arc;
-use super::Material;
 
 pub struct DiffuseLight {
-    emitted: Arc<dyn Texture>
+    emitted: Arc<dyn Texture>,
 }
 
 impl DiffuseLight {
     pub fn new(emitted: Arc<dyn Texture>) -> Self {
-        Self {
-            emitted
-        }
+        Self { emitted }
     }
 }
 

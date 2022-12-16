@@ -8,7 +8,7 @@ use crate::geom::vector3::Vector3f;
 use crate::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal, RefractionIndices};
 use crate::primitives::Primitive;
 use crate::scene::Scene;
-use crate::shapes::{csg, Rectangle, Sphere, AABox};
+use crate::shapes::{csg, AABox, Rectangle, Sphere};
 use crate::spectrum::Spectrum;
 use crate::textures::*;
 use std::f64;
@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     // CSG Union of 2 identical cubes
-    // Overlapping sections disappear because a point of the surface of ine box 
+    // Overlapping sections disappear because a point of the surface of ine box
     // belongss to the volume of the other, and so is not considered a valid surface point
     // for the union.
 
@@ -52,23 +52,21 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         }),
     ]);
 
-    scene
-        .add_object(Arc::new(Primitive::new(
-            Box::new(union_cube_cube),
-            Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
-            Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE))))
-        )));
-    
-    scene
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Rectangle::new(6.0, 6.0)),
-            Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
-            Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
-                Spectrum::new(0.65, 0.0, 0.0),
-                Spectrum::new(0.65, 0.65, 0.65),
-                2.0,
-            )))),
-        )));
+    scene.add_object(Arc::new(Primitive::new(
+        Box::new(union_cube_cube),
+        Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
+        Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))),
+    )));
+
+    scene.add_object(Arc::new(Primitive::new(
+        Box::new(Rectangle::new(6.0, 6.0)),
+        Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
+        Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
+            Spectrum::new(0.65, 0.0, 0.0),
+            Spectrum::new(0.65, 0.65, 0.65),
+            2.0,
+        )))),
+    )));
 
     (scene, Box::new(camera))
 }

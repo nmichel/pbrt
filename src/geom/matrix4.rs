@@ -1,20 +1,19 @@
-use std::f64;
-use std::fmt;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, Div};
 use super::vector3;
 use super::vector3::Vector3f;
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Sub};
+use std::{f64, fmt};
 
 /// A 3D vector generic type.
-/// 
+///
 #[derive(Debug, PartialEq)]
 pub struct Matrix4 {
-    m: [[f64; 4]; 4]
+    m: [[f64; 4]; 4],
 }
 
 impl fmt::Display for Matrix4 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[").ok();
-        for i in  0..4 {
+        for i in 0..4 {
             write!(f, "[{} {} {} {}]", self.m[i][0], self.m[i][1], self.m[i][2], self.m[i][3]).ok();
         }
         write!(f, "]")
@@ -23,41 +22,24 @@ impl fmt::Display for Matrix4 {
 
 impl Matrix4 {
     pub fn zero() -> Self {
-        Self {
-            m: [[0.0; 4]; 4]
-        }
+        Self { m: [[0.0; 4]; 4] }
     }
 
     pub fn identity() -> Self {
         Self {
-            m: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0]
-            ]
+            m: [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]],
         }
     }
 
     pub fn translation(x: f64, y: f64, z: f64) -> Self {
         Self {
-            m: [
-                [1.0, 0.0, 0.0, x],
-                [0.0, 1.0, 0.0, y],
-                [0.0, 0.0, 1.0, z],
-                [0.0, 0.0, 0.0, 1.0]
-            ]
+            m: [[1.0, 0.0, 0.0, x], [0.0, 1.0, 0.0, y], [0.0, 0.0, 1.0, z], [0.0, 0.0, 0.0, 1.0]],
         }
     }
 
     pub fn scale(x: f64, y: f64, z: f64) -> Self {
         Self {
-            m: [
-                [  x, 0.0, 0.0, 0.0],
-                [0.0,   y, 0.0, 0.0],
-                [0.0, 0.0,   z, 0.0],
-                [0.0, 0.0, 0.0, 1.0]
-            ]
+            m: [[x, 0.0, 0.0, 0.0], [0.0, y, 0.0, 0.0], [0.0, 0.0, z, 0.0], [0.0, 0.0, 0.0, 1.0]],
         }
     }
 
@@ -65,12 +47,7 @@ impl Matrix4 {
         let s = theta.sin();
         let c = theta.cos();
         Self {
-            m: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0,   c,  -s, 0.0],
-                [0.0,   s,   c, 0.0],
-                [0.0, 0.0, 0.0, 1.0]
-            ]
+            m: [[1.0, 0.0, 0.0, 0.0], [0.0, c, -s, 0.0], [0.0, s, c, 0.0], [0.0, 0.0, 0.0, 1.0]],
         }
     }
 
@@ -78,12 +55,7 @@ impl Matrix4 {
         let s = theta.sin();
         let c = theta.cos();
         Self {
-            m: [
-                [  c, 0.0,   s, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [ -s, 0.0,   c, 0.0],
-                [0.0, 0.0, 0.0, 1.0]
-            ]
+            m: [[c, 0.0, s, 0.0], [0.0, 1.0, 0.0, 0.0], [-s, 0.0, c, 0.0], [0.0, 0.0, 0.0, 1.0]],
         }
     }
 
@@ -91,12 +63,7 @@ impl Matrix4 {
         let s = theta.sin();
         let c = theta.cos();
         Self {
-            m: [
-                [  c,  -s, 0.0, 0.0],
-                [  s,   c, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0]
-            ]
+            m: [[c, -s, 0.0, 0.0], [s, c, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]],
         }
     }
 
@@ -105,12 +72,9 @@ impl Matrix4 {
 
         let s = 1.0 / (fov / 2.0).tan();
         Self {
-            m: [
-                [  s, 0.0,         0.0,               0.0],
-                [0.0,   s,         0.0,               0.0],
-                [0.0, 0.0, f / (f - n),  -f * n / (f - n)],
-                [0.0, 0.0,         1.0,               0.0]
-            ]
+            m: [[s, 0.0, 0.0, 0.0], [0.0, s, 0.0, 0.0], [0.0, 0.0, f / (f - n), -f * n / (f - n)], [
+                0.0, 0.0, 1.0, 0.0,
+            ]],
         }
     }
 
@@ -128,8 +92,8 @@ impl Matrix4 {
                 [right.x, real_up.x, dir.x, pos.x],
                 [right.y, real_up.y, dir.y, pos.y],
                 [right.z, real_up.z, dir.z, pos.z],
-                [    0.0,     0.0,    0.0,   1.0],
-            ]
+                [0.0, 0.0, 0.0, 1.0],
+            ],
         }
     }
 
@@ -153,7 +117,8 @@ impl Matrix4 {
                                 irow = j;
                                 icol = k;
                             }
-                        } else if ipiv[k] > 1 {
+                        }
+                        else if ipiv[k] > 1 {
                             // Error("Singular matrix in MatrixInvert");
                         }
                     }
@@ -205,9 +170,7 @@ impl Matrix4 {
             }
         }
 
-        Self {
-            m: minv
-        }
+        Self { m: minv }
     }
 
     pub fn transpose(&self) -> Self {
@@ -216,8 +179,8 @@ impl Matrix4 {
                 [self.m[0][0], self.m[1][0], self.m[2][0], self.m[3][0]],
                 [self.m[0][1], self.m[1][1], self.m[2][1], self.m[3][1]],
                 [self.m[0][2], self.m[1][2], self.m[2][2], self.m[3][2]],
-                [self.m[0][3], self.m[1][3], self.m[2][3], self.m[3][3]]
-            ]
+                [self.m[0][3], self.m[1][3], self.m[2][3], self.m[3][3]],
+            ],
         }
     }
 
@@ -228,7 +191,7 @@ impl Matrix4 {
         let w = self.m[3][0] * v.x + self.m[3][1] * v.y + self.m[3][2] * v.z + self.m[3][3];
         let res = Vector3f::new(x, y, z);
         if w != 1.0 {
-             res * (1.0/w)
+            res * (1.0 / w)
         }
         else {
             res
@@ -256,17 +219,16 @@ impl Mul for &Matrix4 {
     fn mul(self, o: Self) -> Self::Output {
         let mut res = Matrix4::zero();
         let m = &mut res.m;
-        for i in  0..4 {
+        for i in 0..4 {
             for j in 0..4 {
                 for k in 0..4 {
                     m[i][j] += self.m[i][k] * o.m[k][j];
                 }
             }
         }
-        
+
         res
     }
-
 }
 
 impl Mul for Matrix4 {
@@ -287,14 +249,13 @@ impl Mul<&Vector3f> for &Matrix4 {
         let w = self.m[3][0] * v.x + self.m[3][1] * v.y + self.m[3][2] * v.z + self.m[3][3];
         let res = Vector3f::new(x, y, z);
         if w != 1.0 {
-             res * (1.0/w)
+            res * (1.0 / w)
         }
         else {
             res
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -305,7 +266,7 @@ mod tests {
         let unit_x = Vector3f::new(1.0, 0.0, 0.0);
         let unit_y = Vector3f::new(0.0, 1.0, 0.0);
         let unit_z = Vector3f::new(0.0, 0.0, 1.0);
-        
+
         let m = Matrix4::rotation_x(f64::consts::PI / 2.0);
         assert_eq!(unit_x, &m * &unit_x); // unit x stays the same
         assert!(unit_z.quite_same(&(&m * &unit_y))); // unit y maps to unit z

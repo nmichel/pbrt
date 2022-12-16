@@ -19,8 +19,8 @@ impl PathIntegrator {
     fn background_radiance(&self, ray: &Ray, _scene: &Scene) -> Spectrum {
         let mut unit_direction = ray.direction;
         unit_direction.normalize();
-        let t = 0.5*(unit_direction.y + 1.0);
-        return Spectrum::new(1.0, 1.0, 1.0)*(1.0-t) + Spectrum::new(0.5, 0.7, 1.0) * t;
+        let t = 0.5 * (unit_direction.y + 1.0);
+        return Spectrum::new(1.0, 1.0, 1.0) * (1.0 - t) + Spectrum::new(0.5, 0.7, 1.0) * t;
     }
 }
 
@@ -37,10 +37,7 @@ impl Integrator for PathIntegrator {
                     None => Spectrum::new(0.0, 0.0, 0.0),
                 };
                 match material.scatter(ray, &interaction) {
-                    Some((attenuation, scattered)) => {
-                        emitted
-                            + attenuation * &self.li(&scattered, scene, depth - 1, near, far)
-                    }
+                    Some((attenuation, scattered)) => emitted + attenuation * &self.li(&scattered, scene, depth - 1, near, far),
                     None => emitted,
                 }
             }

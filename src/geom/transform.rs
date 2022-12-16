@@ -1,8 +1,8 @@
-use std::ops::Mul;
 use super::intersectable::Intersection;
-use super::ray::Ray;
 use super::matrix4::Matrix4;
+use super::ray::Ray;
 use super::vector3::Vector3f;
+use std::ops::Mul;
 
 pub struct Transform {
     mat: Matrix4,
@@ -16,19 +16,13 @@ impl Transform {
     pub fn from_matrix(mat: Matrix4) -> Self {
         let inv_mat = mat.inverse();
 
-        Self {
-            mat,
-            inv_mat: inv_mat
-        }
+        Self { mat, inv_mat: inv_mat }
     }
 
     ///  Build a `Transform` from `mat` and `inv_mat`.
     ///
     pub fn from_matrix_and_inverse(mat: Matrix4, inv_mat: Matrix4) -> Self {
-        Self {  
-            mat,
-            inv_mat
-        }
+        Self { mat, inv_mat }
     }
 
     ///  Build a translation `Transform`.
@@ -36,7 +30,7 @@ impl Transform {
     pub fn translation(p: Vector3f) -> Self {
         Self {
             mat: Matrix4::translation(p.x, p.y, p.z),
-            inv_mat: Matrix4::translation(-p.x, -p.y, -p.z)
+            inv_mat: Matrix4::translation(-p.x, -p.y, -p.z),
         }
     }
 
@@ -46,7 +40,6 @@ impl Transform {
         let mat = Matrix4::rotation_x(a);
         let inv_mat = Matrix4::transpose(&mat);
         Self { mat, inv_mat }
-
     }
 
     ///  Build a rotation `Transform` around y-axis.
@@ -92,7 +85,8 @@ impl Transform {
     pub fn transform_ray_to_local(&self, ray: &Ray) -> Ray {
         Ray::new(
             &self.transform_point_to_local(&ray.origin),
-            &self.transform_direction_to_local(&ray.direction))
+            &self.transform_direction_to_local(&ray.direction),
+        )
     }
 
     pub fn transform_interaction_to_world(&self, intersection: &Intersection) -> Intersection {
@@ -104,7 +98,7 @@ impl Transform {
             u: intersection.u,
             v: intersection.v,
             dpdu: self.transform_direction_to_world(&intersection.dpdu),
-            dpdv: self.transform_direction_to_world(&intersection.dpdv)
+            dpdv: self.transform_direction_to_world(&intersection.dpdv),
         }
     }
 }
@@ -115,7 +109,7 @@ impl Mul for &Transform {
     fn mul(self, o: Self) -> Self::Output {
         let mat = &self.mat * &o.mat;
         let inv_mat = &o.inv_mat * &self.inv_mat;
-        Transform { mat, inv_mat}
+        Transform { mat, inv_mat }
     }
 }
 

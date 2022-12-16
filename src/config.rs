@@ -1,8 +1,8 @@
+use crate::integrators;
 use std::collections::HashMap;
 use std::fmt;
 use std::slice::ChunksExact;
 use std::str::FromStr;
-use crate::integrators;
 
 #[derive(Debug)]
 pub struct Config {
@@ -18,7 +18,7 @@ pub struct Config {
     pub threads: usize,
     pub lens_radius: f64,
     pub focal_distance: f64,
-    pub integrator: integrators::Type
+    pub integrator: integrators::Type,
 }
 
 type OptionParserFn = fn(&mut Config, &String);
@@ -99,7 +99,7 @@ fn default_config() -> Config {
         threads: 1,
         lens_radius: 0.0,
         focal_distance: 1.0,
-        integrator: integrators::Type::PATH
+        integrator: integrators::Type::PATH,
     }
 }
 
@@ -120,14 +120,17 @@ impl Config {
             ("--threads", parse_threads as OptionParserFn),
             ("--lens_radius", parse_lens_radius as OptionParserFn),
             ("--focal_distance", parse_focal_distance as OptionParserFn),
-            ("--integrator", parse_integrator as OptionParserFn)
-        ].iter().cloned().collect();
+            ("--integrator", parse_integrator as OptionParserFn),
+        ]
+        .iter()
+        .cloned()
+        .collect();
 
         let pairs_iter: ChunksExact<_> = args[1..].chunks_exact(2);
         if pairs_iter.remainder().len() > 0 {
             let rem = &pairs_iter.remainder()[0];
             println!("found trailing parameter {:?}", &rem);
-            return Err("trailing parameter")
+            return Err("trailing parameter");
         }
 
         let pairs: Vec<_> = pairs_iter.collect(); // _ stands for &[String]
@@ -145,8 +148,10 @@ impl Config {
 
 impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f,
-        "input_filename : {:?}\n
+        writeln!(
+            f,
+            "
+        input_filename : {:?}\n
         output_filename : {:?}\n
         near : {:?}\n
         far : {:?}\n
@@ -158,7 +163,21 @@ impl fmt::Display for Config {
         threads : {:?}\n
         lens_radius : {:?}\n
         focal_distance : {:?}\n
-        integrator : {:?}\n",
-        self.input_filename, self.output_filename, self.near, self.far, self.fov_deg, self.output_width, self.output_height, self.max_depth, self.samples_ppx, self.threads, self.lens_radius, self.focal_distance, self.integrator)
+        integrator : {:?}\n
+        ",
+            self.input_filename,
+            self.output_filename,
+            self.near,
+            self.far,
+            self.fov_deg,
+            self.output_width,
+            self.output_height,
+            self.max_depth,
+            self.samples_ppx,
+            self.threads,
+            self.lens_radius,
+            self.focal_distance,
+            self.integrator
+        )
     }
 }

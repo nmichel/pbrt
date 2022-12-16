@@ -1,10 +1,10 @@
-use crate::geom::intersectable::{IntersectionResult, Intersectable, Intersection};
+use super::Elem;
+use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
-use super::Elem;
 
 pub struct Union {
-    elements: Vec<Box<Elem>>
+    elements: Vec<Box<Elem>>,
 }
 
 impl Union {
@@ -24,16 +24,16 @@ impl Intersectable for Union {
 
             for collision in element_collisions.iter() {
                 // Transform collision back in world frame
-               let collision_in_world_space = e.transform.transform_interaction_to_world(&collision);
+                let collision_in_world_space = e.transform.transform_interaction_to_world(&collision);
 
-               // Each collision that doesn't lie inside any other element's volume is kept in the result set
-               if !self.is_inside(&collision_in_world_space, e.as_ref()) {
-                   current.push(collision_in_world_space)
-               }
-           }
+                // Each collision that doesn't lie inside any other element's volume is kept in the result set
+                if !self.is_inside(&collision_in_world_space, e.as_ref()) {
+                    current.push(collision_in_world_space)
+                }
+            }
 
-           current.sort_by(|a, b| a.d.partial_cmp(&b.d).unwrap());
-           current
+            current.sort_by(|a, b| a.d.partial_cmp(&b.d).unwrap());
+            current
         })
     }
 
@@ -66,5 +66,3 @@ impl Union {
         false
     }
 }
-
-

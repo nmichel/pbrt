@@ -80,7 +80,7 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         .add_object(Arc::new(Primitive::new(
             Box::new(csg::Union::new(elements)),
             Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-            Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE))))
+            Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))),
         )))
         .add_object(Arc::new(Primitive::new(
             Box::new(Rectangle::new(3.0, 3.0)),

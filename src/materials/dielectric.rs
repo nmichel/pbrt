@@ -1,3 +1,4 @@
+use super::Material;
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
@@ -7,21 +8,19 @@ use crate::spectrum::Spectrum;
 use crate::textures::*;
 use crate::utils::random_double;
 use std::sync::Arc;
-use super::Material;
 
 #[non_exhaustive]
 pub struct RefractionIndices;
 
 impl RefractionIndices {
-    pub const WATER: f64 = 1.333;
-    pub const GLASS: f64 = 1.517;
     pub const DIAMOND: f64 = 2.417;
+    pub const GLASS: f64 = 1.517;
+    pub const WATER: f64 = 1.333;
 }
-
 
 pub struct Dielectric {
     ref_idx: f64,
-    albedo: Arc<dyn Texture>
+    albedo: Arc<dyn Texture>,
 }
 
 impl Dielectric {
@@ -40,7 +39,7 @@ impl Material for Dielectric {
         let mut local_wo = intersection.world_to_local(&wo);
         local_wo.normalize();
 
-        // Always compute the reflected vector (in local frame), as it is likely to be used (though not 
+        // Always compute the reflected vector (in local frame), as it is likely to be used (though not
         // certain)
         let local_reflected = Vector3f::new(-local_wo.x, -local_wo.y, local_wo.z);
 
@@ -100,7 +99,7 @@ impl Material for Dielectric {
                 let scatter_direction = intersection.local_to_world(&local_scatter_direction);
                 let scattered_ray = Ray::new(&scattered_ray_origin, &scatter_direction);
                 Some((attenuation, scattered_ray))
-            },
+            }
             None => {
                 // Total reflection
                 let target = intersection.local_to_world(&local_reflected);
@@ -143,18 +142,18 @@ fn refract(wo: &Vector3f, n: &Vector3f, ni_over_nt: f64) -> Option<Vector3f> {
 }
 
 /// Compute reflectance using refectance equations.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `wo` - Opposite of incident ray direction (i.e. points outward the intersection point)
-/// * `normal` - Normal vector to the interface, pointing in the same direction as `wo` 
+/// * `normal` - Normal vector to the interface, pointing in the same direction as `wo`
 /// * `n1`- Refractive index of the material the incident ray comes from
 /// * `n2`- Refractive index of the material the refracted ray goes into
 ///
 fn fresnel(wo: Vector3f, normal: Vector3f, n1: f64, n2: f64) -> f64 {
     let n1_over_n2 = n1 / n2;
     let cos_theta_i = wo.z * normal.z;
-    let cos_theta_t = (1.0 - n1_over_n2 * n1_over_n2 * (1.0 - cos_theta_i*cos_theta_i)).sqrt();
+    let cos_theta_t = (1.0 - n1_over_n2 * n1_over_n2 * (1.0 - cos_theta_i * cos_theta_i)).sqrt();
 
     // (27a)
     let r_ortho_root = (n1 * cos_theta_i - n2 * cos_theta_t) / (n1 * cos_theta_i + n2 * cos_theta_t);
@@ -168,11 +167,11 @@ fn fresnel(wo: Vector3f, normal: Vector3f, n1: f64, n2: f64) -> f64 {
 }
 
 /// Use Schlick's approximation to compute reflectance.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `wo` - Opposite of incident ray direction (i.e. points outward the intersection point)
-/// * `normal` - Normal vector to the interface, pointing in the same direction as `wo` 
+/// * `normal` - Normal vector to the interface, pointing in the same direction as `wo`
 /// * `n1`- Refractive index of the material the incident ray comes from
 /// * `n2`- Refractive index of the material the refracted ray goes into
 ///
@@ -180,20 +179,19 @@ fn schlick(wo: Vector3f, normal: Vector3f, n1: f64, n2: f64) -> f64 {
     let r0 = (n1 - n2) / (n1 + n2);
     let r0_2 = r0 * r0;
     let cos_theta_i = wo.z * normal.z;
-    let cosine =
-        if n1 <= n2 {
-            // cosine = cos ϴᵢ    (32)
-            cos_theta_i
-        }
-        else {
-            // cosine = cos ϴₜ    (32)
-            // 
-            // cos² ϴₜ + sin² ϴₜ = 1
-            // cos² ϴₜ = 1 - sin² ϴₜ
-            // cos² ϴₜ = 1 - (ηᵢ / ηₜ)²(1 - cos² ϴᵢ)     (23)
-            // cos ϴₜ = √(1 - (ηᵢ / ηₜ)²(1 - cos² ϴᵢ))
-            let n1_over_n2 = n1 / n2;
-            (1.0 - n1_over_n2 * n1_over_n2 * (1.0 - cos_theta_i*cos_theta_i)).sqrt()
-        };
-    return r0_2 + (1.0 - r0_2)*(1.0 - cosine).powf(5.0);
+    let cosine = if n1 <= n2 {
+        // cosine = cos ϴᵢ    (32)
+        cos_theta_i
+    }
+    else {
+        // cosine = cos ϴₜ    (32)
+        //
+        // cos² ϴₜ + sin² ϴₜ = 1
+        // cos² ϴₜ = 1 - sin² ϴₜ
+        // cos² ϴₜ = 1 - (ηᵢ / ηₜ)²(1 - cos² ϴᵢ)     (23)
+        // cos ϴₜ = √(1 - (ηᵢ / ηₜ)²(1 - cos² ϴᵢ))
+        let n1_over_n2 = n1 / n2;
+        (1.0 - n1_over_n2 * n1_over_n2 * (1.0 - cos_theta_i * cos_theta_i)).sqrt()
+    };
+    return r0_2 + (1.0 - r0_2) * (1.0 - cosine).powf(5.0);
 }

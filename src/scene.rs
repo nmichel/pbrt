@@ -1,8 +1,8 @@
 use crate::geom::intersectable;
 
 use super::geom::intersectable::Intersectable;
-use super::interaction::Interaction;
 use super::geom::ray::Ray;
+use super::interaction::Interaction;
 use super::light::Light;
 use super::materials::Material;
 use super::primitives::Primitive;
@@ -10,13 +10,16 @@ use std::sync::Arc;
 
 pub struct Scene {
     pub primitives: Vec<Arc<Primitive>>,
-    pub lights: Vec<Arc<dyn Light>>
+    pub lights: Vec<Arc<dyn Light>>,
 }
 
 impl Scene {
     pub fn new() -> Scene {
         // Scene { primitives: Vec::new(), lights: Arc::new(Vec::new()) }
-        Scene { primitives: Vec::new(), lights: Vec::new() }
+        Scene {
+            primitives: Vec::new(),
+            lights: Vec::new(),
+        }
     }
 
     pub fn add_object(&mut self, object: Arc<Primitive>) -> &mut Self {
@@ -44,21 +47,26 @@ impl Scene {
                         None => {
                             let inter = *intersection;
                             let material: &dyn Material = &*(primitive.material);
-                            Some(Interaction { intersection: inter, material })
-                        },
+                            Some(Interaction {
+                                intersection: inter,
+                                material,
+                            })
+                        }
                         Some(ref prev_interaction) => {
                             if intersection.d < prev_interaction.intersection.d {
                                 let material: &dyn Material = &*(primitive.material);
-                                Some(Interaction { intersection: *intersection, material })
+                                Some(Interaction {
+                                    intersection: *intersection,
+                                    material,
+                                })
                             }
                             else {
                                 acc
                             }
                         }
                     }
-                },
-                _ =>
-                    acc
+                }
+                _ => acc,
             }
         })
     }

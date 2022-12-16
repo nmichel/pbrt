@@ -1,3 +1,4 @@
+use super::Material;
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
@@ -6,10 +7,9 @@ use crate::spectrum::Spectrum;
 use crate::textures::*;
 use crate::utils::random_unit_vector;
 use std::sync::Arc;
-use super::Material;
 
 pub struct Lambertian {
-    albedo: Arc<dyn Texture>
+    albedo: Arc<dyn Texture>,
 }
 
 impl Lambertian {

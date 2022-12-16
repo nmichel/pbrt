@@ -1,6 +1,6 @@
 use super::Camera;
-use crate::geom::ray::Ray;
 use crate::geom::matrix4::Matrix4;
+use crate::geom::ray::Ray;
 use crate::geom::vector2::Vector2u;
 use crate::geom::vector3::Vector3f;
 use crate::utils::random_in_unit_disk;
@@ -15,7 +15,7 @@ pub struct ThinLensCamera {
 
     lens_radius: f64,
 
-    focal_distance: f64
+    focal_distance: f64,
 }
 
 impl ThinLensCamera {
@@ -34,20 +34,25 @@ impl ThinLensCamera {
             screen_p_max_x = image_aspect_ratio;
             screen_p_min_y = -1.0;
             screen_p_max_y = 1.0;
-        } else {
+        }
+        else {
             screen_p_min_x = -1.0;
             screen_p_max_x = 1.0;
             screen_p_min_y = -1.0 / image_aspect_ratio;
             screen_p_max_y = 1.0 / image_aspect_ratio;
         }
 
-        let trans =
-            Matrix4::perspective(fov, near, far).inverse() *
-            Matrix4::translation(screen_p_min_x, screen_p_max_y, 0.0) *
-            Matrix4::scale(screen_p_max_x - screen_p_min_x, screen_p_min_y - screen_p_max_y, 1.0) *
-            Matrix4::scale(1.0 / (image_width as f64), 1.0 / (image_height as f64), 1.0);
+        let trans = Matrix4::perspective(fov, near, far).inverse()
+            * Matrix4::translation(screen_p_min_x, screen_p_max_y, 0.0)
+            * Matrix4::scale(screen_p_max_x - screen_p_min_x, screen_p_min_y - screen_p_max_y, 1.0)
+            * Matrix4::scale(1.0 / (image_width as f64), 1.0 / (image_height as f64), 1.0);
 
-        Self { lens_radius, focal_distance, raster_to_screen: trans, cam_to_world }
+        Self {
+            lens_radius,
+            focal_distance,
+            raster_to_screen: trans,
+            cam_to_world,
+        }
     }
 }
 

@@ -1,16 +1,19 @@
-use crate::geom::intersectable::{IntersectionResult, Intersectable, Intersection};
+use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
 
 pub struct Rectangle {
     half_width: f64,
-    half_height: f64
+    half_height: f64,
 }
 
 impl Rectangle {
     pub fn new(width: f64, height: f64) -> Self {
-        Self { half_width: width/2.0, half_height: height/2.0 }
+        Self {
+            half_width: width / 2.0,
+            half_height: height / 2.0,
+        }
     }
 }
 
@@ -34,18 +37,17 @@ impl Intersectable for Rectangle {
                 return res;
             }
 
-            res.push(
-                Intersection {
-                    p,
-                    d,
-                    n: vector3::Vector3f::new(0.0, 1.0, 0.0),
-                    wo: &ray.direction * -1.0,
-                    u: p.x,
-                    v: p.z,
-                    dpdu: vector3::Vector3::new(1.0, 0.0, 0.0),
-                    dpdv: vector3::Vector3::new(0.0, 0.0, 1.0)
-                });
-            
+            res.push(Intersection {
+                p,
+                d,
+                n: vector3::Vector3f::new(0.0, 1.0, 0.0),
+                wo: &ray.direction * -1.0,
+                u: p.x,
+                v: p.z,
+                dpdu: vector3::Vector3::new(1.0, 0.0, 0.0),
+                dpdv: vector3::Vector3::new(0.0, 0.0, 1.0),
+            });
+
             res
         }
     }

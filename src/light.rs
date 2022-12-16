@@ -7,7 +7,7 @@ use super::spectrum::Spectrum;
 
 pub struct VisibilityTester {
     from: Vector3f,
-    to: Vector3f
+    to: Vector3f,
 }
 
 impl VisibilityTester {
@@ -20,14 +20,19 @@ impl VisibilityTester {
         match scene.intersect(&ray, 0.00001, std::f64::MAX) {
             Some(interaction) => {
                 let l = (&self.to - &self.from).squared_length();
-                if (interaction.intersection.d * interaction.intersection.d) <= l { false } else { true }
-            },
-            None => true
+                if (interaction.intersection.d * interaction.intersection.d) <= l {
+                    false
+                }
+                else {
+                    true
+                }
+            }
+            None => true,
         }
     }
 }
 
-pub trait Light : Send + Sync {
+pub trait Light: Send + Sync {
     fn le(&self, _ray: &Ray) -> Spectrum {
         Spectrum::new(0.0, 0.0, 0.0)
     }
@@ -37,7 +42,7 @@ pub trait Light : Send + Sync {
 
 pub struct PointLight {
     t: Box<Transform>,
-    i: Spectrum 
+    i: Spectrum,
 }
 
 impl PointLight {

@@ -8,7 +8,7 @@ use crate::geom::vector3::Vector3f;
 use crate::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal, RefractionIndices};
 use crate::primitives::Primitive;
 use crate::scene::Scene;
-use crate::shapes::{csg, Rectangle, Sphere, AABox};
+use crate::shapes::{csg, AABox, Rectangle, Sphere};
 use crate::spectrum::Spectrum;
 use crate::textures::*;
 use std::f64;
@@ -78,24 +78,21 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         }),
     ]));
 
-      scene
-        .add_object(Arc::new(Primitive::new(
-            Box::new(csg::Substraction::new(vec![
-                Box::new(csg::Elem {
-                    shape: Box::new(AABox::new(&Vector3f::new(2.0, 1.0, 2.0))),
-                    transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-                }
-                ),
-                Box::new(csg::Elem {
-                    shape: nine_balls,
-                    transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-                })
-            ])),
-            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-            // Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))),
-            Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::ALICE_BLUE))))
-            // Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE))))
-        )));
+    scene.add_object(Arc::new(Primitive::new(
+        Box::new(csg::Substraction::new(vec![
+            Box::new(csg::Elem {
+                shape: Box::new(AABox::new(&Vector3f::new(2.0, 1.0, 2.0))),
+                transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+            }),
+            Box::new(csg::Elem {
+                shape: nine_balls,
+                transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+            }),
+        ])),
+        Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+        // Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))),
+        Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::ALICE_BLUE)))), // Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE))))
+    )));
 
     scene
         .add_object(Arc::new(Primitive::new(
@@ -142,27 +139,25 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
             Box::new(Sphere::new(0.3)),
             Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.5))),
             Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))),
-        )))
-        ;
-      
-/*      scene
-        .add_object(Arc::new(Primitive::new(
-            nine_balls,
-            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-            Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))),
-            // Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::ALICE_BLUE))))
-            // Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE))))
         )));
- */
-    scene
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Rectangle::new(3.0, 3.0)),
-            Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
-            Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
-                Spectrum::new(0.65, 0.0, 0.0),
-                Spectrum::new(0.65, 0.65, 0.65),
-                2.0,
-            )))),
+
+    /*      scene
+           .add_object(Arc::new(Primitive::new(
+               nine_balls,
+               Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+               Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))),
+               // Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::ALICE_BLUE))))
+               // Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE))))
+           )));
+    */
+    scene.add_object(Arc::new(Primitive::new(
+        Box::new(Rectangle::new(3.0, 3.0)),
+        Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
+        Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
+            Spectrum::new(0.65, 0.0, 0.0),
+            Spectrum::new(0.65, 0.65, 0.65),
+            2.0,
+        )))),
     )));
 
     (scene, Box::new(camera))

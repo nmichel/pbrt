@@ -6,12 +6,11 @@ use crate::spectrum::Spectrum;
 
 use super::Integrator;
 
-pub struct NormalIntegrator {
-}
+pub struct NormalIntegrator {}
 
 impl NormalIntegrator {
     pub fn new() -> Self {
-        Self { }
+        Self {}
     }
 
     fn background_radiance(&self, _ray: &Ray, _scene: &Scene) -> Spectrum {
@@ -26,12 +25,10 @@ impl Integrator for NormalIntegrator {
                 let Interaction { ref intersection, .. } = interaction;
                 let mut normal = intersection.n;
                 normal = normal + Vector3f::new(1.0, 1.0, 1.0);
-                let Vector3f {x, y, z} = normal * 0.5;
+                let Vector3f { x, y, z } = normal * 0.5;
                 Spectrum::new(x, y, z)
-            },
-            None => {
-                self.background_radiance(&ray, &scene)
             }
+            None => self.background_radiance(&ray, &scene),
         }
     }
 }

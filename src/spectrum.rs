@@ -1,13 +1,13 @@
-use std::ops::{Add, Div, Mul, AddAssign};
+use std::ops::{Add, AddAssign, Div, Mul};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Spectrum {
-    spectrum: [f64; 3]
+    spectrum: [f64; 3],
 }
 
 impl Spectrum {
     pub const fn new(r: f64, g: f64, b: f64) -> Self {
-        Self { spectrum: [r, g, b]}
+        Self { spectrum: [r, g, b] }
     }
 
     pub fn to_rgb(&self) -> Vec<u8> {
@@ -32,7 +32,7 @@ impl Add for Spectrum {
         Spectrum::new(
             self.spectrum[0] + other.spectrum[0],
             self.spectrum[1] + other.spectrum[1],
-            self.spectrum[2] + other.spectrum[2]
+            self.spectrum[2] + other.spectrum[2],
         )
     }
 }
@@ -54,7 +54,7 @@ impl Mul<&Spectrum> for Spectrum {
         Spectrum::new(
             self.spectrum[0] * other.spectrum[0],
             self.spectrum[1] * other.spectrum[1],
-            self.spectrum[2] * other.spectrum[2]
+            self.spectrum[2] * other.spectrum[2],
         )
     }
 }
@@ -66,7 +66,7 @@ impl Mul<&Spectrum> for &Spectrum {
         Spectrum::new(
             self.spectrum[0] * other.spectrum[0],
             self.spectrum[1] * other.spectrum[1],
-            self.spectrum[2] * other.spectrum[2]
+            self.spectrum[2] * other.spectrum[2],
         )
     }
 }
@@ -75,11 +75,7 @@ impl Mul<f64> for &Spectrum {
     type Output = Spectrum;
 
     fn mul(self, scale: f64) -> Self::Output {
-        Spectrum::new(
-            self.spectrum[0] * scale,
-            self.spectrum[1] * scale,
-            self.spectrum[2] * scale
-        )
+        Spectrum::new(self.spectrum[0] * scale, self.spectrum[1] * scale, self.spectrum[2] * scale)
     }
 }
 
@@ -87,11 +83,7 @@ impl Mul<f64> for Spectrum {
     type Output = Spectrum;
 
     fn mul(self, scale: f64) -> Self::Output {
-        Spectrum::new(
-            self.spectrum[0] * scale,
-            self.spectrum[1] * scale,
-            self.spectrum[2] * scale
-        )
+        Spectrum::new(self.spectrum[0] * scale, self.spectrum[1] * scale, self.spectrum[2] * scale)
     }
 }
 
@@ -99,11 +91,7 @@ impl Div<f64> for Spectrum {
     type Output = Spectrum;
 
     fn div(self, scale: f64) -> Self::Output {
-        Spectrum::new(
-            self.spectrum[0] / scale,
-            self.spectrum[1] / scale,
-            self.spectrum[2] / scale
-        )
+        Spectrum::new(self.spectrum[0] / scale, self.spectrum[1] / scale, self.spectrum[2] / scale)
     }
 }
 

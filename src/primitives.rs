@@ -1,4 +1,4 @@
-use super::geom::intersectable::{IntersectionResult, Intersectable, Intersection};
+use super::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use super::geom::ray::Ray;
 use super::geom::transform::Transform;
 use super::geom::vector3::Vector3f;
@@ -8,12 +8,16 @@ use std::sync::Arc;
 pub struct Primitive {
     pub shape: Box<dyn Intersectable>,
     pub transform: Box<Transform>,
-    pub material: Arc<dyn Material>
+    pub material: Arc<dyn Material>,
 }
 
 impl Primitive {
     pub fn new(shape: Box<dyn Intersectable>, transform: Box<Transform>, material: Arc<dyn Material>) -> Self {
-        Self { shape, transform, material: Arc::clone(&material) }
+        Self {
+            shape,
+            transform,
+            material: Arc::clone(&material),
+        }
     }
 }
 

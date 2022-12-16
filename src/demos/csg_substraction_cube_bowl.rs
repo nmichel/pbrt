@@ -88,9 +88,8 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     scene.add_object(Arc::new(Primitive::new(
         Box::new(substraction_box_bowl),
         Box::new(Transform::translation(Vector3f::new(0.8, 0.0, 0.0))),
-        Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE))))
-        // Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::ALICE_BLUE))))
-        // Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE)))),
+        Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))), // Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::ALICE_BLUE))))
+                                                                              // Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE)))),
     )));
 
     scene.add_object(Arc::new(Primitive::new(
@@ -103,17 +102,10 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         )))),
     )));
 
-
     scene.add_object(Arc::new(Primitive::new(
         Box::new(Rectangle::new(5.0, 5.0)),
-        Box::new(
-            Transform::translation(Vector3f::new(0.0, 1.0, 0.0)) * Transform::rotation_x(core::f64::consts::PI)
-        ),
-        Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
-            colors::BLUE_VIOLET,
-            colors::ALICE_BLUE,
-            2.0,
-        )))),
+        Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0)) * Transform::rotation_x(core::f64::consts::PI)),
+        Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(colors::BLUE_VIOLET, colors::ALICE_BLUE, 2.0)))),
     )));
 
     (scene, Box::new(camera))

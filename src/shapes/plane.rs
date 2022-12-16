@@ -1,4 +1,4 @@
-use crate::geom::intersectable::{IntersectionResult, Intersectable, Intersection};
+use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
@@ -23,17 +23,16 @@ impl Intersectable for Plane {
         let mut p = ray.origin + ray.direction * d;
         p.y = 0.0;
 
-        res.push(
-            Intersection {
-                p,
-                d,
-                n: vector3::Vector3f::new(0.0, 1.0, 0.0),
-                wo: &ray.direction * -1.0,
-                u: p.x,
-                v: p.z,
-                dpdu: vector3::Vector3::new(1.0, 0.0, 0.0),
-                dpdv: vector3::Vector3::new(0.0, 0.0, 1.0)
-            });
+        res.push(Intersection {
+            p,
+            d,
+            n: vector3::Vector3f::new(0.0, 1.0, 0.0),
+            wo: &ray.direction * -1.0,
+            u: p.x,
+            v: p.z,
+            dpdu: vector3::Vector3::new(1.0, 0.0, 0.0),
+            dpdv: vector3::Vector3::new(0.0, 0.0, 1.0),
+        });
 
         res
     }

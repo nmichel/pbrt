@@ -1,11 +1,11 @@
-use crate::geom::intersectable::{IntersectionResult, Intersectable};
+use crate::geom::intersectable::{Intersectable, IntersectionResult};
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 
 use super::Elem;
 
 pub struct Intersection {
-    elements: Vec<Box<Elem>>
+    elements: Vec<Box<Elem>>,
 }
 
 impl Intersection {
@@ -25,16 +25,16 @@ impl Intersectable for Intersection {
 
             for collision in element_collisions.iter() {
                 // Transform collision back in world frame
-               let collision_in_world_space = e.transform.transform_interaction_to_world(&collision);
+                let collision_in_world_space = e.transform.transform_interaction_to_world(&collision);
 
-               // Each collision that lies inside all other element's volume is kept in the result set
-               if self.is_inside(&collision_in_world_space, e.as_ref()) {
-                   current.push(collision_in_world_space)
-               }
-           }
+                // Each collision that lies inside all other element's volume is kept in the result set
+                if self.is_inside(&collision_in_world_space, e.as_ref()) {
+                    current.push(collision_in_world_space)
+                }
+            }
 
-           current.sort_by(|a, b| a.d.partial_cmp(&b.d).unwrap());
-           current
+            current.sort_by(|a, b| a.d.partial_cmp(&b.d).unwrap());
+            current
         })
     }
 
@@ -59,7 +59,7 @@ impl Intersection {
             }
 
             let local_p = elem.transform.transform_point_to_local(&intersection.p);
-            if ! elem.shape.contain_point(&local_p) {
+            if !elem.shape.contain_point(&local_p) {
                 return false;
             }
         }
@@ -75,15 +75,20 @@ mod tests {
     use crate::geom::transform::*;
     use crate::geom::vector3;
     use crate::geom::vector3::Vector3f;
-    use crate::shapes::csg;
-    use crate::shapes::Plane;
+    use crate::shapes::{csg, Plane};
 
     #[test]
     fn test_intersect() {
         let elements = vec![
-            Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(2.0, 0.0, 0.0)) * Transform::rotation_z(-std::f64::consts::PI/2.0)) }), // left
-            Box::new(csg::Elem { shape: Box::new(Plane::new()), transform: Box::new(Transform::translation(Vector3f::new(0.0, 2.0, 0.0))) }), // top
-            ];
+            Box::new(csg::Elem {
+                shape: Box::new(Plane::new()),
+                transform: Box::new(Transform::translation(Vector3f::new(2.0, 0.0, 0.0)) * Transform::rotation_z(-std::f64::consts::PI / 2.0)),
+            }), // left
+            Box::new(csg::Elem {
+                shape: Box::new(Plane::new()),
+                transform: Box::new(Transform::translation(Vector3f::new(0.0, 2.0, 0.0))),
+            }), // top
+        ];
 
         let o = Intersection::new(elements);
         let position = Vector3f::new(0.0, 3.0, 30.0);
@@ -93,7 +98,7 @@ mod tests {
 
         match o.intersect(&ray, 0.0, 1000.0).as_slice() {
             [] => println!("NONE"),
-            [ref interaction, ..] =>  println!("Point : {:?} {:?}", &interaction.p, &interaction.d)
-       }
+            [ref interaction, ..] => println!("Point : {:?} {:?}", &interaction.p, &interaction.d),
+        }
     }
 }

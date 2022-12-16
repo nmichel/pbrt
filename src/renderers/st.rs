@@ -26,8 +26,7 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
             None => {}
             Some(coords) => {
                 // println!("\n\n* Pixel {:?}", &coords);
-                let mut spectrum =
-                    compute_pixel(config, integrator, coords, camera, scene, &mut sample);
+                let mut spectrum = compute_pixel(config, integrator, coords, camera, scene, &mut sample);
 
                 spectrum.gamma_correct();
                 let sample = spectrum.to_rgb();
@@ -38,10 +37,7 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
                 pixels[pixel_index + 3] = sample[3];
                 pixel_computed = pixel_computed + 1;
 
-                print!(
-                    "done [{:?}]\r",
-                    (pixel_computed as f64 / pixel_count as f64 * 100.0) as u32
-                );
+                print!("done [{:?}]\r", (pixel_computed as f64 / pixel_count as f64 * 100.0) as u32);
             }
         }
     }

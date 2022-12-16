@@ -8,7 +8,7 @@ use crate::geom::vector3::Vector3f;
 use crate::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal, RefractionIndices};
 use crate::primitives::Primitive;
 use crate::scene::Scene;
-use crate::shapes::{csg, Rectangle, Sphere, AABox};
+use crate::shapes::{csg, AABox, Rectangle, Sphere};
 use crate::spectrum::Spectrum;
 use crate::textures::*;
 use std::f64;
@@ -49,16 +49,14 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         }),
     ]);
 
-    scene
-        .add_object(Arc::new(Primitive::new(
-            Box::new(union_sphere_cube),
-            Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
-            // Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE))))
-            Arc::new(Dielectric::new(RefractionIndices::GLASS, Arc::new(PlainColor::new(colors::WHITE))))
-        )));
+    scene.add_object(Arc::new(Primitive::new(
+        Box::new(union_sphere_cube),
+        Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
+        // Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE))))
+        Arc::new(Dielectric::new(RefractionIndices::GLASS, Arc::new(PlainColor::new(colors::WHITE)))),
+    )));
 
-    scene
-    .add_object(Arc::new(Primitive::new(
+    scene.add_object(Arc::new(Primitive::new(
         Box::new(Rectangle::new(6.0, 6.0)),
         Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
         Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(

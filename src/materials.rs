@@ -2,7 +2,7 @@ use crate::geom::ray::Ray;
 use crate::interaction::Interaction;
 use crate::spectrum::Spectrum;
 
-pub trait Material : Send + Sync {
+pub trait Material: Send + Sync {
     fn scatter(&self, _ray: &Ray, _interaction: &Interaction) -> Option<(Spectrum, Ray)> {
         None
     }
@@ -17,12 +17,10 @@ mod diffuse_light;
 mod lambertian;
 mod metal;
 
-pub use self::dielectric::RefractionIndices;
-pub use self::dielectric::Dielectric;
+pub use self::dielectric::{Dielectric, RefractionIndices};
 pub use self::diffuse_light::DiffuseLight;
 pub use self::lambertian::Lambertian;
 pub use self::metal::Metal;
-
 
 /*
 impl Material {
@@ -31,7 +29,7 @@ impl Material {
         let specular = Spectrum::new(1.0, 1.0, 1.0);
         let spec_coef = Self::cook_torrance(&intersection, &world_wi);
         // println!("spec_coef {:?}", &spec_coef);
-        diffuse * Self::lambert() * (1.0 - spec_coef) 
+        diffuse * Self::lambert() * (1.0 - spec_coef)
         + specular * spec_coef
         // + specular * Self::phong(&intersection, &world_wi)
         // + specular * Self::blinn_phong(&intersection, &world_wi)
@@ -95,8 +93,8 @@ impl Material {
 
         let alpha_2 = alpha * alpha; // α²
         let m_z = f64::max(0.0, m.z);
-        let m_z_2 = m_z * m_z; // (n.m)² with m in local frame, where n is local z unit vector [0, 0, 1] 
-        let den = m_z_2 * (alpha_2 - 1.0) + 1.0; // (n⋅m)²(α² - 1) + 1  
+        let m_z_2 = m_z * m_z; // (n.m)² with m in local frame, where n is local z unit vector [0, 0, 1]
+        let den = m_z_2 * (alpha_2 - 1.0) + 1.0; // (n⋅m)²(α² - 1) + 1
         alpha_2 / (std::f64::consts::PI * den*den) // α² / (π((n⋅m)²(α² - 1) + 1)²)
     }
 

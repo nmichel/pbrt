@@ -1,4 +1,4 @@
-use crate::geom::intersectable::{IntersectionResult, Intersectable, Intersection};
+use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
@@ -6,7 +6,7 @@ use num_traits::clamp;
 use std::f64::consts::PI;
 
 pub struct Sphere {
-    r: f64
+    r: f64,
 }
 
 impl Sphere {
@@ -20,61 +20,61 @@ impl Sphere {
 }
 
 impl Intersectable for Sphere {
-    /// 
-    /// θ 
+    ///
+    /// θ
     /// φ
     /// π
     /// δ
-    /// 
+    ///
     /// 3D space to sperical coordinates
     /// ---
-    /// 
+    ///
     /// φ = atan2(y, x)
     /// θ = acos(z/r)
-    /// 
+    ///
     /// x = r sin(θ) cos(φ)   [1]
     /// y = r sin(θ) sin(φ)   [2]
     /// z = r cos(θ)
-    /// 
+    ///
     /// Angles to u/v mapping
     /// ---
-    /// 
+    ///
     /// φ in [0, 2π]
     /// θ in [0, π]
     /// u, v in [0, 1]
-    /// 
+    ///
     /// φ(u) = 2π u
     /// θ(v) = π v
-    /// 
+    ///
     /// Projection of intersection point / basic trigonometry
     /// ---
-    /// 
+    ///
     /// cos(θ) = z/r   [3]
     /// cos(φ) = x/r   [4]
     /// sin(φ) = y/r   [5]
-    /// 
+    ///
     /// Derivatives of (u, v) position
     /// ---
-    /// 
+    ///
     /// δx/δθ = δ(r sin(θ) cos(φ))/δθ
     ///       = r cos(θ) cos(φ)
     ///       = r (z/r) cos(φ)   [3]
-    ///       = z cos(φ) 
-    /// 
+    ///       = z cos(φ)
+    ///
     /// δy/δθ = r cos(θ) sin(φ)
     ///       = r (z/r) sin(φ)   [3]
     ///       = z sin(φ)
-    /// 
+    ///
     /// δz/δθ = -r sin(θ)
-    /// 
+    ///
     /// δx/δφ = -r sin(θ) sin(φ)
     ///       = -y     [2]
-    /// 
+    ///
     /// δy/δφ = r sin(θ) cos(φ)
     ///       = x       [1]
-    /// 
+    ///
     /// δz/δφ = 0
-    /// 
+    ///
     /// θ(v) = π v
     /// δθ/δv = π
     /// δx/δv = δx/δθ δθ/δv
@@ -83,7 +83,7 @@ impl Intersectable for Sphere {
     /// δy/δv = δy/δθ δθ/δv
     ///       = π z sin(φ)
     /// δz/δv = -r π sin(θ)
-    /// 
+    ///
     /// φ(u) = 2π u
     /// δφ/δu = 2π
     /// δx/δu = δx/δφ δφ/δu
@@ -92,16 +92,16 @@ impl Intersectable for Sphere {
     /// δy/δu = δy/δφ δφ/δu
     ///       = 2π x
     /// δz/δu = 0
-    /// 
+    ///
     /// δp/δu = 2π(-y, x, 0)
     /// δp/δv = π(z cos(φ), z sin(φ), -r sin(θ))
     ///       = π(zx/r, zy/r, -r sin(θ))   [4][5]
-    /// 
+    ///
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
         // Compute intersection point (geometric solution):
         // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
-        
-        let l = &ray.origin * -1.0; 
+
+        let l = &ray.origin * -1.0;
         let tca = vector3::dot(&l, &ray.direction);
         if tca < 0.0 {
             return IntersectionResult::new();
@@ -174,7 +174,7 @@ impl Sphere {
             u,
             v,
             dpdu,
-            dpdv
+            dpdv,
         }
     }
 }

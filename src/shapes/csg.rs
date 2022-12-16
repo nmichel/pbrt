@@ -3,7 +3,7 @@ use crate::geom::transform::Transform;
 
 pub struct Elem {
     pub shape: Box<dyn Intersectable>,
-    pub transform: Box<Transform>
+    pub transform: Box<Transform>,
 }
 
 mod intersection;

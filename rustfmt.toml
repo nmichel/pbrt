@@ -1,0 +1,12 @@
+attr_fn_like_width = 90
+max_width = 150
+indent_style = "Block"
+imports_granularity = "Module"
+normalize_doc_attributes = true
+overflow_delimited_expr = true
+format_strings = true
+control_brace_style = "ClosingNextLine"
+edition = "2021"
+force_multiline_blocks = true
+reorder_impl_items = true
+reorder_modules = true

@@ -1,9 +1,9 @@
+use super::Texture;
 use crate::geom::intersectable::Intersection;
 use crate::spectrum::Spectrum;
-use super::Texture;
 
 pub struct PlainColor {
-    c: Spectrum
+    c: Spectrum,
 }
 
 impl PlainColor {
