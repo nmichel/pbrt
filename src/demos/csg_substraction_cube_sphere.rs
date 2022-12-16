@@ -38,7 +38,7 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     //
     let mut scene = Scene::new();
 
-    let substraction_sphere_sphere = csg::Substraction::new(vec![
+    let substraction_cube_sphere = csg::Substraction::new(vec![
         Box::new(csg::Elem {
             shape: Box::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
@@ -51,7 +51,7 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
 
     scene
         .add_object(Arc::new(Primitive::new(
-            Box::new(substraction_sphere_sphere),
+            Box::new(substraction_cube_sphere),
             Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
             // Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::WHITE))))
             Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::ALICE_BLUE))))
@@ -67,14 +67,14 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         )));
 
     scene
-    .add_object(Arc::new(Primitive::new(
-        Box::new(Rectangle::new(3.0, 3.0)),
-        Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
-        Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
-            Spectrum::new(0.65, 0.0, 0.0),
-            Spectrum::new(0.65, 0.65, 0.65),
-            2.0,
-        )))),
+        .add_object(Arc::new(Primitive::new(
+            Box::new(Rectangle::new(3.0, 3.0)),
+            Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
+            Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
+                Spectrum::new(0.65, 0.0, 0.0),
+                Spectrum::new(0.65, 0.65, 0.65),
+                2.0,
+            )))),
     )));
 
     (scene, Box::new(camera))
