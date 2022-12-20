@@ -21,3 +21,6 @@ pub mod csg_intersection_spheres;
 
 // CSG Combo
 pub mod csg_bowl;
+
+// Test scene for Ray Training in One WeekEnd
+pub mod test_scene;
