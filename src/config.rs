@@ -1,4 +1,4 @@
-use crate::integrators;
+use crate::{integrators, renderers};
 use std::collections::HashMap;
 use std::fmt;
 use std::slice::ChunksExact;
@@ -19,6 +19,7 @@ pub struct Config {
     pub lens_radius: f64,
     pub focal_distance: f64,
     pub integrator: integrators::Type,
+    pub renderer: renderers::Type,
 }
 
 type OptionParserFn = fn(&mut Config, &String);
@@ -85,6 +86,20 @@ fn parse_integrator(config: &mut Config, value: &String) {
     }
 }
 
+fn parse_renderer(config: &mut Config, value: &String) {
+    match value.as_str() {
+        "st" => {
+            config.renderer = renderers::Type::ST;
+        }
+        "mt" => {
+            config.renderer = renderers::Type::MT;
+        }
+        _ => {
+            config.renderer = renderers::Type::MT;
+        }
+    }
+}
+
 fn default_config() -> Config {
     Config {
         input_filename: "input".to_string(),
@@ -100,6 +115,7 @@ fn default_config() -> Config {
         lens_radius: 0.0,
         focal_distance: 1.0,
         integrator: integrators::Type::PATH,
+        renderer: renderers::Type::MT,
     }
 }
 
@@ -121,6 +137,7 @@ impl Config {
             ("--lens_radius", parse_lens_radius as OptionParserFn),
             ("--focal_distance", parse_focal_distance as OptionParserFn),
             ("--integrator", parse_integrator as OptionParserFn),
+            ("--renderer", parse_renderer as OptionParserFn),
         ]
         .iter()
         .cloned()

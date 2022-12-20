@@ -19,5 +19,10 @@ fn main() {
         integrators::Type::PATH => Box::new(PathIntegrator::new(config.max_depth)),
     };
 
-    renderers::st::render(&config, &scene, camera.as_ref(), &*integrator);
+    let render_function = match config.renderer {
+        renderers::Type::ST => renderers::st::render,
+        renderers::Type::MT => renderers::mt::render,
+    };
+
+    render_function(&config, &scene, camera.as_ref(), &*integrator);
 }
