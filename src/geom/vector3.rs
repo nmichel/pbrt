@@ -1,6 +1,6 @@
 use std::fmt;
 use std::marker::Copy;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub};
+use std::ops::{Add, AddAssign, Index, Mul, MulAssign, Sub};
 
 /// A 3D vector generic type.
 ///
@@ -243,6 +243,25 @@ pub fn normalize(v: &Vector3f) -> Vector3f {
     o
 }
 
+impl<T> Index<usize> for Vector3<T> {
+    type Output = T;
+
+    fn index<'a>(&'a self, i: usize) -> &'a T {
+        if i == 0 {
+            &self.x
+        }
+        else if i == 1 {
+            &self.y
+        }
+        else if i == 2 {
+            &self.z
+        }
+        else {
+            panic!("out of bound");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,5 +366,21 @@ mod tests {
 
         assert_eq!(b, b);
         assert_eq!(c, c);
+    }
+
+    #[test]
+    fn test_random_access_vector() {
+        let a = Vector3::new(1.0, 2.0, 3.0);
+
+        assert_eq!(a[0], 1.0);
+        assert_eq!(a[1], 2.0);
+        assert_eq!(a[2], 3.0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_oob_access_vector() {
+        let a = Vector3::new(1.0, 2.0, 3.0);
+        a[3];
     }
 }

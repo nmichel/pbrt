@@ -7,9 +7,12 @@ pub struct Ray {
 
 impl Ray {
     pub fn new(origin: &Vector3f, direction: &Vector3f) -> Self {
+        let mut dir = *direction;
+        dir.normalize();
+
         Self {
             origin: *origin,
-            direction: *direction,
+            direction: dir,
         }
     }
 

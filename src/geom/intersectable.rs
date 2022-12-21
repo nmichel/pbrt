@@ -3,6 +3,7 @@ use super::vector3;
 use super::vector3::Vector3f;
 use crate::spectrum::Spectrum;
 use std::fmt;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Intersection {
     /// Intersection point
