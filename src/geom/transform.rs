@@ -9,6 +9,10 @@ pub struct Transform {
     inv_mat: Matrix4,
 }
 
+pub trait Transformable<T> {
+    fn transform(&self, transform: &Transform) -> T;
+}
+
 impl Transform {
     ///  Build a `Transform` from `mat`.
     ///  Compute the inverse tranform (`mat` must be invertible)

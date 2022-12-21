@@ -50,7 +50,15 @@ impl<T> Vector3<T> {
 
 impl Vector3<f64> {
     pub const fn zero() -> Self {
-        Self { x: 0.0, y: 0.0, z: 0.0 }
+        Self::new(0.0, 0.0, 0.0)
+    }
+
+    pub const fn min() -> Self {
+        Self::new(f64::MIN, f64::MIN, f64::MIN)
+    }
+
+    pub const fn max() -> Self {
+        Self::new(f64::MAX, f64::MAX, f64::MAX)
     }
 
     pub fn length(&self) -> f64 {
