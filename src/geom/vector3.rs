@@ -85,6 +85,46 @@ impl Vector3<f64> {
         let s = 1e-8;
         return (self.x.abs() < s) && (self.y.abs() < s) && (self.z.abs() < s);
     }
+
+    /// Update each compoment of self with respect to other, such as
+    /// each compoment is the minimum found in self or other.
+    ///  
+    /// # Example
+    /// ```
+    /// use pbrt::geom::vector3::Vector3f;
+    /// let mut a = Vector3f::new(-1.0, 2.0, 3.0);
+    /// let b = Vector3f::new(1.0, -2.0, 3.0);
+    /// a.minimize_by(&b);
+    /// assert_eq!(a.x, -1.0);
+    /// assert_eq!(a.y, -2.0);
+    /// assert_eq!(a.z, 3.0);
+    /// ```
+    pub fn minimize_by(&mut self, other: &Vector3f) -> &mut Self {
+        self.x = self.x.min(other.x);
+        self.y = self.y.min(other.y);
+        self.z = self.z.min(other.z);
+        self
+    }
+
+    /// Update each compoment of self with respect to other, such as
+    /// each compoment is the maximum found in self or other.
+    ///  
+    /// # Example
+    /// ```
+    /// use pbrt::geom::vector3::Vector3f;
+    /// let mut a = Vector3f::new(-1.0, 2.0, 3.0);
+    /// let b = Vector3f::new(1.0, -2.0, 3.0);
+    /// a.maximize_by(&b);
+    /// assert_eq!(a.x, 1.0);
+    /// assert_eq!(a.y, 2.0);
+    /// assert_eq!(a.z, 3.0);
+    /// ```
+    pub fn maximize_by(&mut self, other: &Vector3f) -> &mut Self {
+        self.x = self.x.max(other.x);
+        self.y = self.y.max(other.y);
+        self.z = self.z.max(other.z);
+        self
+    }
 }
 
 impl<T> Add for Vector3<T>
