@@ -1,3 +1,4 @@
+pub mod bvh;
 pub mod cameras;
 pub mod colors;
 pub mod config;
