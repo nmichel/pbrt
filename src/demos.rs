@@ -1,6 +1,6 @@
 // Basic
 //
-pub mod two_pheres_one_cube;
+pub mod two_spheres_one_cube;
 
 // CSG Substraction
 //
