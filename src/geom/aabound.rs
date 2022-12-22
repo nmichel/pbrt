@@ -1,8 +1,9 @@
 use super::ray::Ray;
-use super::transform::{Transformable, Transform};
+use super::transform::{Transform, Transformable};
 use super::vector3::Vector3f;
 use std::mem::swap;
 
+#[derive(Debug)]
 pub struct AABoundingBox {
     pub bmin: Vector3f,
     pub bmax: Vector3f,
@@ -37,38 +38,73 @@ impl AABoundingBox {
         }
         true
     }
+
+    /// Update self such as it encompass itself and other.
+    ///
+    /// # Example
+    /// ```
+    /// use pbrt::geom::aabound::AABoundingBox;
+    /// use pbrt::geom::vector3::Vector3f;
+    /// let mut a = AABoundingBox::new(&Vector3f::new(-1.0, -1.0, -1.0), &Vector3f::new(1.0, 1.0, 1.0));
+    /// let b = AABoundingBox::new(&Vector3f::new(0.0, -1.0, -1.0), &Vector3f::new(2.0, 1.0, 1.0));
+    /// a.combine_with(&b);
+    /// assert_eq!(a.bmin.x, -1.0);
+    /// assert_eq!(a.bmax.x, 2.0);
+    /// ```
+    pub fn combine_with(&mut self, other: &AABoundingBox) -> &mut Self {
+        self.bmin.minimize_by(&other.bmin);
+        self.bmax.maximize_by(&other.bmax);
+        self
+    }
+
+    /// Return the AABoundingBox emcompassing a and b.
+    ///
+    /// # Example
+    /// ```
+    /// use pbrt::geom::aabound::AABoundingBox;
+    /// use pbrt::geom::vector3::Vector3f;
+    /// let a = AABoundingBox::new(&Vector3f::new(-1.0, -1.0, -1.0), &Vector3f::new(1.0, 1.0, 1.0));
+    /// let b = AABoundingBox::new(&Vector3f::new(0.0, -1.0, -1.0), &Vector3f::new(2.0, 1.0, 1.0));
+    /// let c = AABoundingBox::combine(&a, &b);
+    /// assert_eq!(c.bmin.x, -1.0);
+    /// assert_eq!(c.bmin.y, -1.0);
+    /// assert_eq!(c.bmin.z, -1.0);
+    /// assert_eq!(c.bmax.x, 2.0);
+    /// assert_eq!(c.bmax.y, 1.0);
+    /// assert_eq!(c.bmax.z, 1.0);
+    /// ```
+    pub fn combine(a: &AABoundingBox, b: &AABoundingBox) -> AABoundingBox {
+        let mut res = AABoundingBox::new(&Vector3f::max(), &Vector3f::min());
+        res.combine_with(a).combine_with(b);
+        res
+    }
 }
 
 impl Transformable<AABoundingBox> for AABoundingBox {
     fn transform(&self, transform: &Transform) -> Self {
-      let min = &self.bmin;
-      let max = &self.bmax;
-      let vertices = vec![
-        Vector3f::new(min.x, min.y, min.z),
-        Vector3f::new(min.x, min.y, max.z),
-        Vector3f::new(min.x, max.y, min.z),
-        Vector3f::new(min.x, max.y, max.z),
-        Vector3f::new(max.x, max.y, max.z),
-        Vector3f::new(max.x, max.y, min.z),
-        Vector3f::new(max.x, min.y, max.z),
-        Vector3f::new(max.x, min.y, min.z),
-      ];
+        let min = &self.bmin;
+        let max = &self.bmax;
+        let vertices = vec![
+            Vector3f::new(min.x, min.y, min.z),
+            Vector3f::new(min.x, min.y, max.z),
+            Vector3f::new(min.x, max.y, min.z),
+            Vector3f::new(min.x, max.y, max.z),
+            Vector3f::new(max.x, max.y, max.z),
+            Vector3f::new(max.x, max.y, min.z),
+            Vector3f::new(max.x, min.y, max.z),
+            Vector3f::new(max.x, min.y, min.z),
+        ];
 
-      let mut transformed_min = Vector3f::max();
-      let mut transformed_max = Vector3f::min();
+        let mut transformed_min = Vector3f::max();
+        let mut transformed_max = Vector3f::min();
 
-      for vertex in vertices.iter() {
-        let transformed_point =transform.transform_point_to_world(vertex);
-        transformed_min.x = transformed_min.x.min(transformed_point.x);
-        transformed_min.y = transformed_min.y.min(transformed_point.y);
-        transformed_min.z = transformed_min.z.min(transformed_point.z);
+        for vertex in vertices.iter() {
+            let transformed_point = transform.transform_point_to_world(vertex);
+            transformed_min.minimize_by(&transformed_point);
+            transformed_max.maximize_by(&transformed_point);
+        }
 
-        transformed_max.x = transformed_max.x.max(transformed_point.x);
-        transformed_max.y = transformed_max.y.max(transformed_point.y);
-        transformed_max.z = transformed_max.z.max(transformed_point.z);
-      }
-
-      AABoundingBox::new(&transformed_min, &transformed_max)
+        AABoundingBox::new(&transformed_min, &transformed_max)
     }
 }
 
