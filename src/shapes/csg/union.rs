@@ -1,6 +1,8 @@
 use super::Elem;
+use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use crate::geom::ray::Ray;
+use crate::geom::transform::Transformable;
 use crate::geom::vector3::Vector3f;
 
 pub struct Union {
@@ -46,6 +48,23 @@ impl Intersectable for Union {
         }
 
         false
+    }
+}
+
+impl AABound for Union {
+    fn get_bounding_box(&self) -> AABoundingBox {
+        match &self.elements[..] {
+            &[] => AABoundingBox::new(&Vector3f::zero(), &Vector3f::zero()),
+
+            &[ref first_element, ref other_elements @ ..] => {
+                let mut res_bbox = first_element.shape.get_bounding_box().transform(&first_element.transform);
+                for next_element in other_elements.iter() {
+                    let bbox = next_element.shape.get_bounding_box().transform(&next_element.transform);
+                    res_bbox.combine_with(&bbox);
+                }
+                res_bbox
+            }
+        }
     }
 }
 

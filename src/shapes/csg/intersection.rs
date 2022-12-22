@@ -1,5 +1,7 @@
+use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::intersectable::{Intersectable, IntersectionResult};
 use crate::geom::ray::Ray;
+use crate::geom::transform::Transformable;
 use crate::geom::vector3::Vector3f;
 
 use super::Elem;
@@ -47,6 +49,24 @@ impl Intersectable for Intersection {
         }
 
         false
+    }
+}
+
+impl AABound for Intersection {
+    /// Return the bounding box of the first element (with which others are
+    /// intersecting).
+    /// In many case it's oversized, but I postpone finding a better answer
+    /// as it's a first acceptable approximation.
+    ///
+    fn get_bounding_box(&self) -> AABoundingBox {
+        match &self.elements[..] {
+            &[] => AABoundingBox::new(&Vector3f::zero(), &Vector3f::zero()),
+
+            &[ref first_element, ref other_elements @ ..] => {
+                let mut res_bbox = first_element.shape.get_bounding_box().transform(&first_element.transform);
+                res_bbox
+            }
+        }
     }
 }
 

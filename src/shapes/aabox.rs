@@ -1,3 +1,4 @@
+use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
@@ -194,5 +195,13 @@ impl Intersectable for AABox {
             && point.y <= self.max.y
             && point.z >= self.min.z
             && point.z <= self.max.z
+    }
+}
+
+impl AABound for AABox {
+    fn get_bounding_box(&self) -> AABoundingBox {
+        let bmin = self.min;
+        let bmax = self.max;
+        AABoundingBox::new(&bmin, &bmax)
     }
 }

@@ -1,3 +1,4 @@
+use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
@@ -54,5 +55,13 @@ impl Intersectable for Rectangle {
 
     fn contain_point(&self, point: &Vector3f) -> bool {
         point.y < 0.0 && point.x.abs() <= self.half_width && point.z.abs() <= self.half_height
+    }
+}
+
+impl AABound for Rectangle {
+    fn get_bounding_box(&self) -> AABoundingBox {
+        let bmin = Vector3f::new(-self.half_width, -0.01, -self.half_height);
+        let bmax = Vector3f::new(self.half_width, 0.01, self.half_height);
+        AABoundingBox::new(&bmin, &bmax)
     }
 }

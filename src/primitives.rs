@@ -1,3 +1,6 @@
+use crate::geom::aabound::{AABound, AABoundingBox};
+use crate::geom::transform::Transformable;
+
 use super::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use super::geom::ray::Ray;
 use super::geom::transform::Transform;
@@ -36,5 +39,11 @@ impl Intersectable for Primitive {
     fn contain_point(&self, point: &Vector3f) -> bool {
         let local_point = self.transform.transform_point_to_local(&point);
         self.shape.contain_point(&local_point)
+    }
+}
+
+impl AABound for Primitive {
+    fn get_bounding_box(&self) -> AABoundingBox {
+        self.shape.get_bounding_box().transform(&self.transform)
     }
 }

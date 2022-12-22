@@ -1,3 +1,4 @@
+use super::aabound::AABound;
 use super::ray::Ray;
 use super::vector3;
 use super::vector3::Vector3f;
@@ -29,7 +30,7 @@ pub struct Intersection {
 
 pub type IntersectionResult = Vec<Intersection>;
 
-pub trait Intersectable: Send + Sync {
+pub trait Intersectable: AABound + Send + Sync {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult;
     fn contain_point(&self, point: &Vector3f) -> bool;
 }

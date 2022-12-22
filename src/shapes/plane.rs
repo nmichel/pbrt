@@ -1,3 +1,4 @@
+use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
@@ -39,5 +40,15 @@ impl Intersectable for Plane {
 
     fn contain_point(&self, point: &Vector3f) -> bool {
         point.y < 0.0
+    }
+}
+
+impl AABound for Plane {
+    fn get_bounding_box(&self) -> AABoundingBox {
+        let mut bmin = Vector3f::min();
+        bmin.y = -0.01;
+        let mut bmax = Vector3f::max();
+        bmax.y = 0.01;
+        AABoundingBox::new(&bmin, &bmax)
     }
 }

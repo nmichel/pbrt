@@ -1,3 +1,4 @@
+use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
@@ -20,6 +21,8 @@ impl Sphere {
 }
 
 impl Intersectable for Sphere {
+    /// See https://www.pbr-book.org/3ed-2018/Shapes/Spheres
+    /// see https://en.wikipedia.org/wiki/Spherical_coordinate_system
     ///
     /// θ
     /// φ
@@ -176,5 +179,13 @@ impl Sphere {
             dpdu,
             dpdv,
         }
+    }
+}
+
+impl AABound for Sphere {
+    fn get_bounding_box(&self) -> AABoundingBox {
+        let bmin = Vector3f::new(-self.r, -self.r, -self.r);
+        let bmax = Vector3f::new(self.r, self.r, self.r);
+        AABoundingBox::new(&bmin, &bmax)
     }
 }
