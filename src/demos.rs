@@ -24,3 +24,4 @@ pub mod csg_bowl;
 
 // Test scene for Ray Training in One WeekEnd
 pub mod test_scene;
+pub mod test_scene_cube;

@@ -14,6 +14,7 @@ use crate::spectrum::Spectrum;
 use crate::textures::*;
 use crate::utils::random_double;
 use crate::{colors, materials};
+use core::f64::consts::{FRAC_PI_3, FRAC_PI_4};
 use std::f64;
 use std::sync::Arc;
 
@@ -50,19 +51,21 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
             Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.5, 0.5, 0.5))))),
         )))
         .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(1.0)),
-            Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0))),
+            Box::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+            Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0)) * Transform::rotation_x(FRAC_PI_3)),
             Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::WHITE)))),
         )))
         .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(1.0)),
-            Box::new(Transform::translation(Vector3f::new(-4.0, 1.0, 0.0))),
-            Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1))))),
+            Box::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+            Box::new(Transform::translation(Vector3f::new(-4.0, 1.0, 0.0)) * Transform::rotation_y(FRAC_PI_3)),
+            // Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1))))),
+            Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::DARK_RED)))),
         )))
         .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(1.0)),
-            Box::new(Transform::translation(Vector3f::new(4.0, 1.0, 0.0))),
-            Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(Spectrum::new(0.7, 0.6, 0.5))))),
+            Box::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+            Box::new(Transform::translation(Vector3f::new(4.0, 1.0, 0.0)) * Transform::rotation_z(FRAC_PI_3)),
+            // Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(Spectrum::new(0.7, 0.6, 0.5))))),
+            Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::YELLOW_GREEN)))),
         )));
 
     for a in -11..10 {
