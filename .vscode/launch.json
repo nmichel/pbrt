@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+        "name": "(OSX) Launch",
+        "type": "lldb",
+        "request": "launch",
+        "program": "${workspaceRoot}/target/debug/pbrt",
+        "args": ["--output", "output_dev.png", "--max_depth", "4", "--samples_ppx", "100", "--output_width", "30", "--output_height", "30", "--threads", "1"],
+        "cwd": "${workspaceRoot}",
+    }
+  ]
+}
