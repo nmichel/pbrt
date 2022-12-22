@@ -1,3 +1,4 @@
+use crate::bvh::BVHNode;
 use crate::geom::intersectable;
 
 use super::geom::intersectable::Intersectable;
@@ -11,6 +12,7 @@ use std::sync::Arc;
 pub struct Scene {
     pub primitives: Vec<Arc<Primitive>>,
     pub lights: Vec<Arc<dyn Light>>,
+    pub bvh: Option<BVHNode>,
 }
 
 impl Scene {
@@ -19,6 +21,7 @@ impl Scene {
         Scene {
             primitives: Vec::new(),
             lights: Vec::new(),
+            bvh: None,
         }
     }
 
@@ -32,42 +35,24 @@ impl Scene {
         self.lights.push(light);
         self
     }
+
+    pub fn commit(&mut self) -> &mut Self {
+        let bvh = Self::build_bvh(&mut self.primitives);
+        self.primitives = vec![];
+        self.bvh = bvh;
+        self
+    }
+
+    fn build_bvh(prim: &mut Vec<Arc<Primitive>>) -> Option<BVHNode> {
+        Some(BVHNode::new(prim))
+    }
 }
 
 impl Scene {
     pub fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
-        let res: Option<Interaction> = None;
-        self.primitives.iter().fold(res, |acc, primitive| {
-            let res = primitive.intersect(ray, near, far);
-            // println!("Collisions {:?}\n", &res);
-            let slice: &[intersectable::Intersection] = res.as_slice();
-            match slice {
-                [intersection, ..] => {
-                    match acc {
-                        None => {
-                            let inter = *intersection;
-                            let material: &dyn Material = &*(primitive.material);
-                            Some(Interaction {
-                                intersection: inter,
-                                material,
-                            })
-                        }
-                        Some(ref prev_interaction) => {
-                            if intersection.d < prev_interaction.intersection.d {
-                                let material: &dyn Material = &*(primitive.material);
-                                Some(Interaction {
-                                    intersection: *intersection,
-                                    material,
-                                })
-                            }
-                            else {
-                                acc
-                            }
-                        }
-                    }
-                }
-                _ => acc,
-            }
-        })
+        match &self.bvh {
+            None => None,
+            Some(bvh_node) => bvh_node.intersect(ray, near, far),
+        }
     }
 }
