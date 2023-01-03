@@ -2,6 +2,9 @@
 //
 pub mod two_spheres_one_cube;
 
+// Cylinder
+pub mod cylinder;
+
 // CSG Substraction
 //
 pub mod csg_substraction_cube_bowl;
