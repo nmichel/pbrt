@@ -49,7 +49,6 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
                 2000.0,
             )))),
         )))
-
         .add_object(Arc::new(Primitive::new(
             Box::new(Cylinder::new(0.45, 1.0)),
             Box::new(Transform::translation(Vector3f::new(-offset, 0.0, -offset)) * Transform::rotation_z(-FRAC_PI_3)),
@@ -62,10 +61,11 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         )))
         .add_object(Arc::new(Primitive::new(
             Box::new(Cylinder::new(0.45, 1.0)),
-            Box::new(Transform::translation(Vector3f::new(offset, 0.0, -offset)) * Transform::rotation_x(FRAC_PI_4) * Transform::rotation_z(FRAC_PI_3)),
+            Box::new(
+                Transform::translation(Vector3f::new(offset, 0.0, -offset)) * Transform::rotation_x(FRAC_PI_4) * Transform::rotation_z(FRAC_PI_3),
+            ),
             Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::PEACH_PUFF)))),
         )))
-
         .add_object(Arc::new(Primitive::new(
             Box::new(Cylinder::new(0.45, 1.0)),
             Box::new(Transform::translation(Vector3f::new(-offset, 0.0, 0.0))),
@@ -81,7 +81,6 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
             Box::new(Transform::translation(Vector3f::new(offset, 0.0, 0.0))),
             Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::PEACH_PUFF)))),
         )))
-
         .add_object(Arc::new(Primitive::new(
             Box::new(Cylinder::new(0.45, 1.0)),
             Box::new(Transform::translation(Vector3f::new(-offset, 0.0, offset))),

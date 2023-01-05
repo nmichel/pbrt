@@ -10,15 +10,22 @@ use crate::materials::Material;
 use crate::primitives::Primitive;
 use crate::utils::random_double;
 
-pub struct BVHNode {
-    left: Option<Box<BVHNode>>,
-    right: Option<Box<BVHNode>>,
+pub struct BVHNode<T>
+where
+    T: Intersectable + AABound,
+{
+    left: Option<Box<BVHNode<T>>>,
+    right: Option<Box<BVHNode<T>>>,
     aabbox: AABoundingBox,
-    primitives: Vec<Arc<Primitive>>,
+    primitives: Vec<Arc<T>>,
 }
 
-impl BVHNode {
-    pub fn new(primitives: &mut Vec<Arc<Primitive>>) -> Self {
+pub trait Accumulator<T> {
+    fn accumulate(&mut self, item: &Arc<T>, intersections: Vec<Intersection>) -> ();
+}
+
+impl<T: Intersectable + AABound> BVHNode<T> {
+    pub fn new(primitives: &mut Vec<Arc<T>>) -> Self {
         // Sort primitive with respect to a comparator randomly chosen
         primitives.sort_by(Self::choose_comparator());
 
@@ -51,78 +58,39 @@ impl BVHNode {
         }
     }
 
-    pub fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
+    pub fn intersect(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
         if !self.aabbox.hit(ray, near, far) {
-            return None;
+            return;
         }
 
         if self.primitives.len() > 0 {
-            self.intersect_local(ray, near, far)
+            self.intersect_local(ray, near, far, accumulator);
         }
         else {
-            let left_interaction = Self::intersect_subnode(&self.left, ray, near, far);
-            let right_interaction = Self::intersect_subnode(&self.right, ray, near, far);
-
-            match (left_interaction, right_interaction) {
-                (None, None) => None,
-                (None, i) => i,
-                (i, None) => i,
-                (Some(left_i), Some(right_i)) => {
-                    if left_i.intersection.d > right_i.intersection.d {
-                        Some(right_i)
-                    }
-                    else {
-                        Some(left_i)
-                    }
-                }
-            }
+            Self::intersect_subnode(&self.left, ray, near, far, accumulator);
+            Self::intersect_subnode(&self.right, ray, near, far, accumulator);
         }
     }
 
-    fn intersect_subnode<'a>(node: &'a Option<Box<BVHNode>>, ray: &Ray, near: f64, far: f64) -> Option<Interaction<'a>> {
+    fn intersect_subnode<'a>(node: &'a Option<Box<BVHNode<T>>>, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
         match &node {
-            None => None,
-            Some(node) => node.intersect(ray, near, far),
+            None => (),
+            Some(node) => node.intersect(ray, near, far, accumulator),
         }
     }
 
-    fn intersect_local(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
+    fn intersect_local(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
+        // Use a simple iteration
         let res: Option<Interaction> = None;
         self.primitives.iter().fold(res, |acc, primitive| {
-            let res = primitive.intersect(ray, near, far);
-            // println!("Collisions {:?}\n", &res);
-            let slice: &[Intersection] = res.as_slice();
-            match slice {
-                [intersection, ..] => {
-                    match acc {
-                        None => {
-                            let inter = *intersection;
-                            let material: &dyn Material = &*(primitive.material);
-                            Some(Interaction {
-                                intersection: inter,
-                                material,
-                            })
-                        }
-                        Some(ref prev_interaction) => {
-                            if intersection.d < prev_interaction.intersection.d {
-                                let material: &dyn Material = &*(primitive.material);
-                                Some(Interaction {
-                                    intersection: *intersection,
-                                    material,
-                                })
-                            }
-                            else {
-                                acc
-                            }
-                        }
-                    }
-                }
-                _ => acc,
-            }
-        })
+            let intersections = primitive.intersect(ray, near, far);
+            accumulator.accumulate(primitive, intersections);
+            acc
+        });
+        ()
     }
 
-    fn choose_comparator() -> fn(&Arc<Primitive>, &Arc<Primitive>) -> Ordering {
+    fn choose_comparator() -> fn(&Arc<T>, &Arc<T>) -> Ordering {
         let r = random_double() * 3.0;
         if r < 1.0 {
             Self::compare_x
@@ -135,20 +103,20 @@ impl BVHNode {
         }
     }
 
-    fn compare_x(a: &Arc<Primitive>, b: &Arc<Primitive>) -> Ordering {
+    fn compare_x(a: &Arc<T>, b: &Arc<T>) -> Ordering {
         a.get_bounding_box().bmin.x.partial_cmp(&b.get_bounding_box().bmin.x).unwrap()
     }
 
-    fn compare_y(a: &Arc<Primitive>, b: &Arc<Primitive>) -> Ordering {
+    fn compare_y(a: &Arc<T>, b: &Arc<T>) -> Ordering {
         a.get_bounding_box().bmin.y.partial_cmp(&b.get_bounding_box().bmin.y).unwrap()
     }
 
-    fn compare_z(a: &Arc<Primitive>, b: &Arc<Primitive>) -> Ordering {
+    fn compare_z(a: &Arc<T>, b: &Arc<T>) -> Ordering {
         a.get_bounding_box().bmin.z.partial_cmp(&b.get_bounding_box().bmin.z).unwrap()
     }
 }
 
-impl fmt::Display for BVHNode {
+impl fmt::Display for BVHNode<Primitive> {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "* aabbox {:?}", &self.aabbox)?;

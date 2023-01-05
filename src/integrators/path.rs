@@ -31,7 +31,7 @@ impl Integrator for PathIntegrator {
         }
         match scene.intersect(&ray, near, far) {
             Some(interaction) => {
-                let Interaction { material, .. } = interaction;
+                let Interaction { ref material, .. } = interaction;
                 let emitted = match material.emit(&ray, &interaction) {
                     Some(emitted) => emitted,
                     None => Spectrum::new(0.0, 0.0, 0.0),
