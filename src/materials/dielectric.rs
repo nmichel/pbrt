@@ -83,7 +83,7 @@ impl Material for Dielectric {
 
         match refract(&local_wo, &local_outward_normal, ni_over_nt) {
             Some(local_refracted) => {
-                let reflectance = schlick(local_wo, local_outward_normal, ni, nt);
+                let reflectance = fresnel(local_wo, local_outward_normal, ni, nt);
                 let local_scatter_direction: Vector3f;
                 let scattered_ray_origin: Vector3f;
                 if random_double() < reflectance {
@@ -175,7 +175,7 @@ fn fresnel(wo: Vector3f, normal: Vector3f, n1: f64, n2: f64) -> f64 {
 /// * `n1`- Refractive index of the material the incident ray comes from
 /// * `n2`- Refractive index of the material the refracted ray goes into
 ///
-fn schlick(wo: Vector3f, normal: Vector3f, n1: f64, n2: f64) -> f64 {
+fn _schlick(wo: Vector3f, normal: Vector3f, n1: f64, n2: f64) -> f64 {
     let r0 = (n1 - n2) / (n1 + n2);
     let r0_2 = r0 * r0;
     let cos_theta_i = wo.z * normal.z;

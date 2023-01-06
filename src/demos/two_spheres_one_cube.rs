@@ -5,10 +5,10 @@ use crate::geom::matrix4::Matrix4;
 use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::geom::vector3::Vector3f;
-use crate::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal, RefractionIndices};
+use crate::materials::{Dielectric, Lambertian, Material, Metal, RefractionIndices};
 use crate::primitives::Primitive;
 use crate::scene::Scene;
-use crate::shapes::{AABox, Rectangle, Sphere};
+use crate::shapes::{AABox, Sphere};
 use crate::spectrum::Spectrum;
 use crate::textures::*;
 use std::f64;
@@ -42,7 +42,6 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     let text_check_red: Arc<dyn Texture> = Arc::new(CheckerBoard::new(Spectrum::new(0.65, 0.0, 0.0), Spectrum::new(0.65, 0.65, 0.65), 1000.0));
     let material_wall: Arc<dyn Material> = Arc::new(Lambertian::new(Arc::clone(&text_check_red)));
     let material_lambertian: Arc<dyn Material> = Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE))));
-    let material_lambertian_white: Arc<dyn Material> = Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::WHITE))));
     let material_dielectric: Arc<dyn Material> = Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::WHITE))));
     let material_metal_white: Arc<dyn Material> = Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE))));
 

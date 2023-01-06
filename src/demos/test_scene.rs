@@ -1,19 +1,19 @@
 use num_traits::ToPrimitive;
 
-use crate::cameras::{Camera, PinHoleCamera, ThinLensCamera};
+use crate::cameras::{Camera, ThinLensCamera};
+use crate::colors;
 use crate::config::Config;
 use crate::geom::matrix4::Matrix4;
 use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::geom::vector3::Vector3f;
-use crate::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal, RefractionIndices};
+use crate::materials::{Dielectric, Lambertian, Material, Metal, RefractionIndices};
 use crate::primitives::Primitive;
 use crate::scene::Scene;
-use crate::shapes::{AABox, Rectangle, Sphere};
+use crate::shapes::Sphere;
 use crate::spectrum::Spectrum;
 use crate::textures::*;
 use crate::utils::random_double;
-use crate::{colors, materials};
 use std::f64;
 use std::sync::Arc;
 
@@ -47,7 +47,11 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         .add_object(Arc::new(Primitive::new(
             Box::new(Sphere::new(1000.0)),
             Box::new(Transform::translation(Vector3f::new(0.0, -1000.0, 0.0))),
-            Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.5, 0.5, 0.5))))),
+            Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
+                Spectrum::new(0.2, 0.3, 0.1),
+                Spectrum::new(0.9, 0.9, 0.9),
+                2000.0,
+            )))),
         )))
         .add_object(Arc::new(Primitive::new(
             Box::new(Sphere::new(1.0)),

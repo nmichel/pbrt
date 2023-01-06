@@ -151,22 +151,22 @@ impl BVHNode {
 impl fmt::Display for BVHNode {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "* aabbox {:?}", &self.aabbox);
-        writeln!(f, "primitives {}", self.primitives.len());
+        writeln!(f, "* aabbox {:?}", &self.aabbox)?;
+        writeln!(f, "primitives {}", self.primitives.len())?;
         match &self.left {
             None => {
-                writeln!(f, "No left child");
+                writeln!(f, "No left child")?;
             }
             Some(sub_node) => {
-                writeln!(f, "left child \n{}", *sub_node);
+                writeln!(f, "left child \n{}", *sub_node)?;
             }
         }
         match &self.right {
             None => {
-                writeln!(f, "No right child");
+                writeln!(f, "No right child")?;
             }
             Some(sub_node) => {
-                writeln!(f, "right child \n{}", *sub_node);
+                writeln!(f, "right child \n{}", *sub_node)?;
             }
         }
 

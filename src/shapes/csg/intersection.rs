@@ -62,8 +62,8 @@ impl AABound for Intersection {
         match &self.elements[..] {
             &[] => AABoundingBox::new(&Vector3f::zero(), &Vector3f::zero()),
 
-            &[ref first_element, ref other_elements @ ..] => {
-                let mut res_bbox = first_element.shape.get_bounding_box().transform(&first_element.transform);
+            &[ref first_element, ref _other_elements @ ..] => {
+                let res_bbox = first_element.shape.get_bounding_box().transform(&first_element.transform);
                 res_bbox
             }
         }

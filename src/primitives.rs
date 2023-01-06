@@ -1,7 +1,7 @@
 use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::transform::Transformable;
 
-use super::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
+use super::geom::intersectable::{Intersectable, IntersectionResult};
 use super::geom::ray::Ray;
 use super::geom::transform::Transform;
 use super::geom::vector3::Vector3f;

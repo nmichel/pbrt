@@ -1,11 +1,7 @@
-use crate::bvh::BVHNode;
-use crate::geom::intersectable;
-
-use super::geom::intersectable::Intersectable;
+use super::bvh::BVHNode;
 use super::geom::ray::Ray;
 use super::interaction::Interaction;
 use super::light::Light;
-use super::materials::Material;
 use super::primitives::Primitive;
 use std::sync::Arc;
 

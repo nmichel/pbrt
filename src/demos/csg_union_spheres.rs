@@ -5,7 +5,7 @@ use crate::geom::matrix4::Matrix4;
 use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::geom::vector3::Vector3f;
-use crate::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal, RefractionIndices};
+use crate::materials::Lambertian;
 use crate::primitives::Primitive;
 use crate::scene::Scene;
 use crate::shapes::{csg, Rectangle, Sphere};

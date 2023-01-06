@@ -23,6 +23,7 @@ impl Sphere {
 impl Intersectable for Sphere {
     /// See https://www.pbr-book.org/3ed-2018/Shapes/Spheres
     /// see https://en.wikipedia.org/wiki/Spherical_coordinate_system
+    /// See https://en.wikipedia.org/wiki/Chain_rule
     ///
     /// θ
     /// φ
@@ -56,7 +57,7 @@ impl Intersectable for Sphere {
     /// cos(φ) = x/r   [4]
     /// sin(φ) = y/r   [5]
     ///
-    /// Derivatives of (u, v) position
+    /// Derivatives of (u, v) position (using Chain Rule)
     /// ---
     ///
     /// δx/δθ = δ(r sin(θ) cos(φ))/δθ
@@ -80,7 +81,7 @@ impl Intersectable for Sphere {
     ///
     /// θ(v) = π v
     /// δθ/δv = π
-    /// δx/δv = δx/δθ δθ/δv
+    /// δx/δv = δx/δθ δθ/δv                           [Chain Rule]
     ///       = (r cos(θ) cos(φ)) δθ/δv
     ///       = π z cos(φ)
     /// δy/δv = δy/δθ δθ/δv
@@ -89,7 +90,7 @@ impl Intersectable for Sphere {
     ///
     /// φ(u) = 2π u
     /// δφ/δu = 2π
-    /// δx/δu = δx/δφ δφ/δu
+    /// δx/δu = δx/δφ δφ/δu                           [Chain Rule]
     ///       = (-r sin(θ) sin(φ)) δφ/δu
     ///       = -2π y
     /// δy/δu = δy/δφ δφ/δu
@@ -128,11 +129,11 @@ impl Intersectable for Sphere {
         let mut res = IntersectionResult::new();
 
         if tmin > near {
-            res.push(self.compute_interection_details(ray, tmin))
+            res.push(self.compute_intersection_details(ray, tmin))
         }
 
         if tmax > near && tmax < far {
-            res.push(self.compute_interection_details(ray, tmax))
+            res.push(self.compute_intersection_details(ray, tmax))
         }
 
         res
@@ -144,7 +145,7 @@ impl Intersectable for Sphere {
 }
 
 impl Sphere {
-    fn compute_interection_details(&self, ray: &Ray, t: f64) -> Intersection {
+    fn compute_intersection_details(&self, ray: &Ray, t: f64) -> Intersection {
         let hit = &ray.origin + &(&ray.direction * t);
         let mut norm = hit;
         norm.normalize();

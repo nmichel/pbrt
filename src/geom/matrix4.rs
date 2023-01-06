@@ -1,6 +1,6 @@
 use super::vector3;
 use super::vector3::Vector3f;
-use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Sub};
+use std::ops::Mul;
 use std::{f64, fmt};
 
 /// A 3D vector generic type.

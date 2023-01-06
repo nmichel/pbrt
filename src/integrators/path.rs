@@ -8,7 +8,7 @@ use super::Integrator;
 
 pub struct PathIntegrator {
     /// Max recursion depth
-    max_depth: usize,
+    pub max_depth: usize,
 }
 
 impl PathIntegrator {

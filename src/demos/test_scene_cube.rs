@@ -1,20 +1,20 @@
 use num_traits::ToPrimitive;
 
-use crate::cameras::{Camera, PinHoleCamera, ThinLensCamera};
+use crate::cameras::{Camera, ThinLensCamera};
+use crate::colors;
 use crate::config::Config;
 use crate::geom::matrix4::Matrix4;
 use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::geom::vector3::Vector3f;
-use crate::materials::{Dielectric, DiffuseLight, Lambertian, Material, Metal, RefractionIndices};
+use crate::materials::{Dielectric, Lambertian, Material, Metal, RefractionIndices};
 use crate::primitives::Primitive;
 use crate::scene::Scene;
-use crate::shapes::{AABox, Rectangle, Sphere};
+use crate::shapes::{AABox, Sphere};
 use crate::spectrum::Spectrum;
 use crate::textures::*;
 use crate::utils::random_double;
-use crate::{colors, materials};
-use core::f64::consts::{FRAC_PI_3, FRAC_PI_4};
+use core::f64::consts::FRAC_PI_3;
 use std::f64;
 use std::sync::Arc;
 
