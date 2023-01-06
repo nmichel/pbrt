@@ -1,22 +1,57 @@
-use crate::bvh::{Accumulator, BVHNode};
-use crate::geom::intersectable;
-
-use super::geom::intersectable::Intersection;
+use super::bvh::{Accumulator, BVHNode};
+use super::geom::aabound::{AABound, AABoundingBox};
+use super::geom::intersectable;
+use super::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use super::geom::ray::Ray;
+use super::geom::vector3::Vector3f;
 use super::interaction::Interaction;
 use super::light::Light;
 use super::primitives::Primitive;
 use std::sync::Arc;
 
+struct Wrapper<T>(Arc<T>)
+where
+    T: Intersectable + AABound;
+
+impl<T> Intersectable for Wrapper<T>
+where
+    T: Intersectable + AABound,
+{
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
+        self.0.intersect(ray, near, far)
+    }
+
+    fn contain_point(&self, point: &Vector3f) -> bool {
+        self.0.contain_point(point)
+    }
+}
+
+impl<T> Clone for Wrapper<T>
+where
+    T: Intersectable + AABound,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T> AABound for Wrapper<T>
+where
+    T: Intersectable + AABound,
+{
+    fn get_bounding_box(&self) -> AABoundingBox {
+        self.0.get_bounding_box()
+    }
+}
+
 pub struct Scene {
-    pub primitives: Vec<Arc<Primitive>>,
-    pub lights: Vec<Arc<dyn Light>>,
-    pub bvh: Option<BVHNode<Primitive>>,
+    primitives: Vec<Wrapper<Primitive>>,
+    lights: Vec<Arc<dyn Light>>,
+    bvh: Option<BVHNode<Wrapper<Primitive>>>,
 }
 
 impl Scene {
     pub fn new() -> Scene {
-        // Scene { primitives: Vec::new(), lights: Arc::new(Vec::new()) }
         Scene {
             primitives: Vec::new(),
             lights: Vec::new(),
@@ -25,7 +60,7 @@ impl Scene {
     }
 
     pub fn add_object(&mut self, object: Arc<Primitive>) -> &mut Self {
-        self.primitives.push(Arc::clone(&object));
+        self.primitives.push(Wrapper(Arc::clone(&object)));
         self
     }
 
@@ -42,7 +77,7 @@ impl Scene {
         self
     }
 
-    fn build_bvh(prim: &mut Vec<Arc<Primitive>>) -> Option<BVHNode<Primitive>> {
+    fn build_bvh(prim: &mut Vec<Wrapper<Primitive>>) -> Option<BVHNode<Wrapper<Primitive>>> {
         Some(BVHNode::new(prim))
     }
 }
@@ -51,15 +86,15 @@ struct PrimitiveAccumulator {
     pub acc: Option<Interaction>,
 }
 
-impl Accumulator<Primitive> for PrimitiveAccumulator {
-    fn accumulate(&mut self, item: &Arc<Primitive>, intersections: Vec<intersectable::Intersection>) -> () {
+impl Accumulator<Wrapper<Primitive>> for PrimitiveAccumulator {
+    fn accumulate(&mut self, item: &Wrapper<Primitive>, intersections: Vec<intersectable::Intersection>) -> () {
         let slice: &[Intersection] = intersections.as_slice();
         match slice {
             [intersection, ..] => {
                 match &mut self.acc {
                     None => {
                         let inter = *intersection;
-                        let material = item.material.clone();
+                        let material = item.0.material.clone();
                         self.acc = Some(Interaction {
                             intersection: inter,
                             material,
@@ -67,7 +102,7 @@ impl Accumulator<Primitive> for PrimitiveAccumulator {
                     }
                     Some(ref prev_interaction) => {
                         if intersection.d < prev_interaction.intersection.d {
-                            let material = item.material.clone();
+                            let material = item.0.material.clone();
                             self.acc = Some(Interaction {
                                 intersection: *intersection,
                                 material,

@@ -1,13 +1,10 @@
 use std::cmp::Ordering;
 use std::fmt;
-use std::sync::Arc;
 
 use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::intersectable::{Intersectable, Intersection};
 use crate::geom::ray::Ray;
 use crate::interaction::Interaction;
-use crate::materials::Material;
-use crate::primitives::Primitive;
 use crate::utils::random_double;
 
 pub struct BVHNode<T>
@@ -17,15 +14,15 @@ where
     left: Option<Box<BVHNode<T>>>,
     right: Option<Box<BVHNode<T>>>,
     aabbox: AABoundingBox,
-    primitives: Vec<Arc<T>>,
+    primitives: Vec<T>,
 }
 
 pub trait Accumulator<T> {
-    fn accumulate(&mut self, item: &Arc<T>, intersections: Vec<Intersection>) -> ();
+    fn accumulate(&mut self, item: &T, intersections: Vec<Intersection>) -> ();
 }
 
-impl<T: Intersectable + AABound> BVHNode<T> {
-    pub fn new(primitives: &mut Vec<Arc<T>>) -> Self {
+impl<T: Intersectable + AABound + Clone> BVHNode<T> {
+    pub fn new(primitives: &mut Vec<T>) -> Self {
         // Sort primitive with respect to a comparator randomly chosen
         primitives.sort_by(Self::choose_comparator());
 
@@ -90,7 +87,7 @@ impl<T: Intersectable + AABound> BVHNode<T> {
         ()
     }
 
-    fn choose_comparator() -> fn(&Arc<T>, &Arc<T>) -> Ordering {
+    fn choose_comparator() -> fn(&T, &T) -> Ordering {
         let r = random_double() * 3.0;
         if r < 1.0 {
             Self::compare_x
@@ -103,20 +100,23 @@ impl<T: Intersectable + AABound> BVHNode<T> {
         }
     }
 
-    fn compare_x(a: &Arc<T>, b: &Arc<T>) -> Ordering {
+    fn compare_x(a: &T, b: &T) -> Ordering {
         a.get_bounding_box().bmin.x.partial_cmp(&b.get_bounding_box().bmin.x).unwrap()
     }
 
-    fn compare_y(a: &Arc<T>, b: &Arc<T>) -> Ordering {
+    fn compare_y(a: &T, b: &T) -> Ordering {
         a.get_bounding_box().bmin.y.partial_cmp(&b.get_bounding_box().bmin.y).unwrap()
     }
 
-    fn compare_z(a: &Arc<T>, b: &Arc<T>) -> Ordering {
+    fn compare_z(a: &T, b: &T) -> Ordering {
         a.get_bounding_box().bmin.z.partial_cmp(&b.get_bounding_box().bmin.z).unwrap()
     }
 }
 
-impl fmt::Display for BVHNode<Primitive> {
+impl<T> fmt::Display for BVHNode<T>
+where
+    T: Intersectable + AABound,
+{
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "* aabbox {:?}", &self.aabbox)?;
