@@ -7,7 +7,8 @@ use crate::scene::Scene;
 use crate::spectrum::Spectrum;
 use rand::distributions::{IndependentSample, Range};
 use std::sync::mpsc;
-use std::{f64, mem, thread};
+use std::thread::{self, ScopedJoinHandle};
+use std::{f64, mem};
 
 enum Request {
     Compute { coords: Vector2u },
@@ -30,96 +31,79 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
     let patch = Bounds2::new(&Vector2::new(0, 0), &resolution);
     let pixel_count = image_width * image_height as u32;
 
-    let config_ptr_transmuted = unsafe { mem::transmute::<&Config, &'static Config>(&config) };
-    let integrator_ptr_transmuted = unsafe { mem::transmute::<&dyn Integrator, &'static dyn Integrator>(integrator) };
-    let scene_ptr_transmuted = unsafe { mem::transmute::<&Scene, &'static Scene>(&scene) };
-    let camera_ptr_transmuted = unsafe { mem::transmute::<&dyn Camera, &'static dyn Camera>(camera) };
+    thread::scope(|s| {
+        let (upstream_tx, upstream_rx) = mpsc::channel();
+        let mut handles: Vec<ScopedJoinHandle<()>> = Vec::new();
+        let mut senders: Vec<mpsc::Sender<Request>> = Vec::new();
 
-    let (upstream_tx, upstream_rx) = mpsc::channel();
-    let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
-    let mut senders: Vec<mpsc::Sender<Request>> = Vec::new();
+        for i in 0..(config.threads) {
+            let (tx, rx): (mpsc::Sender<Request>, mpsc::Receiver<Request>) = mpsc::channel();
+            let upstream_tx = upstream_tx.clone();
 
-    for i in 0..(config.threads) {
-        let (tx, rx): (mpsc::Sender<Request>, mpsc::Receiver<Request>) = mpsc::channel();
-        let upstream_tx = upstream_tx.clone();
+            let handle = s.spawn(move || {
+                println!("Start thread {:?}", i);
 
-        let config_ptr_transmuted = config_ptr_transmuted;
-        let scene_ptr_transmuted = scene_ptr_transmuted;
-        let integrator_ptr_transmuted = integrator_ptr_transmuted;
-        let camera_ptr_transmuted = camera_ptr_transmuted;
+                let mut sample = Sampler2::new();
 
-        let handle = thread::spawn(move || {
-            println!("Start thread {:?}", i);
+                loop {
+                    match rx.recv().unwrap() {
+                        Request::Quit => {
+                            println!("[{:?}] QUIT !", i);
+                            break;
+                        }
 
-            let rx = rx;
-            let mut run = true;
-            let mut sample = Sampler2::new();
-
-            while run {
-                match rx.recv().unwrap() {
-                    Request::Quit => {
-                        println!("[{:?}] QUIT !", i);
-                        run = false;
-                    }
-
-                    Request::Compute { coords } => {
-                        let spectrum = compute_pixel(
-                            &config_ptr_transmuted,
-                            integrator_ptr_transmuted,
-                            coords,
-                            camera_ptr_transmuted,
-                            scene_ptr_transmuted,
-                            &mut sample,
-                        );
-                        let response = Response { coords, spectrum };
-                        upstream_tx.send(response).unwrap();
+                        Request::Compute { coords } => {
+                            let spectrum = compute_pixel(config, integrator, coords, camera, scene, &mut sample);
+                            let response = Response { coords, spectrum };
+                            upstream_tx.send(response).unwrap();
+                        }
                     }
                 }
+                println!("End thread {:?}", i);
+            });
+            handles.push(handle);
+            senders.push(tx);
+        }
+
+        let mut pixel_iter = patch.to_iter();
+        let mut pixel_computed = 0;
+        let mut tid = 0;
+        while pixel_computed < image_width * image_height {
+            match pixel_iter.next() {
+                None => {}
+                Some(coords) => {
+                    senders[tid].send(Request::Compute { coords }).unwrap();
+                    tid = (tid + 1) % config.threads;
+                }
             }
-            println!("End thread {:?}", i);
+
+            match upstream_rx.try_recv() {
+                Ok(Response { coords, spectrum }) => {
+                    let mut res = spectrum;
+                    res.gamma_correct();
+                    let sample = res.to_rgb();
+                    let pixel_index = ((coords.y * image_width + coords.x) * 4) as usize;
+                    pixels[pixel_index] = sample[0];
+                    pixels[pixel_index + 1] = sample[1];
+                    pixels[pixel_index + 2] = sample[2];
+                    pixels[pixel_index + 3] = sample[3];
+                    pixel_computed = pixel_computed + 1;
+
+                    print!("done [{:?}]\r", (pixel_computed as f64 / pixel_count as f64 * 100.0) as u32);
+                }
+                Err(_) => {}
+            }
+        }
+
+        for i in 0..(config.threads) {
+            println!("Sending QUIT order to [{:?}]", i);
+            senders[i].send(Request::Quit).unwrap();
+        }
+
+        handles.drain(..).for_each(|handle| {
+            handle.join().unwrap();
+            ()
         });
-        handles.push(handle);
-        senders.push(tx);
-    }
-
-    let mut pixel_iter = patch.to_iter();
-    let mut pixel_computed = 0;
-    let mut tid = 0;
-    while pixel_computed < image_width * image_height {
-        match pixel_iter.next() {
-            None => {}
-            Some(coords) => {
-                senders[tid].send(Request::Compute { coords }).unwrap();
-                tid = (tid + 1) % config.threads;
-            }
-        }
-
-        match upstream_rx.try_recv() {
-            Ok(Response { coords, spectrum }) => {
-                let mut res = spectrum;
-                res.gamma_correct();
-                let sample = res.to_rgb();
-                let pixel_index = ((coords.y * image_width + coords.x) * 4) as usize;
-                pixels[pixel_index] = sample[0];
-                pixels[pixel_index + 1] = sample[1];
-                pixels[pixel_index + 2] = sample[2];
-                pixels[pixel_index + 3] = sample[3];
-                pixel_computed = pixel_computed + 1;
-
-                print!("done [{:?}]\r", (pixel_computed as f64 / pixel_count as f64 * 100.0) as u32);
-            }
-            Err(_) => {}
-        }
-    }
-
-    for i in 0..(config.threads) {
-        println!("Sending QUIT order to [{:?}]", i);
-        senders[i].send(Request::Quit).unwrap();
-    }
-
-    handles.drain(..).for_each(|handle| {
-        handle.join().unwrap();
-        ()
     });
 
     image_write(&config.output_filename, &resolution, &pixels);
