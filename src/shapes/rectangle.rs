@@ -60,8 +60,8 @@ impl Intersectable for Rectangle {
 
 impl AABound for Rectangle {
     fn get_bounding_box(&self) -> AABoundingBox {
-        let bmin = Vector3f::new(-self.half_width, -0.01, -self.half_height);
-        let bmax = Vector3f::new(self.half_width, 0.01, self.half_height);
+        let bmin = Vector3f::new(-self.half_width, -1.0, -self.half_height);
+        let bmax = Vector3f::new(self.half_width, 1.0, self.half_height);
         AABoundingBox::new(&bmin, &bmax)
     }
 }
