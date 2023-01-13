@@ -77,6 +77,18 @@ impl Scene {
         self
     }
 
+    pub fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
+        let mut accumulator = PrimitiveAccumulator { acc: None };
+
+        match &self.bvh {
+            None => None,
+            Some(bvh_node) => {
+                bvh_node.intersect(ray, near, far, &mut accumulator);
+                accumulator.acc
+            }
+        }
+    }
+
     fn build_bvh(prim: &mut Vec<Wrapper<Primitive>>) -> Option<BVHNode<Wrapper<Primitive>>> {
         Some(BVHNode::new(prim))
     }
@@ -117,19 +129,5 @@ impl Accumulator<Wrapper<Primitive>> for PrimitiveAccumulator {
             _ => (),
         }
         ()
-    }
-}
-
-impl Scene {
-    pub fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
-        let mut accumulator = PrimitiveAccumulator { acc: None };
-
-        match &self.bvh {
-            None => None,
-            Some(bvh_node) => {
-                bvh_node.intersect(ray, near, far, &mut accumulator);
-                accumulator.acc
-            }
-        }
     }
 }
