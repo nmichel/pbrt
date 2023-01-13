@@ -2,14 +2,12 @@ use std::cmp::Ordering;
 use std::fmt;
 
 use crate::geom::aabound::{AABound, AABoundingBox};
-use crate::geom::intersectable::{Intersectable, Intersection};
 use crate::geom::ray::Ray;
-use crate::interaction::Interaction;
 use crate::utils::random_double;
 
 pub struct BVHNode<T>
 where
-    T: Intersectable + AABound,
+    T: AABound,
 {
     left: Option<Box<BVHNode<T>>>,
     right: Option<Box<BVHNode<T>>>,
@@ -18,10 +16,10 @@ where
 }
 
 pub trait Accumulator<T> {
-    fn accumulate(&mut self, item: &T, intersections: Vec<Intersection>) -> ();
+    fn accumulate(&mut self, items: &mut Vec<T>) -> ();
 }
 
-impl<T: Intersectable + AABound + Clone> BVHNode<T> {
+impl<T: AABound + Clone> BVHNode<T> {
     pub fn new(primitives: &mut Vec<T>) -> Self {
         // Sort primitive with respect to a comparator randomly chosen
         primitives.sort_by(Self::choose_comparator());
@@ -55,36 +53,25 @@ impl<T: Intersectable + AABound + Clone> BVHNode<T> {
         }
     }
 
-    pub fn intersect(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
+    pub fn query(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
         if !self.aabbox.hit(ray, near, far) {
             return;
         }
 
         if self.primitives.len() > 0 {
-            self.intersect_local(ray, near, far, accumulator);
+            accumulator.accumulate(&mut self.primitives.clone())
         }
         else {
-            Self::intersect_subnode(&self.left, ray, near, far, accumulator);
-            Self::intersect_subnode(&self.right, ray, near, far, accumulator);
+            Self::query_subnode(&self.left, ray, near, far, accumulator);
+            Self::query_subnode(&self.right, ray, near, far, accumulator);
         }
     }
 
-    fn intersect_subnode<'a>(node: &'a Option<Box<BVHNode<T>>>, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
+    fn query_subnode<'a>(node: &'a Option<Box<BVHNode<T>>>, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
         match &node {
             None => (),
-            Some(node) => node.intersect(ray, near, far, accumulator),
+            Some(node) => node.query(ray, near, far, accumulator),
         }
-    }
-
-    fn intersect_local(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
-        // Use a simple iteration
-        let res: Option<Interaction> = None;
-        self.primitives.iter().fold(res, |acc, primitive| {
-            let intersections = primitive.intersect(ray, near, far);
-            accumulator.accumulate(primitive, intersections);
-            acc
-        });
-        ()
     }
 
     fn choose_comparator() -> fn(&T, &T) -> Ordering {
@@ -115,7 +102,7 @@ impl<T: Intersectable + AABound + Clone> BVHNode<T> {
 
 impl<T> fmt::Display for BVHNode<T>
 where
-    T: Intersectable + AABound,
+    T: AABound,
 {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

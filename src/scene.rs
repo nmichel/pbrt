@@ -1,6 +1,5 @@
 use super::bvh::{Accumulator, BVHNode};
 use super::geom::aabound::{AABound, AABoundingBox};
-use super::geom::intersectable;
 use super::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use super::geom::ray::Ray;
 use super::geom::vector3::Vector3f;
@@ -78,13 +77,46 @@ impl Scene {
     }
 
     pub fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
-        let mut accumulator = PrimitiveAccumulator { acc: None };
+        let mut accumulator = PrimitiveAccumulator { acc: Vec::new() };
 
         match &self.bvh {
             None => None,
             Some(bvh_node) => {
-                bvh_node.intersect(ray, near, far, &mut accumulator);
-                accumulator.acc
+                // Ask the acceleration structure for potentially hit items
+                bvh_node.query(ray, near, far, &mut accumulator);
+
+                // Iterate through candidates to find the nearest interaction
+                accumulator.acc.iter().fold(Option::<Interaction>::None, |acc, primitive| {
+                    let intersections = primitive.intersect(ray, near, far);
+
+                    let slice: &[Intersection] = intersections.as_slice();
+                    match slice {
+                        [intersection, ..] => {
+                            match acc {
+                                None => {
+                                    let material = primitive.0.material.clone();
+                                    Some(Interaction {
+                                        intersection: *intersection,
+                                        material,
+                                    })
+                                }
+                                Some(ref prev_interaction) => {
+                                    if intersection.d < prev_interaction.intersection.d {
+                                        let material = primitive.0.material.clone();
+                                        Some(Interaction {
+                                            intersection: *intersection,
+                                            material,
+                                        })
+                                    }
+                                    else {
+                                        acc
+                                    }
+                                }
+                            }
+                        }
+                        _ => acc,
+                    }
+                })
             }
         }
     }
@@ -95,39 +127,42 @@ impl Scene {
 }
 
 struct PrimitiveAccumulator {
-    pub acc: Option<Interaction>,
+    pub acc: Vec<Wrapper<Primitive>>,
 }
 
 impl Accumulator<Wrapper<Primitive>> for PrimitiveAccumulator {
-    fn accumulate(&mut self, item: &Wrapper<Primitive>, intersections: Vec<intersectable::Intersection>) -> () {
-        let slice: &[Intersection] = intersections.as_slice();
-        match slice {
-            [intersection, ..] => {
-                match &mut self.acc {
-                    None => {
-                        let inter = *intersection;
-                        let material = item.0.material.clone();
-                        self.acc = Some(Interaction {
-                            intersection: inter,
-                            material,
-                        })
-                    }
-                    Some(ref prev_interaction) => {
-                        if intersection.d < prev_interaction.intersection.d {
-                            let material = item.0.material.clone();
-                            self.acc = Some(Interaction {
-                                intersection: *intersection,
-                                material,
-                            })
-                        }
-                        else {
-                            ()
-                        }
-                    }
-                }
-            }
-            _ => (),
-        }
+    fn accumulate(&mut self, items: &mut Vec<Wrapper<Primitive>>) -> () {
+        self.acc.append(items);
         ()
+
+        // let slice: &[Intersection] = intersections.as_slice();
+        // match slice {
+        //     [intersection, ..] => {
+        //         match &mut self.acc {
+        //             None => {
+        //                 let inter = *intersection;
+        //                 let material = item.0.material.clone();
+        //                 self.acc = Some(Interaction {
+        //                     intersection: inter,
+        //                     material,
+        //                 })
+        //             }
+        //             Some(ref prev_interaction) => {
+        //                 if intersection.d < prev_interaction.intersection.d {
+        //                     let material = item.0.material.clone();
+        //                     self.acc = Some(Interaction {
+        //                         intersection: *intersection,
+        //                         material,
+        //                     })
+        //                 }
+        //                 else {
+        //                     ()
+        //                 }
+        //             }
+        //         }
+        //     }
+        //     _ => (),
+        // }
+        // ()
     }
 }
