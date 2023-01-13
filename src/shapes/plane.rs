@@ -4,6 +4,8 @@ use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
 
+use super::Shape;
+
 pub struct Plane {}
 
 impl Plane {
@@ -11,6 +13,8 @@ impl Plane {
         Self {}
     }
 }
+
+impl Shape for Plane {}
 
 impl Intersectable for Plane {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {

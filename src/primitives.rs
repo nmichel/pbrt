@@ -1,5 +1,6 @@
 use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::transform::Transformable;
+use crate::shapes::Shape;
 
 use super::geom::intersectable::{Intersectable, IntersectionResult};
 use super::geom::ray::Ray;
@@ -9,13 +10,13 @@ use super::materials::Material;
 use std::sync::Arc;
 
 pub struct Primitive {
-    pub shape: Box<dyn Intersectable>,
+    pub shape: Box<dyn Shape>,
     pub transform: Box<Transform>,
     pub material: Arc<dyn Material>,
 }
 
 impl Primitive {
-    pub fn new(shape: Box<dyn Intersectable>, transform: Box<Transform>, material: Arc<dyn Material>) -> Self {
+    pub fn new(shape: Box<dyn Shape>, transform: Box<Transform>, material: Arc<dyn Material>) -> Self {
         Self {
             shape,
             transform,

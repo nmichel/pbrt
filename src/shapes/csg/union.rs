@@ -4,6 +4,7 @@ use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult
 use crate::geom::ray::Ray;
 use crate::geom::transform::Transformable;
 use crate::geom::vector3::Vector3f;
+use crate::shapes::Shape;
 
 pub struct Union {
     elements: Vec<Box<Elem>>,
@@ -14,6 +15,8 @@ impl Union {
         Union { elements }
     }
 }
+
+impl Shape for Union {}
 
 impl Intersectable for Union {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {

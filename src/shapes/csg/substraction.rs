@@ -3,12 +3,15 @@ use crate::geom::intersectable::{Intersectable, IntersectionResult};
 use crate::geom::ray::Ray;
 use crate::geom::transform::Transformable;
 use crate::geom::vector3::Vector3f;
+use crate::shapes::Shape;
 
 use super::Elem;
 
 pub struct Substraction {
     elements: Vec<Box<Elem>>,
 }
+
+impl Shape for Substraction {}
 
 impl Substraction {
     pub fn new(elements: Vec<Box<Elem>>) -> Self {

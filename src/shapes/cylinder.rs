@@ -4,6 +4,8 @@ use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 use std::f64::consts::PI;
 
+use super::Shape;
+
 pub struct Cylinder {
     pub radius: f64,
     pub height: f64,
@@ -19,6 +21,8 @@ impl Cylinder {
         }
     }
 }
+
+impl Shape for Cylinder {}
 
 impl Intersectable for Cylinder {
     fn intersect(&self, ray: &crate::geom::ray::Ray, near: f64, far: f64) -> IntersectionResult {

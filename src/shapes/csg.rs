@@ -1,8 +1,9 @@
-use crate::geom::intersectable::Intersectable;
 use crate::geom::transform::Transform;
 
+use super::Shape;
+
 pub struct Elem {
-    pub shape: Box<dyn Intersectable>,
+    pub shape: Box<dyn Shape>,
     pub transform: Box<Transform>,
 }
 

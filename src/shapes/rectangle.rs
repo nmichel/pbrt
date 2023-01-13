@@ -4,6 +4,8 @@ use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
 
+use super::Shape;
+
 pub struct Rectangle {
     half_width: f64,
     half_height: f64,
@@ -17,6 +19,8 @@ impl Rectangle {
         }
     }
 }
+
+impl Shape for Rectangle {}
 
 impl Intersectable for Rectangle {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {

@@ -6,6 +6,8 @@ use crate::geom::vector3::Vector3f;
 use num_traits::clamp;
 use std::f64::consts::PI;
 
+use super::Shape;
+
 pub struct Sphere {
     r: f64,
 }
@@ -19,6 +21,8 @@ impl Sphere {
         self.r
     }
 }
+
+impl Shape for Sphere {}
 
 impl Intersectable for Sphere {
     /// See https://www.pbr-book.org/3ed-2018/Shapes/Spheres

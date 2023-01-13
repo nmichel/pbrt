@@ -150,6 +150,7 @@ mod test {
     use crate::geom::transform::Transform;
     use crate::geom::vector3::Vector3f;
     use crate::materials::{Lambertian, Material};
+    use crate::primitives::Primitive;
     use crate::shapes::Sphere;
     use crate::textures::PlainColor;
 

@@ -4,6 +4,8 @@ use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
 
+use super::Shape;
+
 pub struct AABox {
     min: Vector3f,
     max: Vector3f,
@@ -57,6 +59,8 @@ impl AABox {
         dv: Vector3f::new(1.0, 0.0, 0.0),
     };
 }
+
+impl Shape for AABox {}
 
 impl Intersectable for AABox {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
