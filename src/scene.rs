@@ -1,23 +1,24 @@
+use crate::objects::Object;
+
 use super::bvh::{Accumulator, BVHNode};
 use super::geom::aabound::{AABound, AABoundingBox};
-use super::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
+use super::geom::intersectable::{Intersectable, IntersectionResult};
 use super::geom::ray::Ray;
 use super::geom::vector3::Vector3f;
 use super::interaction::Interaction;
 use super::light::Light;
-use super::primitives::Primitive;
 use std::sync::Arc;
 
 struct Wrapper<T>(Arc<T>)
 where
-    T: Intersectable + AABound;
+    T: Object + ?Sized;
 
 impl<T> Intersectable for Wrapper<T>
 where
-    T: Intersectable + AABound,
+    T: Object + ?Sized,
 {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
-        self.0.intersect(ray, near, far)
+        Intersectable::intersect(self.0.as_ref(), ray, near, far)
     }
 
     fn contain_point(&self, point: &Vector3f) -> bool {
@@ -27,7 +28,7 @@ where
 
 impl<T> Clone for Wrapper<T>
 where
-    T: Intersectable + AABound,
+    T: Object + ?Sized,
 {
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -36,17 +37,26 @@ where
 
 impl<T> AABound for Wrapper<T>
 where
-    T: Intersectable + AABound,
+    T: Object + ?Sized,
 {
     fn get_bounding_box(&self) -> AABoundingBox {
         self.0.get_bounding_box()
     }
 }
 
+impl<T> Object for Wrapper<T>
+where
+    T: Object + ?Sized,
+{
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
+        Object::intersect(self.0.as_ref(), ray, near, far)
+    }
+}
+
 pub struct Scene {
-    primitives: Vec<Wrapper<Primitive>>,
+    primitives: Vec<Wrapper<dyn Object>>,
     lights: Vec<Arc<dyn Light>>,
-    bvh: Option<BVHNode<Wrapper<Primitive>>>,
+    bvh: Option<BVHNode<Wrapper<dyn Object>>>,
 }
 
 impl Scene {
@@ -58,7 +68,7 @@ impl Scene {
         }
     }
 
-    pub fn add_object(&mut self, object: Arc<Primitive>) -> &mut Self {
+    pub fn add_object(&mut self, object: Arc<dyn Object>) -> &mut Self {
         self.primitives.push(Wrapper(Arc::clone(&object)));
         self
     }
@@ -77,7 +87,7 @@ impl Scene {
     }
 
     pub fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
-        let mut accumulator = PrimitiveAccumulator { acc: Vec::new() };
+        let mut accumulator = ObjectAccumulator { acc: Vec::new() };
 
         match &self.bvh {
             None => None,
@@ -87,82 +97,35 @@ impl Scene {
 
                 // Iterate through candidates to find the nearest interaction
                 accumulator.acc.iter().fold(Option::<Interaction>::None, |acc, primitive| {
-                    let intersections = primitive.intersect(ray, near, far);
-
-                    let slice: &[Intersection] = intersections.as_slice();
-                    match slice {
-                        [intersection, ..] => {
-                            match acc {
-                                None => {
-                                    let material = primitive.0.material.clone();
-                                    Some(Interaction {
-                                        intersection: *intersection,
-                                        material,
-                                    })
-                                }
-                                Some(ref prev_interaction) => {
-                                    if intersection.d < prev_interaction.intersection.d {
-                                        let material = primitive.0.material.clone();
-                                        Some(Interaction {
-                                            intersection: *intersection,
-                                            material,
-                                        })
-                                    }
-                                    else {
-                                        acc
-                                    }
-                                }
+                    match (acc, Object::intersect(primitive, ray, near, far)) {
+                        (acc, None) => acc,
+                        (None, interaction) => interaction,
+                        (Some(prev_interaction), Some(interaction)) => {
+                            if interaction.intersection.d < prev_interaction.intersection.d {
+                                Some(interaction)
+                            }
+                            else {
+                                Some(prev_interaction)
                             }
                         }
-                        _ => acc,
                     }
                 })
             }
         }
     }
 
-    fn build_bvh(prim: &mut Vec<Wrapper<Primitive>>) -> Option<BVHNode<Wrapper<Primitive>>> {
+    fn build_bvh(prim: &mut Vec<Wrapper<dyn Object>>) -> Option<BVHNode<Wrapper<dyn Object>>> {
         Some(BVHNode::new(prim))
     }
 }
 
-struct PrimitiveAccumulator {
-    pub acc: Vec<Wrapper<Primitive>>,
+struct ObjectAccumulator {
+    pub acc: Vec<Wrapper<dyn Object>>,
 }
 
-impl Accumulator<Wrapper<Primitive>> for PrimitiveAccumulator {
-    fn accumulate(&mut self, items: &mut Vec<Wrapper<Primitive>>) -> () {
+impl Accumulator<Wrapper<dyn Object>> for ObjectAccumulator {
+    fn accumulate(&mut self, items: &mut Vec<Wrapper<dyn Object>>) -> () {
         self.acc.append(items);
         ()
-
-        // let slice: &[Intersection] = intersections.as_slice();
-        // match slice {
-        //     [intersection, ..] => {
-        //         match &mut self.acc {
-        //             None => {
-        //                 let inter = *intersection;
-        //                 let material = item.0.material.clone();
-        //                 self.acc = Some(Interaction {
-        //                     intersection: inter,
-        //                     material,
-        //                 })
-        //             }
-        //             Some(ref prev_interaction) => {
-        //                 if intersection.d < prev_interaction.intersection.d {
-        //                     let material = item.0.material.clone();
-        //                     self.acc = Some(Interaction {
-        //                         intersection: *intersection,
-        //                         material,
-        //                     })
-        //                 }
-        //                 else {
-        //                     ()
-        //                 }
-        //             }
-        //         }
-        //     }
-        //     _ => (),
-        // }
-        // ()
     }
 }

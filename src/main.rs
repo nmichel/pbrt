@@ -12,7 +12,7 @@ fn main() {
 
     println!("Redering with configuration settings: {:#?}", &config);
 
-    let (mut scene, camera) = pbrt::demos::cylinder::build_scene(&config);
+    let (mut scene, camera) = pbrt::demos::test_compound_object::build_scene(&config);
     scene.commit();
 
     let integrator: Box<dyn Integrator> = match config.integrator {

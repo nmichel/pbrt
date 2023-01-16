@@ -1,3 +1,5 @@
+#![cfg(target_os = "ignore")]
+
 use crate::cameras::{Camera, PinHoleCamera};
 use crate::colors;
 use crate::config::Config;

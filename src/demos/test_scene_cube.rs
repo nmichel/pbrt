@@ -1,3 +1,5 @@
+#![cfg(target_os = "ignore")]
+
 use num_traits::ToPrimitive;
 
 use crate::cameras::{Camera, ThinLensCamera};

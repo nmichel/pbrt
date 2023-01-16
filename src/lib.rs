@@ -8,7 +8,7 @@ pub mod integrators;
 pub mod interaction;
 pub mod light;
 pub mod materials;
-pub mod primitives;
+pub mod objects;
 pub mod renderers;
 pub mod scene;
 pub mod shapes;

@@ -28,3 +28,8 @@ pub mod test_scene_cube;
 
 // Cornel box (Ray Training The Next Week)
 pub mod cornel_box;
+
+// Objects
+pub mod test_compound_object;
+pub mod test_simple_object;
+pub mod test_transformed_object;

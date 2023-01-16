@@ -6,9 +6,9 @@ use crate::integrators::Integrator;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
 use rand::distributions::{IndependentSample, Range};
+use std::f64;
 use std::sync::mpsc;
 use std::thread::{self, ScopedJoinHandle};
-use std::{f64, mem};
 
 enum Request {
     Compute { coords: Vector2u },
