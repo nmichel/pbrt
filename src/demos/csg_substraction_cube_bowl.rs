@@ -1,5 +1,3 @@
-#![cfg(target_os = "ignore")]
-
 use crate::cameras::{Camera, PinHoleCamera};
 use crate::colors;
 use crate::config::Config;
@@ -8,7 +6,7 @@ use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::geom::vector3::Vector3f;
 use crate::materials::{Lambertian, Metal};
-use crate::primitives::Primitive;
+use crate::objects::{Simple, Transformed};
 use crate::scene::Scene;
 use crate::shapes::{csg, AABox, Rectangle, Sphere};
 use crate::spectrum::Spectrum;
@@ -79,35 +77,40 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         }),
     ]);
 
-    scene.add_object(Arc::new(Primitive::new(
-        Box::new(bowl),
+    scene.add_object(Arc::new(Transformed::new(
+        Arc::new(Simple::new(
+            Arc::new(bowl),
+            Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE)))),
+        )),
         Box::new(Transform::translation(Vector3f::new(-0.8, 0.0, 0.0))),
-        // Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE))))
-        // Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::ALICE_BLUE))))
-        Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE)))),
     )));
 
-    scene.add_object(Arc::new(Primitive::new(
-        Box::new(substraction_box_bowl),
+    scene.add_object(Arc::new(Transformed::new(
+        Arc::new(Simple::new(
+            Arc::new(substraction_box_bowl),
+            Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))),
+        )),
         Box::new(Transform::translation(Vector3f::new(0.8, 0.0, 0.0))),
-        Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))), // Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::ALICE_BLUE))))
-                                                                              // Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE)))),
     )));
 
-    scene.add_object(Arc::new(Primitive::new(
-        Box::new(Rectangle::new(5.0, 5.0)),
+    scene.add_object(Arc::new(Transformed::new(
+        Arc::new(Simple::new(
+            Arc::new(Rectangle::new(5.0, 5.0)),
+            Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
+                Spectrum::new(0.65, 0.0, 0.0),
+                Spectrum::new(0.65, 0.65, 0.65),
+                2.0,
+            )))),
+        )),
         Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
-        Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
-            Spectrum::new(0.65, 0.0, 0.0),
-            Spectrum::new(0.65, 0.65, 0.65),
-            2.0,
-        )))),
     )));
 
-    scene.add_object(Arc::new(Primitive::new(
-        Box::new(Rectangle::new(5.0, 5.0)),
+    scene.add_object(Arc::new(Transformed::new(
+        Arc::new(Simple::new(
+            Arc::new(Rectangle::new(5.0, 5.0)),
+            Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(colors::BLUE_VIOLET, colors::ALICE_BLUE, 2.0)))),
+        )),
         Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0)) * Transform::rotation_x(core::f64::consts::PI)),
-        Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(colors::BLUE_VIOLET, colors::ALICE_BLUE, 2.0)))),
     )));
 
     (scene, Box::new(camera))

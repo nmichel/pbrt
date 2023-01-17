@@ -1,5 +1,3 @@
-#![cfg(target_os = "ignore")]
-
 use crate::cameras::{Camera, PinHoleCamera};
 use crate::colors;
 use crate::config::Config;
@@ -8,7 +6,7 @@ use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::geom::vector3::Vector3f;
 use crate::materials::{Dielectric, Lambertian, Material, Metal, RefractionIndices};
-use crate::primitives::Primitive;
+use crate::objects::{Simple, Transformed};
 use crate::scene::Scene;
 use crate::shapes::{AABox, Sphere};
 use crate::spectrum::Spectrum;
@@ -49,37 +47,24 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
 
     let mut scene = Scene::new();
     scene
-        // .add_object(Arc::new(Primitive::new(
-        //     Box::new(Rectangle::new(4.0, 4.0)),
-        //     Box::new(Transform::translation(Vector3f::new(0.0, 4.0, 0.0))),
-        //     Arc::new(DiffuseLight::new(Arc::new(PlainColor::new(Spectrum::new(
-        //         2.0, 2.0, 2.0,
-        //     ))))),
-        // )))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(100.0)),
+        .add_object(Arc::new(Transformed::new(
+            Arc::new(Simple::new(Arc::new(Sphere::new(100.0)), Arc::clone(&material_wall))),
             Box::new(Transform::translation(Vector3f::new(0.0, -100.5, -1.0))),
-            Arc::clone(&material_wall),
         )))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(0.5)),
+        .add_object(Arc::new(Transformed::new(
+            Arc::new(Simple::new(Arc::new(Sphere::new(0.5)), Arc::clone(&material_lambertian))),
             Box::new(Transform::translation(Vector3f::new(-1.0, 0.0, -1.0))),
-            Arc::clone(&material_lambertian),
         )))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+        .add_object(Arc::new(Transformed::new(
+            Arc::new(Simple::new(
+                Arc::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+                Arc::clone(&material_dielectric),
+            )),
             Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -0.6))),
-            Arc::clone(&material_dielectric),
         )))
-        // .add_object(Arc::new(Primitive::new(
-        //     Box::new(Sphere::new(0.5)),
-        //     Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -1.0))),
-        //     Arc::clone(&material_lambertian),
-        // )))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(0.5)),
+        .add_object(Arc::new(Transformed::new(
+            Arc::new(Simple::new(Arc::new(Sphere::new(0.5)), Arc::clone(&material_metal_white))),
             Box::new(Transform::translation(Vector3f::new(1.0, 0.0, -1.0))),
-            Arc::clone(&material_metal_white),
         )));
 
     (scene, Box::new(camera))

@@ -1,5 +1,3 @@
-#![cfg(target_os = "ignore")]
-
 use crate::cameras::{Camera, PinHoleCamera};
 use crate::colors;
 use crate::config::Config;
@@ -8,7 +6,7 @@ use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::geom::vector3::Vector3f;
 use crate::materials::Lambertian;
-use crate::primitives::Primitive;
+use crate::objects::{Simple, Transformed};
 use crate::scene::Scene;
 use crate::shapes::{csg, Rectangle, Sphere};
 use crate::spectrum::Spectrum;
@@ -59,19 +57,23 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     ];
 
     scene
-        .add_object(Arc::new(Primitive::new(
-            Box::new(csg::Intersection::new(elements)),
+        .add_object(Arc::new(Transformed::new(
+            Arc::new(Simple::new(
+                Arc::new(csg::Intersection::new(elements)),
+                Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))),
+            )),
             Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-            Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE)))),
         )))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Rectangle::new(3.0, 3.0)),
+        .add_object(Arc::new(Transformed::new(
+            Arc::new(Simple::new(
+                Arc::new(Rectangle::new(3.0, 3.0)),
+                Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
+                    Spectrum::new(0.65, 0.0, 0.0),
+                    Spectrum::new(0.65, 0.65, 0.65),
+                    2.0,
+                )))),
+            )),
             Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
-            Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
-                Spectrum::new(0.65, 0.0, 0.0),
-                Spectrum::new(0.65, 0.65, 0.65),
-                2.0,
-            )))),
         )));
 
     (scene, Box::new(camera))

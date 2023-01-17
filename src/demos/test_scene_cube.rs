@@ -1,5 +1,3 @@
-#![cfg(target_os = "ignore")]
-
 use num_traits::ToPrimitive;
 
 use crate::cameras::{Camera, ThinLensCamera};
@@ -10,7 +8,7 @@ use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::geom::vector3::Vector3f;
 use crate::materials::{Dielectric, Lambertian, Material, Metal, RefractionIndices};
-use crate::primitives::Primitive;
+use crate::objects::{Simple, Transformed};
 use crate::scene::Scene;
 use crate::shapes::{AABox, Sphere};
 use crate::spectrum::Spectrum;
@@ -47,27 +45,33 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     //
     let mut scene = Scene::new();
     scene
-        .add_object(Arc::new(Primitive::new(
-            Box::new(Sphere::new(1000.0)),
+        .add_object(Arc::new(Transformed::new(
+            Arc::new(Simple::new(
+                Arc::new(Sphere::new(1000.0)),
+                Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.5, 0.5, 0.5))))),
+            )),
             Box::new(Transform::translation(Vector3f::new(0.0, -1000.0, 0.0))),
-            Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.5, 0.5, 0.5))))),
         )))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+        .add_object(Arc::new(Transformed::new(
+            Arc::new(Simple::new(
+                Arc::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+                Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::WHITE)))),
+            )),
             Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0)) * Transform::rotation_x(FRAC_PI_3)),
-            Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::WHITE)))),
         )))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+        .add_object(Arc::new(Transformed::new(
+            Arc::new(Simple::new(
+                Arc::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+                Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::DARK_RED)))),
+            )),
             Box::new(Transform::translation(Vector3f::new(-4.0, 1.0, 0.0)) * Transform::rotation_y(FRAC_PI_3)),
-            // Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1))))),
-            Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::DARK_RED)))),
         )))
-        .add_object(Arc::new(Primitive::new(
-            Box::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+        .add_object(Arc::new(Transformed::new(
+            Arc::new(Simple::new(
+                Arc::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+                Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::YELLOW_GREEN)))),
+            )),
             Box::new(Transform::translation(Vector3f::new(4.0, 1.0, 0.0)) * Transform::rotation_z(FRAC_PI_3)),
-            // Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(Spectrum::new(0.7, 0.6, 0.5))))),
-            Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::YELLOW_GREEN)))),
         )));
 
     for a in -11..10 {
@@ -92,10 +96,9 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
                 0.2,
                 b.to_f64().unwrap() + 0.9 * random_double(),
             );
-            scene.add_object(Arc::new(Primitive::new(
-                Box::new(Sphere::new(0.2)),
+            scene.add_object(Arc::new(Transformed::new(
+                Arc::new(Simple::new(Arc::new(Sphere::new(0.2)), material)),
                 Box::new(Transform::translation(center)),
-                material,
             )));
         }
     }
