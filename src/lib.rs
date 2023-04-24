@@ -9,6 +9,7 @@ pub mod interaction;
 pub mod light;
 pub mod materials;
 pub mod objects;
+pub mod parser;
 pub mod renderers;
 pub mod scene;
 pub mod shapes;
