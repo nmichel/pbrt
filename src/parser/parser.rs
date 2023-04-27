@@ -110,7 +110,7 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::parser::ast::PrintVisitor;
+    use crate::parser::ast::{PrintVisitor, SceneBuilderVisitor};
 
     use super::*;
 
@@ -132,5 +132,26 @@ mod test {
         let scene = parser.parse_scene();
         let mut print_visitor = PrintVisitor::new();
         scene.visit(&mut print_visitor);
+    }
+
+    #[test]
+    fn test_scenebuilder_visitor() {
+        let input = "
+      scene
+        # A simple diffuse sphere
+        object simple
+          sphere 1.0
+          lambertian color 0.2 0.5 0.9
+
+        # Another simple diffuse sphere
+        object simple
+          sphere 2.0
+          lambertian color 0.3 0.6 0.8
+      ";
+
+        let mut parser = Parser::new(input);
+        let scene = parser.parse_scene();
+        let mut build_visitor = SceneBuilderVisitor::new();
+        scene.visit(&mut build_visitor);
     }
 }
