@@ -2,23 +2,34 @@
 pub enum Token {
     Identifier(String),
     KWBox,
+    KWScene,
     KWSphere,
     KWCylinder,
-    CurlyOpen,
-    CurlyClose,
+    BraceOpen,
+    BraceClose,
+    Comment,
     SquareOpen,
     SquareClose,
     ParenOpen,
     ParenClose,
     Number(f64),
+    KWSimple,
+    KWObject,
+    KWLambertian,
+    KWColor,
 }
 
 impl<'a> From<&'a str> for Token {
     fn from(other: &'a str) -> Token {
         match other {
             "box" => Token::KWBox,
-            "sphere" => Token::KWSphere,
+            "color" => Token::KWColor,
             "cylinder" => Token::KWCylinder,
+            "lambertian" => Token::KWLambertian,
+            "object" => Token::KWObject,
+            "scene" => Token::KWScene,
+            "simple" => Token::KWSimple,
+            "sphere" => Token::KWSphere,
             _ => Token::Identifier(other.to_string()),
         }
     }
@@ -74,7 +85,14 @@ impl<'a> Tokenizer<'a> {
         if let Some(c) = self.peek() {
             if let Some(token) = Self::parse_special_char(c) {
                 self.next();
-                Some(token)
+
+                if token == Token::Comment {
+                    self.skip_comment();
+                    self.next_token()
+                }
+                else {
+                    Some(token)
+                }
             }
             else {
                 match c {
@@ -91,12 +109,13 @@ impl<'a> Tokenizer<'a> {
 
     fn parse_special_char(c: &char) -> Option<Token> {
         match c {
-            '{' => Some(Token::CurlyOpen),
-            '}' => Some(Token::CurlyClose),
+            '{' => Some(Token::BraceOpen),
+            '}' => Some(Token::BraceClose),
             '[' => Some(Token::SquareOpen),
             ']' => Some(Token::SquareClose),
             '(' => Some(Token::ParenOpen),
             ')' => Some(Token::ParenClose),
+            '#' => Some(Token::Comment),
             _ => None,
         }
     }
@@ -201,6 +220,10 @@ impl<'a> Tokenizer<'a> {
                 break;
             }
         }
+    }
+
+    fn skip_comment(self: &mut Self) {
+        self.take_while(|c| c != &'\n');
     }
 
     fn take_while<F>(self: &mut Self, mut pred: F) -> Option<&str>
@@ -312,5 +335,22 @@ mod test {
             Token::Number(-2.4),
             Token::Identifier("Löf".to_string())
         ]);
+    }
+
+    #[test]
+    fn test_comment() {
+        let input = "     
+        # sphere comment
+    sphere # end of line comment
+      Löf 
+      # Comment alone";
+
+        let mut tokenizer = Tokenizer::new(input);
+        let mut tokens = Vec::new();
+        while let Some(token) = tokenizer.next_token() {
+            tokens.push(token);
+        }
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens, vec![Token::KWSphere, Token::Identifier("Löf".to_string())]);
     }
 }
