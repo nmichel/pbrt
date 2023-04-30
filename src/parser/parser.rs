@@ -15,7 +15,7 @@ impl<'a> Parser<'a> {
         parser.parse_scene();
     }
 
-    fn new(input: &'a str) -> Self {
+    pub fn new(input: &'a str) -> Self {
         Parser {
             tokenizer: Tokenizer::<'a>::new(input),
         }
@@ -23,7 +23,7 @@ impl<'a> Parser<'a> {
 
     // Scene parsing
 
-    fn parse_scene(self: &mut Self) -> SceneNode {
+    pub fn parse_scene(self: &mut Self) -> SceneNode {
         match self.tokenizer.next_token() {
             Some(Token::KWScene) => self.parse_scene_block(),
             _ => panic!("Expected scene block"),

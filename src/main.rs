@@ -1,5 +1,7 @@
 use pbrt::config::Config;
 use pbrt::integrators::{self, Integrator, NormalIntegrator, PathIntegrator};
+use pbrt::loader::Loader;
+use pbrt::parser::{Node, Parser, SceneBuilderVisitor};
 use pbrt::renderers;
 use std::{env, process};
 
@@ -12,8 +14,9 @@ fn main() {
 
     println!("Redering with configuration settings: {:#?}", &config);
 
-    let (mut scene, camera) = pbrt::demos::test_compound_object::build_scene(&config);
-    scene.commit();
+    //    let (mut scene, camera) = pbrt::demos::cornel_box::build_scene(&config);
+    let (_, camera) = pbrt::demos::test_simple_object::build_scene(&config);
+    //    scene.commit();
 
     let integrator: Box<dyn Integrator> = match config.integrator {
         integrators::Type::NORMAL => Box::new(NormalIntegrator::new()),
@@ -24,6 +27,16 @@ fn main() {
         renderers::Type::ST => renderers::st::render,
         renderers::Type::MT => renderers::mt::render,
     };
+
+    let input = "
+    scene
+    # A simple diffuse sphere
+    object simple
+      sphere 1.0
+      lambertian color 0.2 0.8 0.1
+    ";
+
+    let scene = Loader::load_scene(input);
 
     render_function(&config, &scene, camera.as_ref(), &*integrator);
 }

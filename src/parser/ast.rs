@@ -173,7 +173,7 @@ impl Visitor for PrintVisitor {
 }
 
 pub struct SceneBuilderVisitor {
-    scene: Scene,
+    pub scene: Scene,
     objects: Vec<Arc<dyn Object>>,
     shapes: Vec<Arc<dyn Shape>>,
     materials: Vec<Arc<dyn Material>>,

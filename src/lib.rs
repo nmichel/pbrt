@@ -7,6 +7,7 @@ pub mod geom;
 pub mod integrators;
 pub mod interaction;
 pub mod light;
+pub mod loader;
 pub mod materials;
 pub mod objects;
 pub mod parser;
