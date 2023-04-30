@@ -1,7 +1,6 @@
 use pbrt::config::Config;
 use pbrt::integrators::{self, Integrator, NormalIntegrator, PathIntegrator};
 use pbrt::loader::Loader;
-use pbrt::parser::{Node, Parser, SceneBuilderVisitor};
 use pbrt::renderers;
 use std::{env, process};
 

@@ -10,7 +10,6 @@ pub mod light;
 pub mod loader;
 pub mod materials;
 pub mod objects;
-pub mod parser;
 pub mod renderers;
 pub mod scene;
 pub mod shapes;

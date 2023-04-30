@@ -1,9 +1,11 @@
+mod lexer;
+
 use crate::spectrum::Spectrum;
 
+use self::lexer::{Token, Tokenizer};
 use super::ast::{
-    ColorTextureNode, LambertianMaterialNode, MaterialNode, Node, ObjectNode, ObjectSimpleNode, SceneNode, ShapeNode, SphereShapeNode, TextureNode,
+    ColorTextureNode, LambertianMaterialNode, MaterialNode, ObjectNode, ObjectSimpleNode, SceneNode, ShapeNode, SphereShapeNode, TextureNode,
 };
-use super::{Token, Tokenizer};
 
 pub struct Parser<'a> {
     tokenizer: Tokenizer<'a>,
@@ -110,7 +112,7 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::parser::ast::{PrintVisitor, SceneBuilderVisitor};
+    use crate::loader::visitors::PrintVisitor;
 
     use super::*;
 
@@ -131,27 +133,6 @@ mod test {
         let mut parser = Parser::new(input);
         let scene = parser.parse_scene();
         let mut print_visitor = PrintVisitor::new();
-        scene.visit(&mut print_visitor);
-    }
-
-    #[test]
-    fn test_scenebuilder_visitor() {
-        let input = "
-      scene
-        # A simple diffuse sphere
-        object simple
-          sphere 1.0
-          lambertian color 0.2 0.5 0.9
-
-        # Another simple diffuse sphere
-        object simple
-          sphere 2.0
-          lambertian color 0.3 0.6 0.8
-      ";
-
-        let mut parser = Parser::new(input);
-        let scene = parser.parse_scene();
-        let mut build_visitor = SceneBuilderVisitor::new();
-        scene.visit(&mut build_visitor);
+        print_visitor.visit(&scene);
     }
 }

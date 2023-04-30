@@ -67,14 +67,6 @@ impl<'a> Tokenizer<'a> {
     ///
     /// # Arguments
     /// * `self` - The tokenizer
-    ///
-    /// # Examples
-    /// ```
-    /// let input = "   
-    ///     box";
-    /// let mut tokenizer = pbrt::parser::Tokenizer::new(input);
-    /// let token = tokenizer.next_token();
-    /// assert_eq!(token, Some(pbrt::parser::Token::KWBox));
     /// ```
     pub fn next_token(self: &mut Self) -> Option<Token> {
         self.skip_whitespace();
