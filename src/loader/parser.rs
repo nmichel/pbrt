@@ -1,10 +1,13 @@
 mod lexer;
 
+use crate::geom::vector3::Vector3f;
+use crate::loader::ast::{Axis, ObjectCompoundNode, TransformRotateAxisNode, TransformStepNode, TransformTranslateNode};
 use crate::spectrum::Spectrum;
 
 use self::lexer::{Token, Tokenizer};
 use super::ast::{
-    ColorTextureNode, LambertianMaterialNode, MaterialNode, ObjectNode, ObjectSimpleNode, SceneNode, ShapeNode, SphereShapeNode, TextureNode,
+    ColorTextureNode, LambertianMaterialNode, MaterialNode, ObjectNode, ObjectSimpleNode, ObjectTransformedNode, SceneNode, ShapeNode,
+    SphereShapeNode, TextureNode, TransformNode,
 };
 
 pub struct Parser<'a> {
@@ -48,7 +51,9 @@ impl<'a> Parser<'a> {
     fn parse_object(self: &mut Self) -> Box<dyn ObjectNode> {
         match self.tokenizer.next_token() {
             Some(Token::KWSimple) => self.parse_object_simple(),
-            _ => panic!("Expected simple"),
+            Some(Token::KWTransformed) => self.parse_object_transformed(),
+            Some(Token::KWCompound) => self.parse_object_compound(),
+            _ => panic!("Expected simple, transformed or compound"),
         }
     }
 
@@ -56,6 +61,36 @@ impl<'a> Parser<'a> {
         let shape = self.parse_shape();
         let material = self.parse_material();
         Box::new(ObjectSimpleNode::new(shape, material))
+    }
+
+    fn parse_object_transformed(self: &mut Self) -> Box<dyn ObjectNode> {
+        if Token::KWObject == self.tokenizer.next_token().expect("Expected object") {
+            let object = self.parse_object();
+            let transform = self.parse_transform();
+            return Box::new(ObjectTransformedNode::new(object, transform));
+        }
+        panic!("Expected object")
+    }
+
+    fn parse_object_compound(self: &mut Self) -> Box<dyn ObjectNode> {
+        if Token::BraceOpen == self.tokenizer.next_token().expect("Expected {") {
+            let mut node: Box<ObjectCompoundNode> = Box::new(ObjectCompoundNode::new());
+            while let Some(token) = self.tokenizer.next_token() {
+                match token {
+                    Token::KWObject => {
+                        let object = self.parse_object();
+                        node.add_object(object);
+                    }
+
+                    Token::BraceClose => {
+                        return node;
+                    }
+
+                    _ => panic!("Expected } or object"),
+                }
+            }
+        }
+        panic!("Expected {")
     }
 
     // Shape parsing
@@ -96,6 +131,43 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn parse_transform(self: &mut Self) -> Box<TransformNode> {
+        if Token::KWTransform == self.tokenizer.next_token().expect("Expected transform") {
+            if Token::BraceOpen == self.tokenizer.next_token().expect("Expected {") {
+                let mut node: Box<TransformNode> = Box::new(TransformNode::new());
+                while let Some(token) = self.tokenizer.next_token() {
+                    match token {
+                        Token::KWTranslate => {
+                            let offset = self.parse_vector();
+                            let translate_node = TransformTranslateNode::new(offset);
+                            node.add_step(Box::new(translate_node));
+                        }
+                        Token::KWRotateX => {
+                            let angle = self.parse_number();
+                            let rotate_node = TransformRotateAxisNode::new(angle, Axis::X);
+                            node.add_step(Box::new(rotate_node));
+                        }
+                        Token::KWRotateY => {
+                            let angle = self.parse_number();
+                            let rotate_node = TransformRotateAxisNode::new(angle, Axis::Y);
+                            node.add_step(Box::new(rotate_node));
+                        }
+                        Token::KWRotateZ => {
+                            let angle = self.parse_number();
+                            let rotate_node = TransformRotateAxisNode::new(angle, Axis::Z);
+                            node.add_step(Box::new(rotate_node));
+                        }
+                        Token::BraceClose => {
+                            return node;
+                        }
+                        _ => panic!("Expected object"),
+                    }
+                }
+            }
+        }
+        panic!("Expected transform")
+    }
+
     // spectrum parsing
 
     fn parse_spectrum(self: &mut Self) -> Spectrum {
@@ -103,6 +175,26 @@ impl<'a> Parser<'a> {
             if let Token::Number(green) = self.tokenizer.next_token().expect("Expected green value") {
                 if let Token::Number(blue) = self.tokenizer.next_token().expect("Expected blue value") {
                     return Spectrum::new(red, green, blue);
+                }
+            }
+        }
+        panic!("Expected color")
+    }
+
+    // vector parsing
+
+    fn parse_number(self: &mut Self) -> f64 {
+        if let Token::Number(x) = self.tokenizer.next_token().expect("Expected number") {
+            return x;
+        }
+        panic!("Expected number")
+    }
+
+    fn parse_vector(self: &mut Self) -> Vector3f {
+        if let Token::Number(x) = self.tokenizer.next_token().expect("Expected x value") {
+            if let Token::Number(y) = self.tokenizer.next_token().expect("Expected y value") {
+                if let Token::Number(z) = self.tokenizer.next_token().expect("Expected z value") {
+                    return Vector3f::new(x, y, z);
                 }
             }
         }
@@ -125,11 +217,34 @@ mod test {
           sphere 1.0
           lambertian color 0.2 0.5 0.9
 
-        # Another simple diffuse sphere
-        object simple
-          sphere 2.0
-          lambertian color 0.3 0.6 0.8
-    ";
+        # a transformed diffuse sphere
+        object transformed
+          object simple
+            sphere 1.0
+            lambertian color 0.2 0.8 0.1
+          transform {
+            translate 0.0 0.0 2.0
+            rotate_x 0.78
+          }
+
+        # a compound object
+        object compound {
+          object transformed
+            object simple
+              sphere 1.0
+              lambertian color 0.2 0.8 0.1
+            transform {
+              translate 0.0 0.0 2.0
+            }
+          object transformed
+            object simple
+              sphere 1.0
+              lambertian color 0.7 0.2 0.1
+            transform {
+              translate 0.0 0.0 -0.5
+            }
+        }
+      ";
         let mut parser = Parser::new(input);
         let scene = parser.parse_scene();
         let mut print_visitor = PrintVisitor::new();

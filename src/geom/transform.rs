@@ -29,6 +29,15 @@ impl Transform {
         Self { mat, inv_mat }
     }
 
+    ///  Build a identity `Transform`.
+    ///
+    pub fn identity() -> Self {
+        Self {
+            mat: Matrix4::identity(),
+            inv_mat: Matrix4::identity(),
+        }
+    }
+
     ///  Build a translation `Transform`.
     ///
     pub fn translation(p: Vector3f) -> Self {

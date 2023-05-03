@@ -17,15 +17,35 @@ impl PrintVisitor {
 
 impl Visitor for PrintVisitor {
     fn visit_scene(self: &mut Self, node: &SceneNode) {
-        let r = self.stack.iter().fold(String::new(), |a, s| a + s);
+        let mut r = String::new();
+        for _ in 1..=node.objects.len() {
+            let object = self.stack.pop().unwrap();
+            r = r + &object;
+        }
 
         println!("scene {}", r);
+    }
+
+    fn visit_object_compound(self: &mut Self, node: &ObjectCompoundNode) {
+        let mut r = String::new();
+        for _ in 1..=node.objects.len() {
+            let object = self.stack.pop().unwrap();
+            r = r + &object;
+        }
+
+        self.stack.push(format!("object compound {}", r));
     }
 
     fn visit_object_simple(self: &mut Self, node: &ObjectSimpleNode) {
         let material = self.stack.pop().unwrap();
         let shape = self.stack.pop().unwrap();
         self.stack.push(format!("object simple {} {}", shape, material));
+    }
+
+    fn visit_object_transformed(self: &mut Self, node: &ObjectTransformedNode) {
+        let transform = self.stack.pop().unwrap();
+        let object = self.stack.pop().unwrap();
+        self.stack.push(format!("object transformed {} {}", object, transform));
     }
 
     fn visit_shape_sphere(self: &mut Self, node: &SphereShapeNode) {
@@ -39,5 +59,49 @@ impl Visitor for PrintVisitor {
 
     fn visit_texture_color(self: &mut Self, node: &ColorTextureNode) {
         self.stack.push(format!("color {:?}", node.color));
+    }
+
+    fn visit_transform(self: &mut Self, node: &TransformNode) {
+        let mut r = String::new();
+        for _ in 1..=node.steps.len() {
+            let object = self.stack.pop().unwrap();
+            r = r + &object;
+        }
+
+        self.stack.push(format!("transform {}", r));
+    }
+
+    fn visit_transform_translate(self: &mut Self, node: &TransformTranslateNode) {
+        self.stack.push(format!("translate {}", node.offset));
+    }
+
+    fn visit_transform_rotate(self: &mut Self, node: &TransformRotateAxisNode) {
+        self.stack.push(format!("rotate {:?} {}", node.axis, node.angle));
+    }
+}
+
+#[cfg(test)]
+
+mod test {
+    use crate::loader::Parser;
+
+    #[test]
+    fn test_print() {
+        let input = "
+    scene
+      object transformed
+        object simple
+          sphere 1.0
+          lambertian color 0.2 0.8 0.1
+        transform {
+            translate 0.0 0.0 2.0
+            rotate 0.0 0.0 1.0 45.0
+        }
+    ";
+
+        let mut parser = Parser::new(input);
+        let scene_node = parser.parse_scene();
+        let mut visitor = super::PrintVisitor::new();
+        visitor.visit(&scene_node);
     }
 }

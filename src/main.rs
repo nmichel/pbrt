@@ -29,10 +29,38 @@ fn main() {
 
     let input = "
     scene
-    # A simple diffuse sphere
-    object simple
-      sphere 1.0
-      lambertian color 0.2 0.8 0.1
+      # A simple diffuse sphere
+      object simple
+        sphere 1.0
+        lambertian color 0.2 0.8 0.1
+      
+      # A simple transformed diffuse sphere
+      object transformed
+        object simple
+          sphere 0.5
+          lambertian color 0.8 0.1 0.1
+        transform {
+          translate 0.0 0.0 1.5
+          rotate_x 0.76
+        }
+      
+      # A simple transformed diffuse sphere
+      object compound {
+        object transformed
+          object simple
+            sphere 1.0
+            lambertian color 0.2 0.8 0.1
+            transform {
+              rotate_z 0.76
+            }
+        object transformed
+          object simple
+            sphere 1.0
+            lambertian color 0.1 0.2 0.8
+            transform {
+              translate 1.0 0.0 0.2
+            }
+      }
     ";
 
     let scene = Loader::load_scene(input);

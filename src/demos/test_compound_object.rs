@@ -9,7 +9,7 @@ use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::geom::vector3::Vector3f;
 use crate::materials::Lambertian;
-use crate::objects::{Compound, Simple, Transformed};
+use crate::objects::{Compound, Object, Simple, Transformed};
 use crate::scene::Scene;
 use crate::shapes::{Cylinder, Sphere};
 use crate::spectrum::Spectrum;
@@ -53,7 +53,7 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         cylinders.push(Arc::new(Transformed::new(
             cylinder.clone(),
             Box::new(Transform::translation(Vector3f::new(x, 0.0, z))),
-        )));
+        )) as Arc<dyn Object>);
     }
     let cylinder_group = Arc::new(Compound::new(&cylinders));
 

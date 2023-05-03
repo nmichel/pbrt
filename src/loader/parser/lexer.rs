@@ -4,6 +4,7 @@ pub enum Token {
     KWBox,
     KWScene,
     KWSphere,
+    KWCompound,
     KWCylinder,
     BraceOpen,
     BraceClose,
@@ -13,10 +14,16 @@ pub enum Token {
     ParenOpen,
     ParenClose,
     Number(f64),
-    KWSimple,
-    KWObject,
-    KWLambertian,
     KWColor,
+    KWLambertian,
+    KWObject,
+    KWSimple,
+    KWTransform,
+    KWTransformed,
+    KWTranslate,
+    KWRotateX,
+    KWRotateY,
+    KWRotateZ,
 }
 
 impl<'a> From<&'a str> for Token {
@@ -24,12 +31,19 @@ impl<'a> From<&'a str> for Token {
         match other {
             "box" => Token::KWBox,
             "color" => Token::KWColor,
+            "compound" => Token::KWCompound,
             "cylinder" => Token::KWCylinder,
             "lambertian" => Token::KWLambertian,
             "object" => Token::KWObject,
+            "rotate_x" => Token::KWRotateX,
+            "rotate_y" => Token::KWRotateY,
+            "rotate_z" => Token::KWRotateZ,
             "scene" => Token::KWScene,
             "simple" => Token::KWSimple,
             "sphere" => Token::KWSphere,
+            "transform" => Token::KWTransform,
+            "transformed" => Token::KWTransformed,
+            "translate" => Token::KWTranslate,
             _ => Token::Identifier(other.to_string()),
         }
     }

@@ -1,3 +1,10 @@
+mod objects;
+mod transform;
+
+pub use self::objects::*;
+pub use self::transform::*;
+
+use crate::geom::vector3::Vector3f;
 use crate::spectrum::Spectrum;
 
 use super::visitors::Visitor;

@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use super::super::ast::*;
 use super::Visitor;
+use crate::geom::transform::Transform;
 use crate::materials::{Lambertian, Material};
-use crate::objects::{Object, Simple};
+use crate::objects::{Compound, Object, Simple, Transformed};
 use crate::scene::Scene;
 use crate::shapes::{Shape, Sphere};
 use crate::textures::{PlainColor, Texture};
@@ -14,6 +15,7 @@ pub struct SceneBuilderVisitor {
     shapes: Vec<Arc<dyn Shape>>,
     materials: Vec<Arc<dyn Material>>,
     textures: Vec<Arc<dyn Texture>>,
+    transforms: Vec<Box<Transform>>,
 }
 
 impl SceneBuilderVisitor {
@@ -24,6 +26,7 @@ impl SceneBuilderVisitor {
             shapes: Vec::new(),
             materials: Vec::new(),
             textures: Vec::new(),
+            transforms: Vec::new(),
         }
     }
 
@@ -34,15 +37,32 @@ impl SceneBuilderVisitor {
 
 impl Visitor for SceneBuilderVisitor {
     fn visit_scene(self: &mut Self, node: &SceneNode) {
-        while let Some(object) = self.objects.pop() {
+        for _ in 1..=node.objects.len() {
+            let object = self.objects.pop().unwrap();
             self.scene.add_object(object);
         }
+    }
+
+    fn visit_object_compound(self: &mut Self, node: &ObjectCompoundNode) {
+        let mut objects: Vec<Arc<dyn Object>> = Vec::new();
+        for _ in 1..=node.objects.len() {
+            objects.push(self.objects.pop().unwrap());
+        }
+
+        let compound = Arc::new(Compound::new(&objects));
+        self.objects.push(compound);
     }
 
     fn visit_object_simple(self: &mut Self, node: &ObjectSimpleNode) {
         let material = self.materials.pop().unwrap();
         let shape = self.shapes.pop().unwrap();
         self.objects.push(Arc::new(Simple::new(shape, material)));
+    }
+
+    fn visit_object_transformed(self: &mut Self, node: &ObjectTransformedNode) {
+        let object = self.objects.pop().unwrap();
+        let transform = self.transforms.pop().unwrap();
+        self.objects.push(Arc::new(Transformed::new(object, transform)));
     }
 
     fn visit_shape_sphere(self: &mut Self, node: &SphereShapeNode) {
@@ -56,5 +76,31 @@ impl Visitor for SceneBuilderVisitor {
 
     fn visit_texture_color(self: &mut Self, node: &ColorTextureNode) {
         self.textures.push(Arc::new(PlainColor::new(node.color)));
+    }
+
+    fn visit_transform(self: &mut Self, node: &TransformNode) {
+        let mut transforms: Vec<Box<Transform>> = Vec::new();
+        for _ in 1..=node.steps.len() {
+            let step = self.transforms.pop().unwrap();
+            transforms.push(step);
+        }
+
+        let res = transforms.iter().fold(Transform::identity(), |acc, t| {
+            let op: &Transform = &**t;
+            &acc * op
+        });
+        self.transforms.push(Box::new(res));
+    }
+
+    fn visit_transform_translate(self: &mut Self, node: &TransformTranslateNode) {
+        self.transforms.push(Box::new(Transform::translation(node.offset)));
+    }
+
+    fn visit_transform_rotate(self: &mut Self, node: &TransformRotateAxisNode) {
+        match node.axis {
+            Axis::X => self.transforms.push(Box::new(Transform::rotation_x(node.angle))),
+            Axis::Y => self.transforms.push(Box::new(Transform::rotation_y(node.angle))),
+            Axis::Z => self.transforms.push(Box::new(Transform::rotation_z(node.angle))),
+        }
     }
 }

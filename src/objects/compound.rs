@@ -6,14 +6,14 @@ use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 
-use super::{Object, Transformed};
+use super::Object;
 
 pub struct Compound {
-    pub objects: Vec<Arc<Transformed>>,
+    pub objects: Vec<Arc<dyn Object>>,
 }
 
 impl Compound {
-    pub fn new(objects: &Vec<Arc<Transformed>>) -> Self {
+    pub fn new(objects: &Vec<Arc<dyn Object>>) -> Self {
         Self { objects: objects.clone() }
     }
 }
