@@ -1,6 +1,29 @@
 use crate::loader::visitors::Visitor;
 
-use super::{Node, ObjectNode, TransformNode};
+use super::{MaterialNode, Node, ShapeNode, TransformNode};
+
+pub trait ObjectNode: Node {}
+
+pub struct ObjectSimpleNode {
+    pub shape: Box<dyn ShapeNode>,
+    pub material: Box<dyn MaterialNode>,
+}
+
+impl ObjectNode for ObjectSimpleNode {}
+
+impl Node for ObjectSimpleNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        self.shape.visit(visitor);
+        self.material.visit(visitor);
+        visitor.visit_object_simple(self);
+    }
+}
+
+impl ObjectSimpleNode {
+    pub fn new(shape: Box<dyn ShapeNode>, material: Box<dyn MaterialNode>) -> Self {
+        ObjectSimpleNode { shape, material }
+    }
+}
 
 pub struct ObjectTransformedNode {
     pub object: Box<dyn ObjectNode>,
