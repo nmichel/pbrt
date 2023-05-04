@@ -65,6 +65,10 @@ impl Visitor for SceneBuilderVisitor {
         self.objects.push(Arc::new(Transformed::new(object, transform)));
     }
 
+    fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode) {
+        self.shapes.push(Arc::new(AABox::new(&node.extend)));
+    }
+
     fn visit_shape_cylinder(self: &mut Self, node: &CylinderShapeNode) {
         self.shapes.push(Arc::new(Cylinder::new(node.radius, node.height)));
     }

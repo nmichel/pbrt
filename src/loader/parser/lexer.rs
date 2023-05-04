@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Identifier(String),
-    KWBox,
+    KWAABox,
     KWScene,
     KWSphere,
     KWCompound,
@@ -31,7 +31,7 @@ pub enum Token {
 impl<'a> From<&'a str> for Token {
     fn from(other: &'a str) -> Token {
         match other {
-            "box" => Token::KWBox,
+            "aabox" => Token::KWAABox,
             "color" => Token::KWColor,
             "compound" => Token::KWCompound,
             "cylinder" => Token::KWCylinder,
@@ -304,7 +304,7 @@ mod test {
 
     #[test]
     fn test_keywords() {
-        assert_eq!(Tokenizer::new("box").next_token().unwrap(), Token::KWBox);
+        assert_eq!(Tokenizer::new("aabox").next_token().unwrap(), Token::KWAABox);
         assert_eq!(Tokenizer::new("cylinder").next_token().unwrap(), Token::KWCylinder);
         assert_eq!(Tokenizer::new("sphere").next_token().unwrap(), Token::KWSphere);
     }
@@ -321,7 +321,7 @@ mod test {
 
     hello world 
         bla_bla
-          box 1.6 2.3 3.4
+          aabox 1.6 2.3 3.4
           cylinder 1.6
             sphere -2.4
       Löf ";
@@ -335,7 +335,7 @@ mod test {
             Token::Identifier("hello".to_string()),
             Token::Identifier("world".to_string()),
             Token::Identifier("bla_bla".to_string()),
-            Token::KWBox,
+            Token::KWAABox,
             Token::Number(1.6),
             Token::Number(2.3),
             Token::Number(3.4),

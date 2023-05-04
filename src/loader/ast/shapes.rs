@@ -1,3 +1,4 @@
+use crate::geom::vector3::Vector3f;
 use crate::loader::visitors::Visitor;
 
 use super::Node;
@@ -73,5 +74,23 @@ impl Node for CylinderShapeNode {
 impl CylinderShapeNode {
     pub fn new(radius: f64, height: f64) -> Self {
         CylinderShapeNode { radius, height }
+    }
+}
+
+pub struct AABoxShapeNode {
+    pub extend: Vector3f,
+}
+
+impl ShapeNode for AABoxShapeNode {}
+
+impl Node for AABoxShapeNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        visitor.visit_shape_aabox(self);
+    }
+}
+
+impl AABoxShapeNode {
+    pub fn new(extend: Vector3f) -> Self {
+        AABoxShapeNode { extend }
     }
 }

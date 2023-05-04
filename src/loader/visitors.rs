@@ -7,6 +7,7 @@ pub trait Visitor {
     fn visit_object_simple(self: &mut Self, node: &ObjectSimpleNode);
     fn visit_object_transformed(self: &mut Self, node: &ObjectTransformedNode);
 
+    fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode);
     fn visit_shape_cylinder(self: &mut Self, node: &CylinderShapeNode);
     fn visit_shape_plane(self: &mut Self, node: &PlaneShapeNode);
     fn visit_shape_rectangle(self: &mut Self, node: &RectangleShapeNode);

@@ -92,12 +92,18 @@ impl<'a> Parser<'a> {
 
     fn parse_shape(self: &mut Self) -> Box<dyn ShapeNode> {
         match self.tokenizer.next_token() {
+            Some(Token::KWAABox) => self.parse_shape_aabox(),
             Some(Token::KWCylinder) => self.parse_shape_cylinder(),
             Some(Token::KWPlane) => self.parse_shape_plane(),
             Some(Token::KWRectangle) => self.parse_shape_rectangle(),
             Some(Token::KWSphere) => self.parse_shape_sphere(),
             _ => panic!("Expected sphere"),
         }
+    }
+
+    fn parse_shape_aabox(self: &mut Self) -> Box<dyn ShapeNode> {
+        let extent = self.parse_vector();
+        return Box::new(AABoxShapeNode::new(extent));
     }
 
     fn parse_shape_cylinder(self: &mut Self) -> Box<dyn ShapeNode> {
@@ -266,6 +272,10 @@ mod test {
         }
       object simple
         cylinder 0.3 1.0
+        lambertian color 0.2 0.32 0.5
+
+      object simple
+        aabox 0.3 1.0 2.0
         lambertian color 0.2 0.32 0.5
 
 
