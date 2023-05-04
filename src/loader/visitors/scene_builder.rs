@@ -6,7 +6,7 @@ use crate::geom::transform::Transform;
 use crate::materials::{Lambertian, Material};
 use crate::objects::{Compound, Object, Simple, Transformed};
 use crate::scene::Scene;
-use crate::shapes::{Shape, Sphere};
+use crate::shapes::{Rectangle, Shape, Sphere};
 use crate::textures::{PlainColor, Texture};
 
 pub struct SceneBuilderVisitor {
@@ -65,6 +65,10 @@ impl Visitor for SceneBuilderVisitor {
         self.objects.push(Arc::new(Transformed::new(object, transform)));
     }
 
+    fn visit_shape_rectangle(self: &mut Self, node: &RectangleShapeNode) {
+        self.shapes.push(Arc::new(Rectangle::new(node.half_width, node.half_height)));
+    }
+
     fn visit_shape_sphere(self: &mut Self, node: &SphereShapeNode) {
         self.shapes.push(Arc::new(Sphere::new(node.radius)));
     }
@@ -92,15 +96,15 @@ impl Visitor for SceneBuilderVisitor {
         self.transforms.push(Box::new(res));
     }
 
-    fn visit_transform_translate(self: &mut Self, node: &TransformTranslateNode) {
-        self.transforms.push(Box::new(Transform::translation(node.offset)));
-    }
-
     fn visit_transform_rotate(self: &mut Self, node: &TransformRotateAxisNode) {
         match node.axis {
             Axis::X => self.transforms.push(Box::new(Transform::rotation_x(node.angle))),
             Axis::Y => self.transforms.push(Box::new(Transform::rotation_y(node.angle))),
             Axis::Z => self.transforms.push(Box::new(Transform::rotation_z(node.angle))),
         }
+    }
+
+    fn visit_transform_translate(self: &mut Self, node: &TransformTranslateNode) {
+        self.transforms.push(Box::new(Transform::translation(node.offset)));
     }
 }

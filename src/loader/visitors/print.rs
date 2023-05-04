@@ -23,7 +23,7 @@ impl Visitor for PrintVisitor {
             r = r + &object;
         }
 
-        println!("scene {}", r);
+        println!("scene {{ {} }}", r);
     }
 
     fn visit_object_compound(self: &mut Self, node: &ObjectCompoundNode) {
@@ -48,6 +48,10 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("object transformed {} {}", object, transform));
     }
 
+    fn visit_shape_rectangle(self: &mut Self, node: &RectangleShapeNode) {
+        self.stack.push(format!("rectangle {} {}", node.half_width, node.half_height));
+    }
+
     fn visit_shape_sphere(self: &mut Self, node: &SphereShapeNode) {
         self.stack.push(format!("sphere {}", node.radius));
     }
@@ -68,15 +72,15 @@ impl Visitor for PrintVisitor {
             r = r + &object;
         }
 
-        self.stack.push(format!("transform {}", r));
-    }
-
-    fn visit_transform_translate(self: &mut Self, node: &TransformTranslateNode) {
-        self.stack.push(format!("translate {}", node.offset));
+        self.stack.push(format!("transform {{  {} }}", r));
     }
 
     fn visit_transform_rotate(self: &mut Self, node: &TransformRotateAxisNode) {
         self.stack.push(format!("rotate {:?} {}", node.axis, node.angle));
+    }
+
+    fn visit_transform_translate(self: &mut Self, node: &TransformTranslateNode) {
+        self.stack.push(format!("translate {}", node.offset));
     }
 }
 
@@ -95,8 +99,12 @@ mod test {
           lambertian color 0.2 0.8 0.1
         transform {
             translate 0.0 0.0 2.0
-            rotate 0.0 0.0 1.0 45.0
+            rotate_x 1.5708
         }
+
+      object simple
+        rectangle 255.0 123
+        lambertian color 0.1 0.8 0.4
     ";
 
         let mut parser = Parser::new(input);

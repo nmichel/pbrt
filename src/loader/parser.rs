@@ -1,7 +1,7 @@
 mod lexer;
 
 use crate::geom::vector3::Vector3f;
-use crate::loader::ast::{Axis, ObjectCompoundNode, TransformRotateAxisNode, TransformStepNode, TransformTranslateNode};
+use crate::loader::ast::{Axis, ObjectCompoundNode, RectangleShapeNode, TransformRotateAxisNode, TransformStepNode, TransformTranslateNode};
 use crate::spectrum::Spectrum;
 
 use self::lexer::{Token, Tokenizer};
@@ -98,8 +98,18 @@ impl<'a> Parser<'a> {
     fn parse_shape(self: &mut Self) -> Box<dyn ShapeNode> {
         match self.tokenizer.next_token() {
             Some(Token::KWSphere) => self.parse_shape_sphere(),
+            Some(Token::KWRectangle) => self.parse_shape_rectangle(),
             _ => panic!("Expected sphere"),
         }
+    }
+
+    fn parse_shape_rectangle(self: &mut Self) -> Box<dyn ShapeNode> {
+        if let Token::Number(half_width) = self.tokenizer.next_token().expect("Expected half_witdh value") {
+            if let Token::Number(half_height) = self.tokenizer.next_token().expect("Expected half_height value") {
+                return Box::new(RectangleShapeNode::new(half_width, half_height));
+            }
+        }
+        panic!("Expected radius");
     }
 
     fn parse_shape_sphere(self: &mut Self) -> Box<dyn ShapeNode> {
