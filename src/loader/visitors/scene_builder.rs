@@ -4,10 +4,10 @@ use super::super::ast::*;
 use super::Visitor;
 use crate::geom::transform::Transform;
 use crate::materials::{Lambertian, Material};
-use crate::objects::{Compound, Object, Simple, Transformed};
+use crate::objects::*;
 use crate::scene::Scene;
-use crate::shapes::{Rectangle, Shape, Sphere};
-use crate::textures::{PlainColor, Texture};
+use crate::shapes::*;
+use crate::textures::*;
 
 pub struct SceneBuilderVisitor {
     pub scene: Scene,
@@ -53,16 +53,20 @@ impl Visitor for SceneBuilderVisitor {
         self.objects.push(compound);
     }
 
-    fn visit_object_simple(self: &mut Self, node: &ObjectSimpleNode) {
+    fn visit_object_simple(self: &mut Self, _node: &ObjectSimpleNode) {
         let material = self.materials.pop().unwrap();
         let shape = self.shapes.pop().unwrap();
         self.objects.push(Arc::new(Simple::new(shape, material)));
     }
 
-    fn visit_object_transformed(self: &mut Self, node: &ObjectTransformedNode) {
+    fn visit_object_transformed(self: &mut Self, _node: &ObjectTransformedNode) {
         let object = self.objects.pop().unwrap();
         let transform = self.transforms.pop().unwrap();
         self.objects.push(Arc::new(Transformed::new(object, transform)));
+    }
+
+    fn visit_shape_plane(self: &mut Self, _node: &PlaneShapeNode) {
+        self.shapes.push(Arc::new(Plane::new()));
     }
 
     fn visit_shape_rectangle(self: &mut Self, node: &RectangleShapeNode) {
@@ -73,7 +77,7 @@ impl Visitor for SceneBuilderVisitor {
         self.shapes.push(Arc::new(Sphere::new(node.radius)));
     }
 
-    fn visit_material_lambertian(self: &mut Self, node: &LambertianMaterialNode) {
+    fn visit_material_lambertian(self: &mut Self, _node: &LambertianMaterialNode) {
         let texture = self.textures.pop().unwrap();
         self.materials.push(Arc::new(Lambertian::new(texture)));
     }

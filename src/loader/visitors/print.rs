@@ -36,16 +36,20 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("object compound {}", r));
     }
 
-    fn visit_object_simple(self: &mut Self, node: &ObjectSimpleNode) {
+    fn visit_object_simple(self: &mut Self, _node: &ObjectSimpleNode) {
         let material = self.stack.pop().unwrap();
         let shape = self.stack.pop().unwrap();
         self.stack.push(format!("object simple {} {}", shape, material));
     }
 
-    fn visit_object_transformed(self: &mut Self, node: &ObjectTransformedNode) {
+    fn visit_object_transformed(self: &mut Self, _node: &ObjectTransformedNode) {
         let transform = self.stack.pop().unwrap();
         let object = self.stack.pop().unwrap();
         self.stack.push(format!("object transformed {} {}", object, transform));
+    }
+
+    fn visit_shape_plane(self: &mut Self, _node: &PlaneShapeNode) {
+        self.stack.push("plane".to_string());
     }
 
     fn visit_shape_rectangle(self: &mut Self, node: &RectangleShapeNode) {
@@ -56,7 +60,7 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("sphere {}", node.radius));
     }
 
-    fn visit_material_lambertian(self: &mut Self, node: &LambertianMaterialNode) {
+    fn visit_material_lambertian(self: &mut Self, _node: &LambertianMaterialNode) {
         let texture = self.stack.pop().unwrap();
         self.stack.push(format!("lambertian {}", texture));
     }

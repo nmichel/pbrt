@@ -1,13 +1,13 @@
 mod lexer;
 
 use crate::geom::vector3::Vector3f;
-use crate::loader::ast::{Axis, ObjectCompoundNode, RectangleShapeNode, TransformRotateAxisNode, TransformStepNode, TransformTranslateNode};
+use crate::loader::ast::*;
 use crate::spectrum::Spectrum;
 
 use self::lexer::{Token, Tokenizer};
 use super::ast::{
     ColorTextureNode, LambertianMaterialNode, MaterialNode, ObjectNode, ObjectSimpleNode, ObjectTransformedNode, SceneNode, ShapeNode,
-    SphereShapeNode, TextureNode, TransformNode,
+    SphereShapeNode, TextureNode, TransformNode, PlaneShapeNode,
 };
 
 pub struct Parser<'a> {
@@ -15,9 +15,9 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn parse(input: &str) -> () {
+    pub fn parse(input: &str) -> SceneNode {
         let mut parser = Parser::new(input);
-        parser.parse_scene();
+        parser.parse_scene()
     }
 
     pub fn new(input: &'a str) -> Self {
@@ -86,21 +86,26 @@ impl<'a> Parser<'a> {
                         return node;
                     }
 
-                    _ => panic!("Expected } or object"),
+                    _ => panic!("{}", "Expected } or object"),
                 }
             }
         }
-        panic!("Expected {")
+        panic!("{}", "Expected {")
     }
 
     // Shape parsing
 
     fn parse_shape(self: &mut Self) -> Box<dyn ShapeNode> {
         match self.tokenizer.next_token() {
-            Some(Token::KWSphere) => self.parse_shape_sphere(),
+            Some(Token::KWPlane) => self.parse_shape_plane(),
             Some(Token::KWRectangle) => self.parse_shape_rectangle(),
+            Some(Token::KWSphere) => self.parse_shape_sphere(),
             _ => panic!("Expected sphere"),
         }
+    }
+
+    fn parse_shape_plane(self: &mut Self) -> Box<dyn ShapeNode> {
+        Box::new(PlaneShapeNode::new())
     }
 
     fn parse_shape_rectangle(self: &mut Self) -> Box<dyn ShapeNode> {
@@ -248,7 +253,7 @@ mod test {
             }
           object transformed
             object simple
-              sphere 1.0
+              plane
               lambertian color 0.7 0.2 0.1
             transform {
               translate 0.0 0.0 -0.5

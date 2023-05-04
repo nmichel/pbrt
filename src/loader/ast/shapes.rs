@@ -40,3 +40,19 @@ impl RectangleShapeNode {
         RectangleShapeNode { half_width, half_height }
     }
 }
+
+pub struct PlaneShapeNode {}
+
+impl ShapeNode for PlaneShapeNode {}
+
+impl Node for PlaneShapeNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        visitor.visit_shape_plane(self);
+    }
+}
+
+impl PlaneShapeNode {
+    pub fn new() -> Self {
+        PlaneShapeNode {}
+    }
+}
