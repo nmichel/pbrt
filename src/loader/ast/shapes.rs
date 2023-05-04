@@ -56,3 +56,22 @@ impl PlaneShapeNode {
         PlaneShapeNode {}
     }
 }
+
+pub struct CylinderShapeNode {
+    pub radius: f64,
+    pub height: f64,
+}
+
+impl ShapeNode for CylinderShapeNode {}
+
+impl Node for CylinderShapeNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        visitor.visit_shape_cylinder(self);
+    }
+}
+
+impl CylinderShapeNode {
+    pub fn new(radius: f64, height: f64) -> Self {
+        CylinderShapeNode { radius, height }
+    }
+}

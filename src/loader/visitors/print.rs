@@ -48,6 +48,10 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("object transformed {} {}", object, transform));
     }
 
+    fn visit_shape_cylinder(self: &mut Self, node: &CylinderShapeNode) {
+        self.stack.push(format!("cylinder {} {}", node.radius, node.height));
+    }
+
     fn visit_shape_plane(self: &mut Self, _node: &PlaneShapeNode) {
         self.stack.push("plane".to_string());
     }

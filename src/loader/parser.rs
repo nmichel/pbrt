@@ -1,14 +1,9 @@
 mod lexer;
 
-use crate::geom::vector3::Vector3f;
-use crate::loader::ast::*;
-use crate::spectrum::Spectrum;
-
 use self::lexer::{Token, Tokenizer};
-use super::ast::{
-    ColorTextureNode, LambertianMaterialNode, MaterialNode, ObjectNode, ObjectSimpleNode, ObjectTransformedNode, SceneNode, ShapeNode,
-    SphereShapeNode, TextureNode, TransformNode, PlaneShapeNode,
-};
+use super::ast::*;
+use crate::geom::vector3::Vector3f;
+use crate::spectrum::Spectrum;
 
 pub struct Parser<'a> {
     tokenizer: Tokenizer<'a>,
@@ -97,11 +92,21 @@ impl<'a> Parser<'a> {
 
     fn parse_shape(self: &mut Self) -> Box<dyn ShapeNode> {
         match self.tokenizer.next_token() {
+            Some(Token::KWCylinder) => self.parse_shape_cylinder(),
             Some(Token::KWPlane) => self.parse_shape_plane(),
             Some(Token::KWRectangle) => self.parse_shape_rectangle(),
             Some(Token::KWSphere) => self.parse_shape_sphere(),
             _ => panic!("Expected sphere"),
         }
+    }
+
+    fn parse_shape_cylinder(self: &mut Self) -> Box<dyn ShapeNode> {
+        if let Token::Number(radius) = self.tokenizer.next_token().expect("Expected radius") {
+            if let Token::Number(height) = self.tokenizer.next_token().expect("Expected height value") {
+                return Box::new(CylinderShapeNode::new(radius, height));
+            }
+        }
+        panic!("Expected cylinder");
     }
 
     fn parse_shape_plane(self: &mut Self) -> Box<dyn ShapeNode> {
@@ -213,7 +218,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        panic!("Expected color")
+        panic!("Expected vector")
     }
 }
 
@@ -259,6 +264,11 @@ mod test {
               translate 0.0 0.0 -0.5
             }
         }
+      object simple
+        cylinder 0.3 1.0
+        lambertian color 0.2 0.32 0.5
+
+
       ";
         let mut parser = Parser::new(input);
         let scene = parser.parse_scene();
