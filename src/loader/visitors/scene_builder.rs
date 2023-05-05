@@ -117,6 +117,11 @@ impl Visitor for SceneBuilderVisitor {
         self.shapes.push(Arc::new(Sphere::new(node.radius)));
     }
 
+    fn visit_material_dielectric(self: &mut Self, node: &DielectricMaterialNode) {
+        let texture = self.textures.pop().unwrap();
+        self.materials.push(Arc::new(Dielectric::new(node.index, texture)));
+    }
+
     fn visit_material_lambertian(self: &mut Self, _node: &LambertianMaterialNode) {
         let texture = self.textures.pop().unwrap();
         self.materials.push(Arc::new(Lambertian::new(texture)));

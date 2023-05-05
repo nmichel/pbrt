@@ -17,6 +17,7 @@ pub trait Visitor {
     fn visit_shape_rectangle(self: &mut Self, node: &RectangleShapeNode);
     fn visit_shape_sphere(self: &mut Self, node: &SphereShapeNode);
 
+    fn visit_material_dielectric(self: &mut Self, node: &DielectricMaterialNode);
     fn visit_material_lambertian(self: &mut Self, node: &LambertianMaterialNode);
 
     fn visit_texture_checkerboard(self: &mut Self, node: &CheckerboardTextureNode);
