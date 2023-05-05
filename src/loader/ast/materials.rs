@@ -43,3 +43,22 @@ impl DielectricMaterialNode {
     }
 }
 
+pub struct MetalMaterialNode {
+    pub fuzz: f64,
+    pub texture: Box<dyn TextureNode>,
+}
+
+impl MaterialNode for MetalMaterialNode {}
+
+impl Node for MetalMaterialNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        self.texture.visit(visitor);
+        visitor.visit_material_metal(self);
+    }
+}
+
+impl MetalMaterialNode {
+    pub fn new(fuzz: f64, texture: Box<dyn TextureNode>) -> Self {
+        MetalMaterialNode { fuzz, texture }
+    }
+}

@@ -127,6 +127,11 @@ impl Visitor for SceneBuilderVisitor {
         self.materials.push(Arc::new(Lambertian::new(texture)));
     }
 
+    fn visit_material_metal(self: &mut Self, node: &MetalMaterialNode) {
+        let texture = self.textures.pop().unwrap();
+        self.materials.push(Arc::new(Metal::new(node.fuzz, texture)));
+    }
+
     fn visit_texture_checkerboard(self: &mut Self, node: &CheckerboardTextureNode) {
         self.textures.push(Arc::new(CheckerBoard::new(node.color1, node.color2, node.scale)));
     }

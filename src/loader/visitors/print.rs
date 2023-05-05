@@ -114,6 +114,11 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("lambertian {}", texture));
     }
 
+    fn visit_material_metal(self: &mut Self, node: &MetalMaterialNode) {
+        let texture = self.stack.pop().unwrap();
+        self.stack.push(format!("metal {} {}", node.fuzz, texture));
+    }
+
     fn visit_texture_checkerboard(self: &mut Self, node: &CheckerboardTextureNode) {
         self.stack
             .push(format!("checkerboard {:?} {:?} {}", node.color1, node.color2, node.scale));
