@@ -2,6 +2,7 @@
 pub enum Token {
     Identifier(String),
     KWAABox,
+    KWCheckerboard,
     KWCSG,
     KWElem,
     KWIntersection,
@@ -37,6 +38,7 @@ impl<'a> From<&'a str> for Token {
     fn from(other: &'a str) -> Token {
         match other {
             "aabox" => Token::KWAABox,
+            "checkerboard" => Token::KWCheckerboard,
             "color" => Token::KWColor,
             "csg" => Token::KWCSG,
             "compound" => Token::KWCompound,

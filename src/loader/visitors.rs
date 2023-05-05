@@ -19,6 +19,7 @@ pub trait Visitor {
 
     fn visit_material_lambertian(self: &mut Self, node: &LambertianMaterialNode);
 
+    fn visit_texture_checkerboard(self: &mut Self, node: &CheckerboardTextureNode);
     fn visit_texture_color(self: &mut Self, node: &ColorTextureNode);
 
     fn visit_transform(self: &mut Self, node: &TransformNode);

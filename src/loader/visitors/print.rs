@@ -109,6 +109,11 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("lambertian {}", texture));
     }
 
+    fn visit_texture_checkerboard(self: &mut Self, node: &CheckerboardTextureNode) {
+        self.stack
+            .push(format!("checkerboard {:?} {:?} {}", node.color1, node.color2, node.scale));
+    }
+
     fn visit_texture_color(self: &mut Self, node: &ColorTextureNode) {
         self.stack.push(format!("color {:?}", node.color));
     }

@@ -191,8 +191,16 @@ impl<'a> Parser<'a> {
     fn parse_texture(self: &mut Self) -> Box<dyn TextureNode> {
         match self.tokenizer.next_token() {
             Some(Token::KWColor) => Box::new(ColorTextureNode::new(self.parse_spectrum())),
+            Some(Token::KWCheckerboard) => self.parse_texture_checkerboard(),
             _ => panic!("Expected plain color"),
         }
+    }
+
+    fn parse_texture_checkerboard(self: &mut Self) -> Box<dyn TextureNode> {
+        let color1 = self.parse_spectrum();
+        let color2 = self.parse_spectrum();
+        let scale = self.parse_number();
+        Box::new(CheckerboardTextureNode::new(color1, color2, scale))
     }
 
     fn parse_transform(self: &mut Self) -> Box<TransformNode> {

@@ -1,0 +1,72 @@
+scene
+  object transformed
+    object simple
+      csg union {
+        elem
+          sphere 0.4
+          transform {
+            translate -0.5 0 -0.5
+          }
+
+        elem
+          sphere 0.4
+          transform {
+            translate 0 0 -0.5
+          }
+  
+        elem
+          sphere 0.4
+          transform {
+            translate 0.5 0 -0.5
+          }
+  
+        elem
+          sphere 0.4
+          transform {
+            translate -0.5 0 0
+          }
+
+        elem
+          sphere 0.4
+          transform {
+            translate 0 0 0
+          }
+
+        elem
+          sphere 0.4
+          transform {
+            translate 0.5 0 0
+          }
+  
+        elem
+          sphere 0.4
+          transform {
+            translate -0.5 0 0.5
+          }
+  
+        elem
+          sphere 0.4
+          transform {
+            translate 0 0 0.5
+          }
+  
+        elem
+          sphere 0.4
+          transform {
+            translate 0.5 0 0.5
+          }
+      }
+      lambertian color 1 0.6470588235294118 0
+    transform {
+      translate 0 0 0
+    }
+  object transformed
+    object simple
+      rectangle 3 3
+      lambertian checkerboard
+        0.65 0.0 0.0
+        0.65 0.65 0.65
+        2.0
+    transform {
+      translate 0 -0.6 0
+    }
