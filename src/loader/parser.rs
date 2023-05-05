@@ -178,6 +178,7 @@ impl<'a> Parser<'a> {
     fn parse_material(self: &mut Self) -> Box<dyn MaterialNode> {
         match self.tokenizer.next_token() {
             Some(Token::KWDielectric) => self.parse_material_dielectric(),
+            Some(Token::KWDiffuseLight) => self.parse_material_diffuse_light(),
             Some(Token::KWLambertian) => self.parse_material_lambertian(),
             Some(Token::KWMetal) => self.parse_material_metal(),
             _ => panic!("Expected lambertian, dielectric, metal"),
@@ -188,6 +189,10 @@ impl<'a> Parser<'a> {
         let index = self.parse_number();
         let albedo = self.parse_texture();
         Box::new(DielectricMaterialNode::new(index, albedo))
+    }
+
+    fn parse_material_diffuse_light(self: &mut Self) -> Box<dyn MaterialNode> {
+        Box::new(DiffuseLightMaterialNode::new(self.parse_texture()))
     }
 
     fn parse_material_lambertian(self: &mut Self) -> Box<dyn MaterialNode> {

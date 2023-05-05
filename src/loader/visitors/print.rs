@@ -109,6 +109,11 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("dielectric {} {}", node.index, texture));
     }
 
+    fn visit_material_diffuse_light(self: &mut Self, node: &DiffuseLightMaterialNode) {
+        let texture = self.stack.pop().unwrap();
+        self.stack.push(format!("diffuse_light {}", texture));
+    }
+
     fn visit_material_lambertian(self: &mut Self, _node: &LambertianMaterialNode) {
         let texture = self.stack.pop().unwrap();
         self.stack.push(format!("lambertian {}", texture));

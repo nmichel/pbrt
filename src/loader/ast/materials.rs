@@ -62,3 +62,22 @@ impl MetalMaterialNode {
         MetalMaterialNode { fuzz, texture }
     }
 }
+
+pub struct DiffuseLightMaterialNode {
+    pub texture: Box<dyn TextureNode>,
+}
+
+impl MaterialNode for DiffuseLightMaterialNode {}
+
+impl Node for DiffuseLightMaterialNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        self.texture.visit(visitor);
+        visitor.visit_material_diffuse_light(self);
+    }
+}
+
+impl DiffuseLightMaterialNode {
+    pub fn new(texture: Box<dyn TextureNode>) -> Self {
+        DiffuseLightMaterialNode { texture }
+    }
+}

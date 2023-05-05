@@ -18,6 +18,7 @@ pub trait Visitor {
     fn visit_shape_sphere(self: &mut Self, node: &SphereShapeNode);
 
     fn visit_material_dielectric(self: &mut Self, node: &DielectricMaterialNode);
+    fn visit_material_diffuse_light(self: &mut Self, node: &DiffuseLightMaterialNode);
     fn visit_material_lambertian(self: &mut Self, node: &LambertianMaterialNode);
     fn visit_material_metal(self: &mut Self, node: &MetalMaterialNode);
 
