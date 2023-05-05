@@ -43,11 +43,11 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
 
     let union_cube_cube = csg::Union::new(vec![
         Box::new(csg::Elem {
-            shape: Box::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
+            shape: Arc::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
+            shape: Arc::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
             transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
         }),
     ]);

@@ -93,6 +93,8 @@ impl Intersection {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use crate::geom::ray::Ray;
     use crate::geom::transform::*;
@@ -104,11 +106,11 @@ mod tests {
     fn test_intersect() {
         let elements = vec![
             Box::new(csg::Elem {
-                shape: Box::new(Plane::new()),
+                shape: Arc::new(Plane::new()),
                 transform: Box::new(Transform::translation(Vector3f::new(2.0, 0.0, 0.0)) * Transform::rotation_z(-std::f64::consts::PI / 2.0)),
             }), // left
             Box::new(csg::Elem {
-                shape: Box::new(Plane::new()),
+                shape: Arc::new(Plane::new()),
                 transform: Box::new(Transform::translation(Vector3f::new(0.0, 2.0, 0.0))),
             }), // top
         ];

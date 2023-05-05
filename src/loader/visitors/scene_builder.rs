@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::super::ast::*;
 use super::Visitor;
 use crate::geom::transform::Transform;
-use crate::materials::{Lambertian, Material};
+use crate::materials::*;
 use crate::objects::*;
 use crate::scene::Scene;
 use crate::shapes::*;
@@ -11,6 +11,7 @@ use crate::textures::*;
 
 pub struct SceneBuilderVisitor {
     pub scene: Scene,
+    csg_elems: Vec<Box<csg::Elem>>,
     objects: Vec<Arc<dyn Object>>,
     shapes: Vec<Arc<dyn Shape>>,
     materials: Vec<Arc<dyn Material>>,
@@ -22,6 +23,7 @@ impl SceneBuilderVisitor {
     pub fn new() -> Self {
         SceneBuilderVisitor {
             scene: Scene::new(),
+            csg_elems: Vec::new(),
             objects: Vec::new(),
             shapes: Vec::new(),
             materials: Vec::new(),
@@ -67,6 +69,36 @@ impl Visitor for SceneBuilderVisitor {
 
     fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode) {
         self.shapes.push(Arc::new(AABox::new(&node.extend)));
+    }
+
+    fn visit_shape_csg_elem(self: &mut Self, _node: &CSGShapeElemNode) {
+        let transform = self.transforms.pop().unwrap();
+        let shape: Arc<dyn Shape> = self.shapes.pop().unwrap();
+        self.csg_elems.push(Box::new(csg::Elem { shape, transform }));
+    }
+
+    fn visit_shape_csg_intersection(self: &mut Self, node: &CSGShapeIntersectionNode) {
+        let mut elems: Vec<Box<csg::Elem>> = Vec::new();
+        for _ in 1..=node.elems.len() {
+            elems.push(self.csg_elems.pop().unwrap());
+        }
+        self.shapes.push(Arc::new(csg::Intersection::new(elems)));
+    }
+
+    fn visit_shape_csg_substraction(self: &mut Self, node: &CSGShapeSubstractionNode) {
+        let mut elems: Vec<Box<csg::Elem>> = Vec::new();
+        for _ in 1..=node.elems.len() {
+            elems.push(self.csg_elems.pop().unwrap());
+        }
+        self.shapes.push(Arc::new(csg::Substraction::new(elems)));
+    }
+
+    fn visit_shape_csg_union(self: &mut Self, node: &CSGShapeUnionNode) {
+        let mut elems: Vec<Box<csg::Elem>> = Vec::new();
+        for _ in 1..=node.elems.len() {
+            elems.push(self.csg_elems.pop().unwrap());
+        }
+        self.shapes.push(Arc::new(csg::Union::new(elems)));
     }
 
     fn visit_shape_cylinder(self: &mut Self, node: &CylinderShapeNode) {

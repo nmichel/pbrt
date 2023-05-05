@@ -39,41 +39,41 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     let mut scene = Scene::new();
 
     // Union of 9 balls
-    let nine_balls = Box::new(csg::Union::new(vec![
+    let nine_balls = Arc::new(csg::Union::new(vec![
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.35)),
+            shape: Arc::new(Sphere::new(0.35)),
             transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, -0.5))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.35)),
+            shape: Arc::new(Sphere::new(0.35)),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -0.5))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.35)),
+            shape: Arc::new(Sphere::new(0.35)),
             transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, -0.5))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.35)),
+            shape: Arc::new(Sphere::new(0.35)),
             transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.35)),
+            shape: Arc::new(Sphere::new(0.35)),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.35)),
+            shape: Arc::new(Sphere::new(0.35)),
             transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.35)),
+            shape: Arc::new(Sphere::new(0.35)),
             transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.5))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.35)),
+            shape: Arc::new(Sphere::new(0.35)),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.5))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.35)),
+            shape: Arc::new(Sphere::new(0.35)),
             transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.5))),
         }),
     ]));
@@ -82,7 +82,7 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         Arc::new(Simple::new(
             Arc::new(csg::Substraction::new(vec![
                 Box::new(csg::Elem {
-                    shape: Box::new(AABox::new(&Vector3f::new(2.0, 1.0, 2.0))),
+                    shape: Arc::new(AABox::new(&Vector3f::new(2.0, 1.0, 2.0))),
                     transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
                 }),
                 Box::new(csg::Elem {

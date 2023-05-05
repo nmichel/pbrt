@@ -72,15 +72,8 @@ impl<'a> Parser<'a> {
             let mut node: Box<ObjectCompoundNode> = Box::new(ObjectCompoundNode::new());
             while let Some(token) = self.tokenizer.next_token() {
                 match token {
-                    Token::KWObject => {
-                        let object = self.parse_object();
-                        node.add_object(object);
-                    }
-
-                    Token::BraceClose => {
-                        return node;
-                    }
-
+                    Token::KWObject => node.add_object(self.parse_object()),
+                    Token::BraceClose => return node,
                     _ => panic!("{}", "Expected } or object"),
                 }
             }
@@ -93,6 +86,7 @@ impl<'a> Parser<'a> {
     fn parse_shape(self: &mut Self) -> Box<dyn ShapeNode> {
         match self.tokenizer.next_token() {
             Some(Token::KWAABox) => self.parse_shape_aabox(),
+            Some(Token::KWCSG) => self.parse_shape_csg(),
             Some(Token::KWCylinder) => self.parse_shape_cylinder(),
             Some(Token::KWPlane) => self.parse_shape_plane(),
             Some(Token::KWRectangle) => self.parse_shape_rectangle(),
@@ -104,6 +98,50 @@ impl<'a> Parser<'a> {
     fn parse_shape_aabox(self: &mut Self) -> Box<dyn ShapeNode> {
         let extent = self.parse_vector();
         return Box::new(AABoxShapeNode::new(extent));
+    }
+
+    fn parse_shape_csg(self: &mut Self) -> Box<dyn ShapeNode> {
+        match self.tokenizer.next_token() {
+            Some(Token::KWIntersection) => self.parse_shape_csg_intersection(),
+            Some(Token::KWUnion) => self.parse_shape_csg_union(),
+            Some(Token::KWSubtraction) => self.parse_shape_csg_substraction(),
+            _ => panic!("Expected intersection, union or subtraction"),
+        }
+    }
+
+    fn parse_shape_csg_intersection(self: &mut Self) -> Box<dyn ShapeNode> {
+        let elems = self.parse_shape_csg_elements();
+        return Box::new(CSGShapeIntersectionNode::new(elems));
+    }
+
+    fn parse_shape_csg_union(self: &mut Self) -> Box<dyn ShapeNode> {
+        let elems = self.parse_shape_csg_elements();
+        return Box::new(CSGShapeUnionNode::new(elems));
+    }
+
+    fn parse_shape_csg_substraction(self: &mut Self) -> Box<dyn ShapeNode> {
+        let elems = self.parse_shape_csg_elements();
+        return Box::new(CSGShapeSubstractionNode::new(elems));
+    }
+
+    fn parse_shape_csg_elements(self: &mut Self) -> Vec<Box<CSGShapeElemNode>> {
+        if Token::BraceOpen == self.tokenizer.next_token().expect("Expected {") {
+            let mut elems: Vec<Box<CSGShapeElemNode>> = Vec::new();
+            while let Some(token) = self.tokenizer.next_token() {
+                match token {
+                    Token::KWElem => elems.push(self.parse_shape_csg_element()),
+                    Token::BraceClose => return elems,
+                    _ => panic!("{}", "Expected } or elem"),
+                }
+            }
+        }
+        panic!("{}", "Expected {")
+    }
+
+    fn parse_shape_csg_element(self: &mut Self) -> Box<CSGShapeElemNode> {
+        let shape = self.parse_shape();
+        let transform = self.parse_transform();
+        Box::new(CSGShapeElemNode::new(shape, transform))
     }
 
     fn parse_shape_cylinder(self: &mut Self) -> Box<dyn ShapeNode> {
@@ -237,49 +275,76 @@ mod test {
     #[test]
     fn test_parse() {
         let input = "
-      scene
-        # A simple diffuse sphere
-        object simple
-          sphere 1.0
-          lambertian color 0.2 0.5 0.9
-
-        # a transformed diffuse sphere
+        scene
         object transformed
           object simple
-            sphere 1.0
-            lambertian color 0.2 0.8 0.1
+            csg union {
+              elem
+                sphere 0.4
+                transform {
+                  translate -0.5 0 -0.5
+                }
+  
+              elem
+                sphere 0.4
+                transform {
+                  translate 0 0 -0.5
+                }
+        
+              elem
+                sphere 0.4
+                transform {
+                  translate 0.5 0 -0.5
+                }
+        
+              elem
+                sphere 0.4
+                transform {
+                  translate -0.5 0 0
+                }
+  
+              elem
+                sphere 0.4
+                transform {
+                  translate 0 0 0
+                }
+  
+              elem
+                sphere 0.4
+                transform {
+                  translate 0.5 0 0
+                }
+        
+              elem
+                sphere 0.4
+                transform {
+                  translate -0.5 0 0.5
+                }
+        
+              elem
+                sphere 0.4
+                transform {
+                  translate 0 0 0.5
+                }
+        
+              elem
+                sphere 0.4
+                transform {
+                  translate 0.5 0 0.5
+                }
+            }
+            lambertian color 1 0.6470588235294118 0
           transform {
-            translate 0.0 0.0 2.0
-            rotate_x 0.78
+            translate 0 0 0
           }
-
-        # a compound object
-        object compound {
-          object transformed
-            object simple
-              sphere 1.0
-              lambertian color 0.2 0.8 0.1
-            transform {
-              translate 0.0 0.0 2.0
-            }
-          object transformed
-            object simple
-              plane
-              lambertian color 0.7 0.2 0.1
-            transform {
-              translate 0.0 0.0 -0.5
-            }
-        }
-      object simple
-        cylinder 0.3 1.0
-        lambertian color 0.2 0.32 0.5
-
-      object simple
-        aabox 0.3 1.0 2.0
-        lambertian color 0.2 0.32 0.5
-
-
-      ";
+        object transformed
+          object simple
+            rectangle 3 3
+            lambertian color 0.5 0.5 0.5
+          transform {
+            translate 0 -0.6 0
+          }
+    ";
         let mut parser = Parser::new(input);
         let scene = parser.parse_scene();
         let mut print_visitor = PrintVisitor::new();

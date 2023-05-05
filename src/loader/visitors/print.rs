@@ -20,17 +20,17 @@ impl Visitor for PrintVisitor {
         let mut r = String::new();
         for _ in 1..=node.objects.len() {
             let object = self.stack.pop().unwrap();
-            r = r + &object;
+            r = object + &r;
         }
 
-        println!("scene {{ {} }}", r);
+        println!("scene {}", r);
     }
 
     fn visit_object_compound(self: &mut Self, node: &ObjectCompoundNode) {
         let mut r = String::new();
         for _ in 1..=node.objects.len() {
             let object = self.stack.pop().unwrap();
-            r = r + &object;
+            r = object + &r;
         }
 
         self.stack.push(format!("object compound {}", r));
@@ -50,6 +50,42 @@ impl Visitor for PrintVisitor {
 
     fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode) {
         self.stack.push(format!("aabox {}", node.extend));
+    }
+
+    fn visit_shape_csg_elem(self: &mut Self, _node: &CSGShapeElemNode) {
+        let transform = self.stack.pop().unwrap();
+        let elem = self.stack.pop().unwrap();
+        self.stack.push(format!("elem {} {}", elem, transform));
+    }
+
+    fn visit_shape_csg_intersection(self: &mut Self, node: &CSGShapeIntersectionNode) {
+        let mut r = String::new();
+        for _ in 1..=node.elems.len() {
+            let object = self.stack.pop().unwrap();
+            r = object + &r;
+        }
+
+        self.stack.push(format!("csg intersection {{  {} }}", r));
+    }
+
+    fn visit_shape_csg_substraction(self: &mut Self, node: &CSGShapeSubstractionNode) {
+        let mut r = String::new();
+        for _ in 1..=node.elems.len() {
+            let object = self.stack.pop().unwrap();
+            r = object + &r;
+        }
+
+        self.stack.push(format!("csg substraction {{  {} }}", r));
+    }
+
+    fn visit_shape_csg_union(self: &mut Self, node: &CSGShapeUnionNode) {
+        let mut r = String::new();
+        for _ in 1..=node.elems.len() {
+            let object = self.stack.pop().unwrap();
+            r = object + &r;
+        }
+
+        self.stack.push(format!("csg union {{  {} }}", r));
     }
 
     fn visit_shape_cylinder(self: &mut Self, node: &CylinderShapeNode) {
@@ -81,7 +117,7 @@ impl Visitor for PrintVisitor {
         let mut r = String::new();
         for _ in 1..=node.steps.len() {
             let object = self.stack.pop().unwrap();
-            r = r + &object;
+            r = object + &r;
         }
 
         self.stack.push(format!("transform {{  {} }}", r));

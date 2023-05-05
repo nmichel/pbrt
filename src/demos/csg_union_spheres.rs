@@ -39,39 +39,39 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     let mut scene = Scene::new();
     let elements = vec![
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Arc::new(Sphere::new(0.4)),
             transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, -0.5))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Arc::new(Sphere::new(0.4)),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -0.5))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Arc::new(Sphere::new(0.4)),
             transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, -0.5))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Arc::new(Sphere::new(0.4)),
             transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Arc::new(Sphere::new(0.4)),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Arc::new(Sphere::new(0.4)),
             transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Arc::new(Sphere::new(0.4)),
             transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.5))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Arc::new(Sphere::new(0.4)),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.5))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Arc::new(Sphere::new(0.4)),
             transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.5))),
         }),
     ];

@@ -1,7 +1,7 @@
 use crate::geom::vector3::Vector3f;
 use crate::loader::visitors::Visitor;
 
-use super::Node;
+use super::{Node, TransformNode};
 
 pub trait ShapeNode: Node {}
 
@@ -92,5 +92,91 @@ impl Node for AABoxShapeNode {
 impl AABoxShapeNode {
     pub fn new(extend: Vector3f) -> Self {
         AABoxShapeNode { extend }
+    }
+}
+
+// csg
+
+pub struct CSGShapeElemNode {
+    pub shape: Box<dyn ShapeNode>,
+    pub transform: Box<TransformNode>,
+}
+
+impl ShapeNode for CSGShapeElemNode {}
+
+impl Node for CSGShapeElemNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        self.shape.visit(visitor);
+        self.transform.visit(visitor);
+        visitor.visit_shape_csg_elem(self);
+    }
+}
+
+impl CSGShapeElemNode {
+    pub fn new(shape: Box<dyn ShapeNode>, transform: Box<TransformNode>) -> Self {
+        CSGShapeElemNode { shape, transform }
+    }
+}
+
+pub struct CSGShapeIntersectionNode {
+    pub elems: Vec<Box<CSGShapeElemNode>>,
+}
+
+impl ShapeNode for CSGShapeIntersectionNode {}
+
+impl Node for CSGShapeIntersectionNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        for elem in &self.elems {
+            elem.visit(visitor);
+        }
+        visitor.visit_shape_csg_intersection(self);
+    }
+}
+
+impl CSGShapeIntersectionNode {
+    pub fn new(elems: Vec<Box<CSGShapeElemNode>>) -> Self {
+        CSGShapeIntersectionNode { elems }
+    }
+}
+
+pub struct CSGShapeUnionNode {
+    pub elems: Vec<Box<CSGShapeElemNode>>,
+}
+
+impl ShapeNode for CSGShapeUnionNode {}
+
+impl Node for CSGShapeUnionNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        for elem in &self.elems {
+            elem.visit(visitor);
+        }
+        visitor.visit_shape_csg_union(self);
+    }
+}
+
+impl CSGShapeUnionNode {
+    pub fn new(elems: Vec<Box<CSGShapeElemNode>>) -> Self {
+        CSGShapeUnionNode { elems }
+    }
+}
+
+pub struct CSGShapeSubstractionNode {
+    pub elems: Vec<Box<CSGShapeElemNode>>,
+}
+
+impl ShapeNode for CSGShapeSubstractionNode {}
+
+impl Node for CSGShapeSubstractionNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        for elem in &self.elems {
+            elem.visit(visitor);
+        }
+        visitor.visit_shape_csg_substraction(self);
+    }
+}
+
+impl CSGShapeSubstractionNode {
+    pub fn new(elems: Vec<Box<CSGShapeElemNode>>) -> Self {
+        CSGShapeSubstractionNode { elems }
     }
 }

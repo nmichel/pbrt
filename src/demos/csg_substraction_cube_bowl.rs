@@ -40,36 +40,36 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
 
     let bowl = csg::Substraction::new(vec![
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.5)),
+            shape: Arc::new(Sphere::new(0.5)),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(Sphere::new(0.4)),
+            shape: Arc::new(Sphere::new(0.4)),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(AABox::new(&Vector3f::new(1.0, 0.5, 1.0))),
+            shape: Arc::new(AABox::new(&Vector3f::new(1.0, 0.5, 1.0))),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.25, 0.0))),
         }),
     ]);
 
     let substraction_box_bowl = csg::Substraction::new(vec![
         Box::new(csg::Elem {
-            shape: Box::new(AABox::new(&Vector3f::new(1.1, 0.6, 1.1))),
+            shape: Arc::new(AABox::new(&Vector3f::new(1.1, 0.6, 1.1))),
             transform: Box::new(Transform::translation(Vector3f::new(0.0, -0.31, 0.0))),
         }),
         Box::new(csg::Elem {
-            shape: Box::new(csg::Substraction::new(vec![
+            shape: Arc::new(csg::Substraction::new(vec![
                 Box::new(csg::Elem {
-                    shape: Box::new(Sphere::new(0.5)),
+                    shape: Arc::new(Sphere::new(0.5)),
                     transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
                 }),
                 Box::new(csg::Elem {
-                    shape: Box::new(Sphere::new(0.4)),
+                    shape: Arc::new(Sphere::new(0.4)),
                     transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
                 }),
                 Box::new(csg::Elem {
-                    shape: Box::new(AABox::new(&Vector3f::new(1.0, 0.5, 1.0))),
+                    shape: Arc::new(AABox::new(&Vector3f::new(1.0, 0.5, 1.0))),
                     transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.25, 0.0))),
                 }),
             ])),

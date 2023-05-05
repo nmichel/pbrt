@@ -8,6 +8,10 @@ pub trait Visitor {
     fn visit_object_transformed(self: &mut Self, node: &ObjectTransformedNode);
 
     fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode);
+    fn visit_shape_csg_elem(self: &mut Self, node: &CSGShapeElemNode);
+    fn visit_shape_csg_intersection(self: &mut Self, node: &CSGShapeIntersectionNode);
+    fn visit_shape_csg_substraction(self: &mut Self, node: &CSGShapeSubstractionNode);
+    fn visit_shape_csg_union(self: &mut Self, node: &CSGShapeUnionNode);
     fn visit_shape_cylinder(self: &mut Self, node: &CylinderShapeNode);
     fn visit_shape_plane(self: &mut Self, node: &PlaneShapeNode);
     fn visit_shape_rectangle(self: &mut Self, node: &RectangleShapeNode);

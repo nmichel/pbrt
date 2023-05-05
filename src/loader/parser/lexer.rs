@@ -2,6 +2,9 @@
 pub enum Token {
     Identifier(String),
     KWAABox,
+    KWCSG,
+    KWElem,
+    KWIntersection,
     KWScene,
     KWSphere,
     KWCompound,
@@ -23,6 +26,8 @@ pub enum Token {
     KWTransform,
     KWTransformed,
     KWTranslate,
+    KWUnion,
+    KWSubtraction,
     KWRotateX,
     KWRotateY,
     KWRotateZ,
@@ -33,8 +38,11 @@ impl<'a> From<&'a str> for Token {
         match other {
             "aabox" => Token::KWAABox,
             "color" => Token::KWColor,
+            "csg" => Token::KWCSG,
             "compound" => Token::KWCompound,
             "cylinder" => Token::KWCylinder,
+            "elem" => Token::KWElem,
+            "intersection" => Token::KWIntersection,
             "lambertian" => Token::KWLambertian,
             "object" => Token::KWObject,
             "plane" => Token::KWPlane,
@@ -45,9 +53,11 @@ impl<'a> From<&'a str> for Token {
             "scene" => Token::KWScene,
             "simple" => Token::KWSimple,
             "sphere" => Token::KWSphere,
+            "substraction" => Token::KWSubtraction,
             "transform" => Token::KWTransform,
             "transformed" => Token::KWTransformed,
             "translate" => Token::KWTranslate,
+            "union" => Token::KWUnion,
             _ => Token::Identifier(other.to_string()),
         }
     }
