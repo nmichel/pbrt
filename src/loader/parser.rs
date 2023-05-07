@@ -10,15 +10,51 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn parse(input: &str) -> SceneNode {
+    pub fn parse(input: &str) -> StageNode {
         let mut parser = Parser::new(input);
-        parser.parse_scene()
+        parser.parse_stage()
     }
 
     pub fn new(input: &'a str) -> Self {
         Parser {
             tokenizer: Tokenizer::<'a>::new(input),
         }
+    }
+
+    // Stage parsing
+
+    pub fn parse_stage(self: &mut Self) -> StageNode {
+        let camera = self.parse_camera();
+        let scene = self.parse_scene();
+        StageNode::new(scene, camera)
+    }
+
+    // Camera parsing
+
+    pub fn parse_camera(self: &mut Self) -> Box<dyn CameraNode> {
+        if let Token::KWCamera = self.tokenizer.next_token().expect("camera expected") {
+            return match self.tokenizer.next_token().expect("camera type expected") {
+                Token::KWPinHole => self.parse_camera_pinhole(),
+                _ => panic!("Unknown camera type"),
+            };
+        }
+
+        panic!("camera expected")
+    }
+
+    pub fn parse_camera_pinhole(self: &mut Self) -> Box<dyn CameraNode> {
+        if let Token::KWPos = self.tokenizer.next_token().expect("pos expected") {
+            let pos = self.parse_vector();
+            if let Token::KWLook = self.tokenizer.next_token().expect("look expected") {
+                let look = self.parse_vector();
+                if let Token::KWUp = self.tokenizer.next_token().expect("up expected") {
+                    let up = self.parse_vector();
+                    return Box::new(PinHoleCameraNode::new(pos, look, up));
+                }
+            }
+        }
+
+        panic!("camera pin_hole camera")
     }
 
     // Scene parsing
@@ -302,7 +338,7 @@ mod test {
     #[test]
     fn test_parse() {
         let input = "
-        scene
+      scene
         object transformed
           object simple
             csg union {

@@ -2,47 +2,73 @@ use std::sync::Arc;
 
 use super::super::ast::*;
 use super::Visitor;
+use crate::cameras::{Camera, PinHoleCamera};
+use crate::config::Config;
+use crate::geom::matrix4::Matrix4;
 use crate::geom::transform::Transform;
+use crate::geom::vector2::Vector2u;
 use crate::materials::*;
 use crate::objects::*;
 use crate::scene::Scene;
 use crate::shapes::*;
 use crate::textures::*;
 
-pub struct SceneBuilderVisitor {
+pub struct SceneBuilderVisitor<'a> {
     pub scene: Scene,
+    pub camera: Option<Box<dyn Camera>>,
     csg_elems: Vec<Box<csg::Elem>>,
     objects: Vec<Arc<dyn Object>>,
     shapes: Vec<Arc<dyn Shape>>,
     materials: Vec<Arc<dyn Material>>,
     textures: Vec<Arc<dyn Texture>>,
     transforms: Vec<Box<Transform>>,
+    config: &'a Config,
 }
 
-impl SceneBuilderVisitor {
-    pub fn new() -> Self {
+impl<'a> SceneBuilderVisitor<'a> {
+    pub fn new(config: &'a Config) -> Self {
         SceneBuilderVisitor {
             scene: Scene::new(),
+            camera: None,
             csg_elems: Vec::new(),
             objects: Vec::new(),
             shapes: Vec::new(),
             materials: Vec::new(),
             textures: Vec::new(),
             transforms: Vec::new(),
+            config,
         }
     }
 
-    pub fn visit(self: &mut Self, node: &SceneNode) {
+    pub fn visit(self: &mut Self, node: &StageNode) {
         node.visit(self);
     }
 }
 
-impl Visitor for SceneBuilderVisitor {
+impl Visitor for SceneBuilderVisitor<'_> {
+    fn visit_stage(self: &mut Self, _node: &StageNode) {
+        // Nothing special for now
+    }
+
     fn visit_scene(self: &mut Self, node: &SceneNode) {
         for _ in 1..=node.objects.len() {
             let object = self.objects.pop().unwrap();
             self.scene.add_object(object);
         }
+    }
+
+    fn visit_camera_pin_hole(self: &mut Self, node: &PinHoleCameraNode) {
+        let fov = self.config.fov_deg * std::f64::consts::PI / 180.0;
+        let resolution = Vector2u::new(self.config.output_width as u32, self.config.output_height as u32);
+        let cam_to_world = Matrix4::look_at(&node.pos, &node.look, &node.up);
+
+        self.camera = Some(Box::new(PinHoleCamera::new(
+            &resolution,
+            fov,
+            self.config.near,
+            self.config.far,
+            cam_to_world,
+        )));
     }
 
     fn visit_object_compound(self: &mut Self, node: &ObjectCompoundNode) {
@@ -122,7 +148,7 @@ impl Visitor for SceneBuilderVisitor {
         self.materials.push(Arc::new(Dielectric::new(node.index, texture)));
     }
 
-    fn visit_material_diffuse_light(self: &mut Self, node: &DiffuseLightMaterialNode) {
+    fn visit_material_diffuse_light(self: &mut Self, _node: &DiffuseLightMaterialNode) {
         let texture = self.textures.pop().unwrap();
         self.materials.push(Arc::new(DiffuseLight::new(texture)));
     }

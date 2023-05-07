@@ -1,3 +1,8 @@
+camera pin_hole
+  pos 1.0 1.3 1.8
+  look 0.0 -1.0 0.0
+  up 0.0 1.0 0.0
+
 scene
   object transformed
     object simple

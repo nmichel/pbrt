@@ -16,6 +16,12 @@ impl PrintVisitor {
 }
 
 impl Visitor for PrintVisitor {
+    fn visit_stage(self: &mut Self, _node: &StageNode) {
+        let scene = self.stack.pop().unwrap();
+        let camera = self.stack.pop().unwrap();
+        println!("stage {} {}", scene, camera);
+    }
+
     fn visit_scene(self: &mut Self, node: &SceneNode) {
         let mut r = String::new();
         for _ in 1..=node.objects.len() {
@@ -23,7 +29,11 @@ impl Visitor for PrintVisitor {
             r = object + &r;
         }
 
-        println!("scene {}", r);
+        self.stack.push(format!("scene {}", r));
+    }
+
+    fn visit_camera_pin_hole(self: &mut Self, node: &PinHoleCameraNode) {
+        self.stack.push(format!("camera pin hole {} {} {}", node.pos, node.look, node.up));
     }
 
     fn visit_object_compound(self: &mut Self, node: &ObjectCompoundNode) {
@@ -109,7 +119,7 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("dielectric {} {}", node.index, texture));
     }
 
-    fn visit_material_diffuse_light(self: &mut Self, node: &DiffuseLightMaterialNode) {
+    fn visit_material_diffuse_light(self: &mut Self, _node: &DiffuseLightMaterialNode) {
         let texture = self.stack.pop().unwrap();
         self.stack.push(format!("diffuse_light {}", texture));
     }

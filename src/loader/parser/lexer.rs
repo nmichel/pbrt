@@ -2,13 +2,17 @@
 pub enum Token {
     Identifier(String),
     KWAABox,
+    KWCamera,
     KWCheckerboard,
     KWCSG,
     KWDielectric,
     KWDiffuseLight,
     KWElem,
     KWIntersection,
+    KWLook,
     KWMetal,
+    KWPos,
+    KWPinHole,
     KWScene,
     KWSphere,
     KWCompound,
@@ -31,6 +35,7 @@ pub enum Token {
     KWTransformed,
     KWTranslate,
     KWUnion,
+    KWUp,
     KWSubtraction,
     KWRotateX,
     KWRotateY,
@@ -41,6 +46,7 @@ impl<'a> From<&'a str> for Token {
     fn from(other: &'a str) -> Token {
         match other {
             "aabox" => Token::KWAABox,
+            "camera" => Token::KWCamera,
             "checkerboard" => Token::KWCheckerboard,
             "color" => Token::KWColor,
             "csg" => Token::KWCSG,
@@ -51,8 +57,11 @@ impl<'a> From<&'a str> for Token {
             "elem" => Token::KWElem,
             "intersection" => Token::KWIntersection,
             "lambertian" => Token::KWLambertian,
+            "look" => Token::KWLook,
             "metal" => Token::KWMetal,
             "object" => Token::KWObject,
+            "pos" => Token::KWPos,
+            "pin_hole" => Token::KWPinHole,
             "plane" => Token::KWPlane,
             "rectangle" => Token::KWRectangle,
             "rotate_x" => Token::KWRotateX,
@@ -66,6 +75,7 @@ impl<'a> From<&'a str> for Token {
             "transformed" => Token::KWTransformed,
             "translate" => Token::KWTranslate,
             "union" => Token::KWUnion,
+            "up" => Token::KWUp,
             _ => Token::Identifier(other.to_string()),
         }
     }
