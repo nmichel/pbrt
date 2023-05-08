@@ -1,7 +1,10 @@
 #!/bin/bash
 
-time cargo run --release -- --output "output_dev.png" \
+input="${1:?Missing input file}"
+
+time cargo run --release -- --input "${input}" --output "output_test.png" \
   --max_depth 5 \
+  --far 2000 \
   --samples_ppx 5 \
   --output_width 800 \
   --output_height 600 \
