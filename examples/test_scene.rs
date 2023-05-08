@@ -1,22 +1,24 @@
+// Test scene for Ray Training In One WeekEnd
+
 use num_traits::ToPrimitive;
 
-use crate::cameras::{Camera, ThinLensCamera};
-use crate::colors;
-use crate::config::Config;
-use crate::geom::matrix4::Matrix4;
-use crate::geom::transform::Transform;
-use crate::geom::vector2::Vector2u;
-use crate::geom::vector3::Vector3f;
-use crate::materials::{Dielectric, Lambertian, Material, Metal, RefractionIndices};
-use crate::objects::{Simple, Transformed};
-use crate::scene::Scene;
-use crate::shapes::{AABox, Sphere};
-use crate::spectrum::Spectrum;
-use crate::textures::*;
-use crate::utils::random_double;
-use core::f64::consts::FRAC_PI_3;
-use std::f64;
+use pbrt::cameras::{Camera, ThinLensCamera};
+use pbrt::config::Config;
+use pbrt::geom::matrix4::Matrix4;
+use pbrt::geom::transform::Transform;
+use pbrt::geom::vector2::Vector2u;
+use pbrt::geom::vector3::Vector3f;
+use pbrt::integrators::{self, *};
+use pbrt::materials::{Dielectric, Lambertian, Material, Metal, RefractionIndices};
+use pbrt::objects::{Simple, Transformed};
+use pbrt::scene::Scene;
+use pbrt::shapes::Sphere;
+use pbrt::spectrum::Spectrum;
+use pbrt::textures::*;
+use pbrt::utils::random_double;
+use pbrt::{colors, renderers};
 use std::sync::Arc;
+use std::{env, f64, process};
 
 pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     // Sphere refléchissante
@@ -48,30 +50,34 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         .add_object(Arc::new(Transformed::new(
             Arc::new(Simple::new(
                 Arc::new(Sphere::new(1000.0)),
-                Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.5, 0.5, 0.5))))),
+                Arc::new(Lambertian::new(Arc::new(CheckerBoard::new(
+                    Spectrum::new(0.2, 0.3, 0.1),
+                    Spectrum::new(0.9, 0.9, 0.9),
+                    2000.0,
+                )))),
             )),
             Box::new(Transform::translation(Vector3f::new(0.0, -1000.0, 0.0))),
         )))
         .add_object(Arc::new(Transformed::new(
             Arc::new(Simple::new(
-                Arc::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
+                Arc::new(Sphere::new(1.0)),
                 Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::WHITE)))),
             )),
-            Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0)) * Transform::rotation_x(FRAC_PI_3)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 1.0, 0.0))),
         )))
         .add_object(Arc::new(Transformed::new(
             Arc::new(Simple::new(
-                Arc::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
-                Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::DARK_RED)))),
+                Arc::new(Sphere::new(1.0)),
+                Arc::new(Lambertian::new(Arc::new(PlainColor::new(Spectrum::new(0.4, 0.2, 0.1))))),
             )),
-            Box::new(Transform::translation(Vector3f::new(-4.0, 1.0, 0.0)) * Transform::rotation_y(FRAC_PI_3)),
+            Box::new(Transform::translation(Vector3f::new(-4.0, 1.0, 0.0))),
         )))
         .add_object(Arc::new(Transformed::new(
             Arc::new(Simple::new(
-                Arc::new(AABox::new(&Vector3f::new(0.8, 0.8, 0.8))),
-                Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::YELLOW_GREEN)))),
+                Arc::new(Sphere::new(1.0)),
+                Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(Spectrum::new(0.7, 0.6, 0.5))))),
             )),
-            Box::new(Transform::translation(Vector3f::new(4.0, 1.0, 0.0)) * Transform::rotation_z(FRAC_PI_3)),
+            Box::new(Transform::translation(Vector3f::new(4.0, 1.0, 0.0))),
         )));
 
     for a in -11..10 {
@@ -104,4 +110,29 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     }
 
     (scene, Box::new(camera))
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let config = Config::new(&args).unwrap_or_else(|err| {
+        eprintln!("Problem parsing arguments: {}", err);
+        process::exit(1)
+    });
+
+    println!("Redering with configuration settings: {:#?}", &config);
+
+    let integrator: Box<dyn Integrator> = match config.integrator {
+        integrators::Type::NORMAL => Box::new(NormalIntegrator::new()),
+        integrators::Type::PATH => Box::new(PathIntegrator::new(config.max_depth)),
+    };
+
+    let render_function = match config.renderer {
+        renderers::Type::ST => renderers::st::render,
+        renderers::Type::MT => renderers::mt::render,
+    };
+
+    let (mut scene, camera) = build_scene(&config);
+    scene.commit();
+
+    render_function(&config, &scene, camera.as_ref(), &*integrator);
 }

@@ -2,7 +2,6 @@ pub mod bvh;
 pub mod cameras;
 pub mod colors;
 pub mod config;
-pub mod demos;
 pub mod geom;
 pub mod integrators;
 pub mod interaction;

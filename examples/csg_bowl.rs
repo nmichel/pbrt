@@ -1,18 +1,20 @@
-use crate::cameras::{Camera, PinHoleCamera};
-use crate::colors;
-use crate::config::Config;
-use crate::geom::matrix4::Matrix4;
-use crate::geom::transform::Transform;
-use crate::geom::vector2::Vector2u;
-use crate::geom::vector3::Vector3f;
-use crate::materials::{Dielectric, Lambertian, RefractionIndices};
-use crate::objects::{Simple, Transformed};
-use crate::scene::Scene;
-use crate::shapes::{csg, AABox, Rectangle, Sphere};
-use crate::spectrum::Spectrum;
-use crate::textures::*;
+use pbrt::cameras::{Camera, PinHoleCamera};
+use pbrt::config::Config;
+use pbrt::geom::matrix4::Matrix4;
+use pbrt::geom::transform::Transform;
+use pbrt::geom::vector2::Vector2u;
+use pbrt::geom::vector3::Vector3f;
+use pbrt::integrators::{Integrator, NormalIntegrator, PathIntegrator, self};
+use pbrt::materials::*;
+use pbrt::objects::{Simple, Transformed};
+use pbrt::scene::Scene;
+use pbrt::shapes::{AABox, Rectangle, csg, Sphere};
+use pbrt::spectrum::Spectrum;
+use pbrt::textures::{PlainColor, CheckerBoard};
+use pbrt::{colors, renderers};
 use std::f64;
 use std::sync::Arc;
+use std::{env, process};
 
 pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     // CSG Union of 9 orange spheres
@@ -38,9 +40,9 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     //
     let mut scene = Scene::new();
 
-    let union_sphere_cube = csg::Union::new(vec![
+    let bowl = csg::Intersection::new(vec![
         Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.5)),
+            shape: Arc::new(Sphere::new(1.0)),
             transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
         }),
         Box::new(csg::Elem {
@@ -51,10 +53,10 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
 
     scene.add_object(Arc::new(Transformed::new(
         Arc::new(Simple::new(
-            Arc::new(union_sphere_cube),
+            Arc::new(bowl),
             Arc::new(Dielectric::new(RefractionIndices::GLASS, Arc::new(PlainColor::new(colors::WHITE)))),
         )),
-        Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
+        Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
     )));
 
     scene.add_object(Arc::new(Transformed::new(
@@ -70,4 +72,29 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     )));
 
     (scene, Box::new(camera))
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let config = Config::new(&args).unwrap_or_else(|err| {
+        eprintln!("Problem parsing arguments: {}", err);
+        process::exit(1)
+    });
+
+    println!("Redering with configuration settings: {:#?}", &config);
+
+    let integrator: Box<dyn Integrator> = match config.integrator {
+        integrators::Type::NORMAL => Box::new(NormalIntegrator::new()),
+        integrators::Type::PATH => Box::new(PathIntegrator::new(config.max_depth)),
+    };
+
+    let render_function = match config.renderer {
+        renderers::Type::ST => renderers::st::render,
+        renderers::Type::MT => renderers::mt::render,
+    };
+
+    let (mut scene, camera) = build_scene(&config);
+    scene.commit();
+
+    render_function(&config, &scene, camera.as_ref(), &*integrator);
 }
