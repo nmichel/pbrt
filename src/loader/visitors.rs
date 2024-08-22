@@ -6,6 +6,7 @@ pub trait Visitor {
     fn visit_scene(self: &mut Self, node: &SceneNode);
 
     fn visit_camera_pin_hole(self: &mut Self, node: &PinHoleCameraNode);
+    fn visit_camera_thin_lens(self: &mut Self, node: &ThinLensCameraNode);
 
     fn visit_object_compound(self: &mut Self, node: &ObjectCompoundNode);
     fn visit_object_simple(self: &mut Self, node: &ObjectSimpleNode);

@@ -35,6 +35,7 @@ impl<'a> Parser<'a> {
         if let Token::KWCamera = self.tokenizer.next_token().expect("camera expected") {
             return match self.tokenizer.next_token().expect("camera type expected") {
                 Token::KWPinHole => self.parse_camera_pinhole(),
+                Token::KWThinLens => self.parse_camera_thin_lens(),
                 _ => panic!("Unknown camera type"),
             };
         }
@@ -50,6 +51,27 @@ impl<'a> Parser<'a> {
                 if let Token::KWUp = self.tokenizer.next_token().expect("up expected") {
                     let up = self.parse_vector();
                     return Box::new(PinHoleCameraNode::new(pos, look, up));
+                }
+            }
+        }
+
+        panic!("camera pin_hole camera")
+    }
+
+    pub fn parse_camera_thin_lens(self: &mut Self) -> Box<dyn CameraNode> {
+        if let Token::KWPos = self.tokenizer.next_token().expect("pos expected") {
+            let pos = self.parse_vector();
+            if let Token::KWLook = self.tokenizer.next_token().expect("look expected") {
+                let look = self.parse_vector();
+                if let Token::KWUp = self.tokenizer.next_token().expect("up expected") {
+                    let up = self.parse_vector();
+                    if let Token::KWRadius = self.tokenizer.next_token().expect("radius expected") {
+                        let radius = self.parse_number();
+                        if let Token::KWFocalLength = self.tokenizer.next_token().expect("focal_length expected") {
+                            let focal_length = self.parse_number();
+                            return Box::new(ThinLensCameraNode::new(pos, look, up, radius, focal_length));
+                        }
+                    }
                 }
             }
         }

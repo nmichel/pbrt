@@ -36,6 +36,13 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("camera pin hole {} {} {}", node.pos, node.look, node.up));
     }
 
+    fn visit_camera_thin_lens(self: &mut Self, node: &ThinLensCameraNode) {
+        self.stack.push(format!(
+            "camera thin lens {} {} {} {} {}",
+            node.pos, node.look, node.up, node.radius, node.focal_length
+        ));
+    }
+
     fn visit_object_compound(self: &mut Self, node: &ObjectCompoundNode) {
         let mut r = String::new();
         for _ in 1..=node.objects.len() {

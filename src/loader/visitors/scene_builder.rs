@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use super::super::ast::*;
 use super::Visitor;
-use crate::cameras::{Camera, PinHoleCamera};
+use crate::cameras::{Camera, PinHoleCamera, ThinLensCamera};
 use crate::config::Config;
 use crate::geom::matrix4::Matrix4;
 use crate::geom::transform::Transform;
@@ -67,6 +67,22 @@ impl Visitor for SceneBuilderVisitor<'_> {
             fov,
             self.config.near,
             self.config.far,
+            cam_to_world,
+        )));
+    }
+
+    fn visit_camera_thin_lens(self: &mut Self, node: &ThinLensCameraNode) {
+        let fov = self.config.fov_deg * std::f64::consts::PI / 180.0;
+        let resolution = Vector2u::new(self.config.output_width as u32, self.config.output_height as u32);
+        let cam_to_world = Matrix4::look_at(&node.pos, &node.look, &node.up);
+
+        self.camera = Some(Box::new(ThinLensCamera::new(
+            &resolution,
+            fov,
+            self.config.near,
+            self.config.far,
+            node.radius,
+            node.focal_length,
             cam_to_world,
         )));
     }
