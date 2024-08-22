@@ -5,7 +5,7 @@ pub mod config;
 pub mod geom;
 pub mod integrators;
 pub mod interaction;
-pub mod light;
+pub mod lights;
 pub mod loader;
 pub mod materials;
 pub mod objects;

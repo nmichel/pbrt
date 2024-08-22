@@ -6,7 +6,7 @@ use super::geom::intersectable::{Intersectable, IntersectionResult};
 use super::geom::ray::Ray;
 use super::geom::vector3::Vector3f;
 use super::interaction::Interaction;
-use super::light::Light;
+use super::lights::Light;
 use std::sync::Arc;
 
 struct Wrapper<T>(Arc<T>)
