@@ -16,12 +16,12 @@ impl PathIntegrator {
         Self { max_depth }
     }
 
-    fn background_radiance(&self, ray: &Ray, _scene: &Scene) -> Spectrum {
-        let mut unit_direction = ray.direction;
-        unit_direction.normalize();
-        let t = 0.5 * (unit_direction.y + 1.0);
-        return Spectrum::new(1.0, 1.0, 1.0) * (1.0 - t) + Spectrum::new(0.5, 0.7, 1.0) * t;
-    }
+    // fn background_radiance(&self, ray: &Ray, _scene: &Scene) -> Spectrum {
+    //     let mut unit_direction = ray.direction;
+    //     unit_direction.normalize();
+    //     let t = 0.5 * (unit_direction.y + 1.0);
+    //     return Spectrum::new(1.0, 1.0, 1.0) * (1.0 - t) + Spectrum::new(0.5, 0.7, 1.0) * t;
+    // }
 }
 
 impl Integrator for PathIntegrator {
