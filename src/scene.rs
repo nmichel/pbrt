@@ -114,6 +114,19 @@ impl Scene {
         }
     }
 
+    pub fn get_light_count(&self) -> usize {
+        self.lights.len()
+    }
+
+    pub fn get_light_at(&self, index: usize) -> Option<Arc<dyn Light>> {
+        if index < self.lights.len() {
+            Some(Arc::clone(&self.lights[index]))
+        }
+        else {
+            None
+        }
+    }
+
     fn build_bvh(prim: &mut Vec<Wrapper<dyn Object>>) -> Option<BVHNode<Wrapper<dyn Object>>> {
         Some(BVHNode::new(prim))
     }
