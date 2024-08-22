@@ -4,18 +4,17 @@ use pbrt::geom::matrix4::Matrix4;
 use pbrt::geom::transform::Transform;
 use pbrt::geom::vector2::Vector2u;
 use pbrt::geom::vector3::Vector3f;
-use pbrt::integrators::{Integrator, NormalIntegrator, PathIntegrator, self};
+use pbrt::integrators::{self, Integrator, NormalIntegrator, PathIntegrator};
 use pbrt::materials::*;
 use pbrt::objects::{Simple, Transformed};
 use pbrt::scene::Scene;
-use pbrt::shapes::{Sphere, Cylinder};
+use pbrt::shapes::{Cylinder, Sphere};
 use pbrt::spectrum::Spectrum;
-use pbrt::textures::{PlainColor, CheckerBoard};
+use pbrt::textures::{CheckerBoard, PlainColor};
 use pbrt::{colors, renderers};
-use std::f64;
 use std::f64::consts::{FRAC_PI_3, FRAC_PI_4, FRAC_PI_6};
 use std::sync::Arc;
-use std::{env, process};
+use std::{env, f64, process};
 
 pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     // Camera
