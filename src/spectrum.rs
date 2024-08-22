@@ -1,6 +1,6 @@
-use std::ops::{Add, AddAssign, Div, Mul};
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Spectrum {
     spectrum: [f64; 3],
 }
@@ -68,6 +68,14 @@ impl Mul<&Spectrum> for &Spectrum {
             self.spectrum[1] * other.spectrum[1],
             self.spectrum[2] * other.spectrum[2],
         )
+    }
+}
+
+impl MulAssign<&Spectrum> for Spectrum {
+    fn mul_assign(&mut self, other: &Self) {
+        self.spectrum[0] *= other.spectrum[0];
+        self.spectrum[1] *= other.spectrum[1];
+        self.spectrum[2] *= other.spectrum[2];
     }
 }
 
