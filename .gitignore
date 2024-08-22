@@ -1,4 +1,7 @@
 /target
 **/*.rs.bk
-
+**/*.png
+.DS_Store
+pbrt.code-workspace
+*.log
 
