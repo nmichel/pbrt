@@ -12,10 +12,6 @@ impl NormalIntegrator {
     pub fn new() -> Self {
         Self {}
     }
-
-    fn background_radiance(&self, _ray: &Ray, _scene: &Scene) -> Spectrum {
-        Spectrum::new(0.0, 0.0, 0.0)
-    }
 }
 
 impl Integrator for NormalIntegrator {

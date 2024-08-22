@@ -2,7 +2,7 @@ use pbrt::config::Config;
 use pbrt::integrators::{self, Integrator, NormalIntegrator, PathIntegrator};
 use pbrt::loader::Loader;
 use pbrt::renderers;
-use std::{env, process, fs};
+use std::{env, fs, process};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
