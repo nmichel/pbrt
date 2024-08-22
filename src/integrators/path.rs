@@ -1,6 +1,7 @@
 use crate::colors;
 use crate::geom::ray::Ray;
 use crate::interaction::Interaction;
+use crate::materials::ScatterInfo;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
 
@@ -37,7 +38,7 @@ impl Integrator for PathIntegrator {
                     None => Spectrum::new(0.0, 0.0, 0.0),
                 };
                 match material.scatter(ray, &interaction) {
-                    Some((attenuation, scattered)) => emitted + attenuation * &self.li(&scattered, scene, depth - 1, near, far),
+                    Some(ScatterInfo { attenuation, scattered }) => emitted + attenuation * &self.li(&scattered, scene, depth - 1, near, far),
                     None => emitted,
                 }
             }

@@ -2,8 +2,19 @@ use crate::geom::ray::Ray;
 use crate::interaction::Interaction;
 use crate::spectrum::Spectrum;
 
+pub struct ScatterInfo {
+    pub attenuation: Spectrum,
+    pub scattered: Ray,
+}
+
+impl ScatterInfo {
+    pub fn new(attenuation: Spectrum, scattered: Ray) -> Self {
+        Self { attenuation, scattered }
+    }
+}
+
 pub trait Material: Send + Sync {
-    fn scatter(&self, _ray: &Ray, _interaction: &Interaction) -> Option<(Spectrum, Ray)> {
+    fn scatter(&self, _ray: &Ray, _interaction: &Interaction) -> Option<ScatterInfo> {
         None
     }
 

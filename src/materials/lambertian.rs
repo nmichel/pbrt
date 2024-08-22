@@ -1,4 +1,4 @@
-use super::Material;
+use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
@@ -19,7 +19,7 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)> {
+    fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<ScatterInfo> {
         let Interaction { ref intersection, .. } = interaction;
         let Intersection { ref p, ref n, .. } = intersection;
 
@@ -33,6 +33,6 @@ impl Material for Lambertian {
         let shift_avoid_acne = n * 0.001;
         let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &scatter_direction);
         let attenuation = self.albedo.shade(intersection);
-        return Some((attenuation, scattered_ray));
+        return Some(ScatterInfo::new(attenuation, scattered_ray));
     }
 }

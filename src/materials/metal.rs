@@ -1,4 +1,4 @@
-use super::Material;
+use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
@@ -20,7 +20,7 @@ impl Metal {
 }
 
 impl Material for Metal {
-    fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)> {
+    fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<ScatterInfo> {
         // (1) wo is the opposite of incoming ray (i.e. wo "goes away" from the intersection point),
         // so, wi = -wo.
         //
@@ -47,7 +47,7 @@ impl Material for Metal {
             let shift_avoid_acne = n * 0.001;
             let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
             let attenuation = self.albedo.shade(intersection);
-            Some((attenuation, scattered_ray))
+            Some(ScatterInfo::new(attenuation, scattered_ray))
         }
         else {
             None

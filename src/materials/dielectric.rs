@@ -1,4 +1,4 @@
-use super::Material;
+use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
@@ -30,7 +30,7 @@ impl Dielectric {
 }
 
 impl Material for Dielectric {
-    fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<(Spectrum, Ray)> {
+    fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<ScatterInfo> {
         // see https://graphics.stanford.edu/courses/cs148-10-summer/docs/2006--degreve--reflection_refraction.pdf
 
         let Interaction { ref intersection, .. } = interaction;
@@ -98,14 +98,14 @@ impl Material for Dielectric {
                 };
                 let scatter_direction = intersection.local_to_world(&local_scatter_direction);
                 let scattered_ray = Ray::new(&scattered_ray_origin, &scatter_direction);
-                Some((attenuation, scattered_ray))
+                Some(ScatterInfo::new(attenuation, scattered_ray))
             }
             None => {
                 // Total reflection
                 let target = intersection.local_to_world(&local_reflected);
                 let shift_avoid_acne = world_outward_normal * 0.001;
                 let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
-                Some((attenuation, scattered_ray))
+                Some(ScatterInfo::new(attenuation, scattered_ray))
             }
         }
     }
