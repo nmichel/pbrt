@@ -3,7 +3,6 @@ use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
-use crate::spectrum::Spectrum;
 use crate::textures::*;
 use crate::utils::random_in_unit_sphere;
 use std::sync::Arc;
@@ -46,8 +45,13 @@ impl Material for Metal {
             let target = intersection.local_to_world(&local_target);
             let shift_avoid_acne = n * 0.001;
             let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
-            let attenuation = self.albedo.shade(intersection);
-            Some(ScatterInfo::new(attenuation, scattered_ray))
+
+            // see https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#SpecularReflection
+            // Handling of extra cosine because of delta distribution
+            let abs_cos_theta = local_target.z.abs();
+            let attenuation = self.albedo.shade(intersection) / abs_cos_theta;
+
+            Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
         }
         else {
             None

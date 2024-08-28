@@ -9,6 +9,7 @@ pub mod lights;
 pub mod loader;
 pub mod materials;
 pub mod objects;
+pub mod pdfs;
 pub mod renderers;
 pub mod scene;
 pub mod shapes;

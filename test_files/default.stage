@@ -1,0 +1,58 @@
+camera pin_hole
+  pos -1.5 0.0 1.5
+  look 0.0 0.0 0.0
+  up 0.0 1.0 0.0
+
+scene
+  # object on the right
+  object transformed
+    object simple
+      sphere 0.4
+      metal 0.5 color 0 0.6470588235294118 1
+      # lambertian color 0 0.6470588235294118 1
+    transform {
+      translate -1 0 0
+    }
+
+  # object in middle
+  object transformed
+    object simple
+      sphere 0.4
+#      metal 0.5 color 0 0.6470588235294118 1
+      dielectric 1.5 color 0 0.6470588235294118 1
+    transform {
+      translate 0 0 0
+    }
+
+  # object on the left
+  object transformed
+    object simple
+      sphere 0.4
+#      dielectric 1.5 color 0 0.6470588235294118 1
+#      metal 0.5 color 0 0.6470588235294118 1
+       lambertian color 0 0.6470588235294118 1
+    transform {
+      translate 1 0 0
+    }
+
+  # floor
+  object transformed
+    object simple
+      rectangle 3 3
+      lambertian checkerboard
+        0.65 0.0 0.0
+        0.65 0.65 0.65
+        2.0
+    transform {
+      translate 0 -0.6 0
+    }
+
+  # light source
+  object transformed
+    object simple
+      rectangle 3 3
+      diffuse_light color 15.0 15.0 15.0
+    transform {
+      rotate_y 3.1416
+      translate 0.0 3.0 0.0
+    }

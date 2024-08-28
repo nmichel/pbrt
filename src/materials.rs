@@ -5,11 +5,12 @@ use crate::spectrum::Spectrum;
 pub struct ScatterInfo {
     pub attenuation: Spectrum,
     pub scattered: Ray,
+    pub pdf: f64,
 }
 
 impl ScatterInfo {
-    pub fn new(attenuation: Spectrum, scattered: Ray) -> Self {
-        Self { attenuation, scattered }
+    pub fn new(attenuation: Spectrum, scattered: Ray, pdf: f64) -> Self {
+        Self { attenuation, scattered, pdf }
     }
 }
 

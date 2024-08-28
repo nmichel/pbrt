@@ -43,7 +43,7 @@ impl Material for Dielectric {
         // certain)
         let local_reflected = Vector3f::new(-local_wo.x, -local_wo.y, local_wo.z);
 
-        let attenuation = self.albedo.shade(intersection);
+        let mut attenuation = self.albedo.shade(intersection);
         let local_outward_normal: Vector3f;
         let world_outward_normal: Vector3f;
         let ni: f64;
@@ -98,14 +98,26 @@ impl Material for Dielectric {
                 };
                 let scatter_direction = intersection.local_to_world(&local_scatter_direction);
                 let scattered_ray = Ray::new(&scattered_ray_origin, &scatter_direction);
-                Some(ScatterInfo::new(attenuation, scattered_ray))
+
+                // see https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#SpecularReflection
+                // Handling of extra cosine because of delta distribution
+                let abs_cos_theta = local_scatter_direction.z.abs();
+                attenuation = attenuation / abs_cos_theta;
+
+                Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
             }
             None => {
                 // Total reflection
                 let target = intersection.local_to_world(&local_reflected);
                 let shift_avoid_acne = world_outward_normal * 0.001;
                 let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
-                Some(ScatterInfo::new(attenuation, scattered_ray))
+
+                // see https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#SpecularReflection
+                // Handling of extra cosine because of delta distribution
+                let abs_cos_theta = local_reflected.z.abs();
+                attenuation = attenuation / abs_cos_theta;
+
+                Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
             }
         }
     }
