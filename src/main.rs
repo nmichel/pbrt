@@ -1,5 +1,5 @@
 use pbrt::config::Config;
-use pbrt::integrators::{self, Integrator, NormalIntegrator, PathIntegrator};
+use pbrt::integrators::{self, Integrator, NaiveIntegrator, NormalIntegrator, PathIntegrator};
 use pbrt::loader::Loader;
 use pbrt::renderers;
 use std::{env, fs, process};
@@ -14,6 +14,7 @@ fn main() {
     println!("Redering with configuration settings: {:#?}", &config);
 
     let integrator: Box<dyn Integrator> = match config.integrator {
+        integrators::Type::NAIVE => Box::new(NaiveIntegrator::new(config.max_depth)),
         integrators::Type::NORMAL => Box::new(NormalIntegrator::new()),
         integrators::Type::PATH => Box::new(PathIntegrator::new(config.max_depth)),
     };

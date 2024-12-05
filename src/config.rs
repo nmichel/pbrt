@@ -77,6 +77,9 @@ fn parse_integrator(config: &mut Config, value: &String) {
         "path" => {
             config.integrator = integrators::Type::PATH;
         }
+        "naive" => {
+            config.integrator = integrators::Type::NAIVE;
+        }
         "normal" => {
             config.integrator = integrators::Type::NORMAL;
         }

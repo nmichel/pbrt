@@ -11,15 +11,18 @@ pub trait Integrator: Send + Sync {
     }
 }
 
+pub mod naive;
 pub mod normal;
 pub mod path;
 // pub mod whitted;
 
+pub use self::naive::NaiveIntegrator;
 pub use self::normal::NormalIntegrator;
 pub use self::path::PathIntegrator;
 
 #[derive(Debug)]
 pub enum Type {
     PATH,
+    NAIVE,
     NORMAL,
 }
