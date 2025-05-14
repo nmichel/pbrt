@@ -51,7 +51,7 @@ scene
   object transformed
     object simple
       rectangle 3 3
-      diffuse_light color 15.0 15.0 15.0
+      diffuse_light color 5.0 5.0 5.0
     transform {
       rotate_y 3.1416
       translate 0.0 3.0 0.0

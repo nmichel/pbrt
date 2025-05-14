@@ -1,4 +1,7 @@
 # Approx Cornell Room
+# 
+# Requires --far 2000
+# 
 camera pin_hole
   pos 0.0 0.0 800.0
   look 0.0 0.0 0.0
@@ -75,7 +78,7 @@ scene
   object transformed
     object simple
       rectangle 130.0 105.0
-      diffuse_light color 15.0 15.0 15.0
+      diffuse_light color 5.0 5.0 5.0
     transform {
 #      rotate_y PI
       rotate_y 3.1416
