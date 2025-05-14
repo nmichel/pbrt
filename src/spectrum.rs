@@ -23,6 +23,10 @@ impl Spectrum {
         self.spectrum[1] = self.spectrum[1].sqrt();
         self.spectrum[2] = self.spectrum[2].sqrt();
     }
+
+    pub fn max_component_value(&self) -> f64 {
+        self.spectrum[0].max(self.spectrum[1]).max(self.spectrum[2])
+    }
 }
 
 impl Add for Spectrum {
@@ -76,6 +80,14 @@ impl MulAssign<&Spectrum> for Spectrum {
         self.spectrum[0] *= other.spectrum[0];
         self.spectrum[1] *= other.spectrum[1];
         self.spectrum[2] *= other.spectrum[2];
+    }
+}
+
+impl MulAssign<f64> for Spectrum {
+    fn mul_assign(&mut self, other: f64) {
+        self.spectrum[0] *= other;
+        self.spectrum[1] *= other;
+        self.spectrum[2] *= other;
     }
 }
 

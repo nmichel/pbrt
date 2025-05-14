@@ -1,12 +1,12 @@
 use std::f64::consts::PI;
 
-use crate::{colors, interaction};
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::interaction::Interaction;
 use crate::materials::ScatterInfo;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
+use crate::{colors, interaction};
 
 use super::Integrator;
 
@@ -30,7 +30,7 @@ impl PathIntegrator {
 
 impl Integrator for PathIntegrator {
     fn li(&self, ray: &Ray, scene: &Scene, depth: usize, near: f64, far: f64) -> Spectrum {
-        let mut beta : Spectrum = colors::WHITE;
+        let mut beta: Spectrum = colors::WHITE;
         let mut accumulated_radiance: Spectrum = colors::BLACK;
         let mut current_ray: Ray = ray.clone();
 
@@ -41,7 +41,12 @@ impl Integrator for PathIntegrator {
                     accumulated_radiance += emitted * &beta;
                 }
 
-                if let Some(ScatterInfo { attenuation, ref scattered, pdf }) = material.scatter(&current_ray, &interaction) {
+                if let Some(ScatterInfo {
+                    attenuation,
+                    ref scattered,
+                    pdf,
+                }) = material.scatter(&current_ray, &interaction)
+                {
                     let abs_cos_theta = vector3::dot(&scattered.direction, &interaction.intersection.n).abs();
                     let weight = attenuation * abs_cos_theta / pdf;
                     beta *= &weight;
@@ -50,6 +55,15 @@ impl Integrator for PathIntegrator {
                 else {
                     break; // exit the loop if we hit a non-scattering material
                 }
+
+                // Possibly terminate the path with Russian roulette
+                // q is the probability of continuing the path
+                let q = beta.max_component_value();
+                if rand::random::<f64>() > q {
+                    break; // terminate the path
+                }
+
+                beta *= 1.0 / q; // scale beta to account for the probability of continuing
             }
             else {
                 accumulated_radiance += self.background_radiance(&current_ray, scene) * &beta;
@@ -101,7 +115,7 @@ impl Integrator for PathIntegrator {
                 let nb_light = 1;
                 let light_pdf : f64 = 1.0 / nb_light as f64;
                 let light = scene.get_light_at(0).unwrap();
-    
+
                 let (li, wi, visibility_tester) = light.li(&interaction.intersection);
                 if li != colors::BLACK {
                     // let f = material.bsdf(&interaction, &wi, &ray.direction);
