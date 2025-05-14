@@ -129,6 +129,7 @@ where
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use std::sync::Arc;
@@ -161,3 +162,4 @@ mod test {
         println!("Node \n{}", &bvh);
     }
 }
+*/

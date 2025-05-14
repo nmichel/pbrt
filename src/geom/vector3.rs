@@ -310,6 +310,13 @@ impl<T> Index<usize> for Vector3<T> {
     }
 }
 
+
+/// Check if two vectors are in the same hemisphere.
+/// 
+pub fn same_hemisphere(v1: &Vector3f, v2: &Vector3f) -> bool {
+    v1.z * v2.z > 0.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

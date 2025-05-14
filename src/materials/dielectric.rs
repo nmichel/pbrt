@@ -4,7 +4,6 @@ use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
-use crate::spectrum::Spectrum;
 use crate::textures::*;
 use crate::utils::random_double;
 use std::sync::Arc;
@@ -120,6 +119,10 @@ impl Material for Dielectric {
                 Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
             }
         }
+    }
+
+    fn is_specular(&self) -> bool {
+        true
     }
 }
 

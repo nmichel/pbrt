@@ -24,8 +24,8 @@ impl Loader {
         visitor.visit(&scene);
         visitor.scene.commit();
 
-        let point_light = PointLight::new(Box::new(Transform::translation(Vector3::new(0.0, 2.0, 0.0))), colors::WHITE * 10.0);
-        visitor.scene.add_light(Arc::new(point_light));
+        // let point_light = PointLight::new(Box::new(Transform::translation(Vector3::new(0.0, 2.0, 0.0))), colors::WHITE * 1.0);
+        // visitor.scene.add_light(Arc::new(point_light));
         (visitor.scene, visitor.camera.unwrap())
     }
 }

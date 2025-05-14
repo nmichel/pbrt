@@ -1,4 +1,6 @@
+use crate::colors;
 use crate::geom::ray::Ray;
+use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::spectrum::Spectrum;
 
@@ -21,6 +23,14 @@ pub trait Material: Send + Sync {
 
     fn emit(&self, _ray: &Ray, _interaction: &Interaction) -> Option<Spectrum> {
         None
+    }
+
+    fn is_specular(&self) -> bool {
+        false
+    }
+
+    fn f(&self, _wo: &Vector3f, _wi: &Vector3f) -> f64 {
+        0.0
     }
 }
 
