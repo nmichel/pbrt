@@ -1,12 +1,11 @@
-use std::f64::consts::PI;
-
 use crate::geom::ray::Ray;
-use crate::geom::vector3;
+use crate::geom::vector3::{self, Vector3, Vector3f};
 use crate::interaction::Interaction;
 use crate::materials::ScatterInfo;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
-use crate::{colors, interaction};
+use crate::utils::random_double;
+use crate::colors;
 
 use super::Integrator;
 
@@ -20,12 +19,14 @@ impl PathIntegrator {
         Self { max_depth }
     }
 
+    /*
     fn background_radiance(&self, ray: &Ray, _scene: &Scene) -> Spectrum {
         let mut unit_direction = ray.direction;
         unit_direction.normalize();
         let t = 0.5 * (unit_direction.y + 1.0);
         return Spectrum::new(1.0, 1.0, 1.0) * (1.0 - t) + Spectrum::new(0.5, 0.7, 1.0) * t;
     }
+    */
 }
 
 impl Integrator for PathIntegrator {
@@ -51,19 +52,51 @@ impl Integrator for PathIntegrator {
                     let weight = attenuation * abs_cos_theta / pdf;
                     beta *= &weight;
                     current_ray = scattered.clone();
+
+                    /*
+                    // Hack : direct light sampling
+                    // 
+                    let x = random_double() * 130.0 - 65.0;
+                    let z = random_double() * 105.0 - 52.5;
+                    let y = 276.0;
+                    let on_light = Vector3f::new(x, y, z);
+                    let mut to_light = on_light - interaction.intersection.p;
+                    let light_distance_squared = to_light.squared_length();
+                    to_light.normalize();
+
+                    if vector3::dot(&to_light, &interaction.intersection.n) < 0.0 {
+                        // eprintln!("leaving no light");
+                        break;
+                    }
+                    let light_area = 130.0 * 105.0;
+                    let light_cosine = to_light.y;
+                    if light_cosine <= 0.0 {
+                        // eprintln!("leaving neg. cosine");
+                        break;
+                    }
+
+                    let pdf = light_distance_squared / (light_area * light_cosine);
+                    let shift_avoid_acne = interaction.intersection.n * 0.001;
+                    current_ray = Ray::new(&(&interaction.intersection.p + &shift_avoid_acne), &to_light);
+                    let abs_cos_theta = vector3::dot(&current_ray.direction, &interaction.intersection.n).abs();
+                    let weight = attenuation * abs_cos_theta / pdf;
+                    beta *= &weight;
+                    */
                 }
                 else {
                     break; // exit the loop if we hit a non-scattering material
                 }
 
+                /*
                 // Possibly terminate the path with Russian roulette
                 // q is the probability of continuing the path
                 let q = beta.max_component_value();
-                if rand::random::<f64>() > q {
+                if random_double() > q {
                     break; // terminate the path
                 }
 
                 beta *= 1.0 / q; // scale beta to account for the probability of continuing
+                */
             }
             else {
                 accumulated_radiance += self.background_radiance(&current_ray, scene) * &beta;

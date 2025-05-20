@@ -3,9 +3,7 @@ use crate::geom::vector3::Vector3f;
 use rand::distributions::{IndependentSample, Range};
 
 pub fn random_double() -> f64 {
-    let between = Range::new(0., 1.);
-    let mut rng = rand::thread_rng();
-    between.ind_sample(&mut rng)
+    rand::random::<f64>()
 }
 
 pub fn random_in_unit_disk() -> Vector2f {
