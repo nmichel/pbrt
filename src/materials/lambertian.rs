@@ -1,10 +1,12 @@
-use super::{Material, ScatterInfo};
+use super::{same_hemisphere, Material, ScatterInfo};
+use crate::colors;
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
-use crate::geom::vector3::{same_hemisphere, Vector3f};
+use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::pdfs::cosine::CosinePdf;
 use crate::pdfs::Pdf;
+use crate::spectrum::Spectrum;
 use crate::textures::*;
 use std::sync::Arc;
 
@@ -35,12 +37,17 @@ impl Material for Lambertian {
         return Some(ScatterInfo::new(attenuation, scattered_ray, scattering_pdf));
     }
 
-    fn f(&self, wo: &Vector3f, wi: &Vector3f) -> f64 {
-        if same_hemisphere(wo, wi) {
-            std::f64::consts::FRAC_1_PI
+    fn f(&self, world_wo: &Vector3f, world_wi: &Vector3f, interaction: &Interaction) -> Spectrum {
+        let Interaction { ref intersection, .. } = interaction;
+
+        let wi = intersection.world_to_local(world_wi);
+        let wo = intersection.world_to_local(world_wo);
+
+        if same_hemisphere(&wo, &wi) {
+            self.albedo.shade(intersection) / std::f64::consts::PI
         }
         else {
-            0.0
+            colors::BLACK
         }
     }
 }

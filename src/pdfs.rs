@@ -8,3 +8,4 @@ pub trait Pdf {
 
 pub mod cosine;
 pub mod hemisphere;
+pub mod sphere;

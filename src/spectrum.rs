@@ -83,6 +83,14 @@ impl MulAssign<&Spectrum> for Spectrum {
     }
 }
 
+impl MulAssign<Spectrum> for Spectrum {
+    fn mul_assign(&mut self, other: Self) {
+        self.spectrum[0] *= other.spectrum[0];
+        self.spectrum[1] *= other.spectrum[1];
+        self.spectrum[2] *= other.spectrum[2];
+    }
+}
+
 impl MulAssign<f64> for Spectrum {
     fn mul_assign(&mut self, other: f64) {
         self.spectrum[0] *= other;
@@ -108,6 +116,14 @@ impl Mul<f64> for Spectrum {
 }
 
 impl Div<f64> for Spectrum {
+    type Output = Spectrum;
+
+    fn div(self, scale: f64) -> Self::Output {
+        Spectrum::new(self.spectrum[0] / scale, self.spectrum[1] / scale, self.spectrum[2] / scale)
+    }
+}
+
+impl Div<f64> for &Spectrum {
     type Output = Spectrum;
 
     fn div(self, scale: f64) -> Self::Output {

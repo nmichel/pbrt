@@ -1,3 +1,4 @@
+use crate::lights::LightType;
 use crate::objects::Object;
 
 use super::bvh::{Accumulator, BVHNode};
@@ -74,7 +75,6 @@ impl Scene {
     }
 
     pub fn add_light(&mut self, light: Arc<dyn Light>) -> &mut Self {
-        // Arc::get_mut(&mut self.lights).unwrap().push(light);
         self.lights.push(light);
         self
     }
@@ -118,13 +118,21 @@ impl Scene {
         self.lights.len()
     }
 
-    pub fn get_light_at(&self, index: usize) -> Option<Arc<dyn Light>> {
+    pub fn get_light_at<'a>(&'a self, index: usize) -> Option<&'a dyn Light> {
         if index < self.lights.len() {
-            Some(Arc::clone(&self.lights[index]))
+            Some(self.lights[index].as_ref())
         }
         else {
             None
         }
+    }
+
+    pub fn query_lights<'a>(&'a self, light_type: &LightType) -> Vec<&'a dyn Light> {
+        self.lights
+            .iter()
+            .filter(|light| light.light_type() == *light_type)
+            .map(|light| light.as_ref())
+            .collect()
     }
 
     fn build_bvh(prim: &mut Vec<Wrapper<dyn Object>>) -> Option<BVHNode<Wrapper<dyn Object>>> {

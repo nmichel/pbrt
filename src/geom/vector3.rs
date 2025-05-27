@@ -1,6 +1,6 @@
 use std::fmt;
 use std::marker::Copy;
-use std::ops::{Add, AddAssign, Index, Mul, MulAssign, Sub};
+use std::ops::{Add, AddAssign, Index, Mul, MulAssign, Neg, Sub};
 
 /// A 3D vector generic type.
 ///
@@ -73,6 +73,12 @@ impl Vector3<f64> {
         self
     }
 
+    pub fn normalized(&self) -> Self {
+        let mut res: Vector3<f64> = *self;
+        res.normalize();
+        res
+    }
+
     pub fn saturate(&mut self) -> &mut Self {
         self.x = num_traits::clamp(self.x, 0.0, 1.0);
         self.y = num_traits::clamp(self.y, 0.0, 1.0);
@@ -124,6 +130,21 @@ impl Vector3<f64> {
         self.y = self.y.max(other.y);
         self.z = self.z.max(other.z);
         self
+    }
+}
+
+impl<T> Neg for Vector3<T>
+where
+    T: Neg<Output = T>,
+{
+    type Output = Vector3<T>;
+
+    fn neg(self) -> Self::Output {
+        Self {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+        }
     }
 }
 
@@ -308,12 +329,6 @@ impl<T> Index<usize> for Vector3<T> {
             panic!("out of bound");
         }
     }
-}
-
-/// Check if two vectors are in the same hemisphere.
-///
-pub fn same_hemisphere(v1: &Vector3f, v2: &Vector3f) -> bool {
-    v1.z * v2.z > 0.0
 }
 
 #[cfg(test)]
