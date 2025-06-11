@@ -156,7 +156,7 @@ impl Intersectable for AABox {
         let mut res = IntersectionResult::new();
 
         if tmax < near || tmin > far {
-            return IntersectionResult::new();
+            return res;
         }
 
         if tmin > near {

@@ -16,8 +16,15 @@ pub trait AABound {
 }
 
 impl AABoundingBox {
-    pub fn new(min: &Vector3f, max: &Vector3f) -> Self {
-        Self { bmin: *min, bmax: *max }
+    pub fn new(lower: &Vector3f, higher: &Vector3f) -> Self {
+        let mut diff = higher - lower;
+        diff.x = diff.x.max(0.01);
+        diff.y = diff.y.max(0.01);
+        diff.z = diff.z.max(0.01);
+        Self {
+            bmin: *lower,
+            bmax: lower + &diff,
+        }
     }
 
     /// Borrowed from https://raytracing.github.io/books/RayTracingTheNextWeek.html#boundingvolumehierarchies
