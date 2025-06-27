@@ -56,6 +56,17 @@ where
     }
 }
 
+impl<T> Sub for &Vector2<T>
+where
+    T: Sub<Output = T> + Copy,
+{
+    type Output = Vector2<T>;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self::Output::new(self.x - other.x, self.y - other.y)
+    }
+}
+
 impl<T> Mul<T> for Vector2<T>
 where
     T: Mul<Output = T> + Copy,

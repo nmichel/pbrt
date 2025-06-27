@@ -23,101 +23,82 @@ impl Shape for Triangle {}
 impl Intersectable for Triangle {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
         // Moller–Trumbore intersection algorithm
-        let edge1 = self.p1 - self.p0;
-        let edge2 = self.p2 - self.p0;
-        let direction_cross_edge2 = vector3::cross(&ray.direction, &edge2);
-        let det = vector3::dot(&edge1, &direction_cross_edge2);
+        // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
 
-        if det.abs() < 1e-8 {
-            return IntersectionResult::new();
-        }
-
-        let inv_det = 1.0 / det;
-        let s = ray.origin - self.p0;
-        let u = inv_det * vector3::dot(&s, &direction_cross_edge2);
-
-        if u < 0.0 || u > 1.0 {
-            return IntersectionResult::new();
-        }
-
-        let s_cross_edge1 = vector3::cross(&s, &edge1);
-        let v = inv_det * vector3::dot(&ray.direction, &s_cross_edge1);
-
-        if v < 0.0 || u + v > 1.0 {
-            return IntersectionResult::new();
-        }
-
-        let t = inv_det * vector3::dot(&edge2, &s_cross_edge1);
-        if t < near || t > far {
-            return IntersectionResult::new();
-        }
-
-        let hit = &ray.origin + &(&ray.direction * t);
-        let normal = vector3::cross(&edge1, &edge2).normalized();
-        let mut res = IntersectionResult::new();
-
-        let u0: f64 = 0.0;
-        let v0: f64 = 0.0;
-        let u1: f64 = 1.0;
-        let v1: f64 = 0.0;
-        let u2: f64 = 1.0;
-        let v2: f64 = 1.0;
-
-        let du02 = u0 - u2;
-        let dv02 = v0 - v2;
-        let du12 = u1 - u2;
-        let dv12 = v1 - v2;
-
-        let dp02 = self.p0 - self.p2;
-        let dp12 = self.p1 - self.p2;
-
-        let det = du12 * dv02 - dv12 * du02;
-
-        if det.abs() < 1e-8 {
-            // Degenerate triangle, cannot compute derivatives
-            return res;
-        }
-
-        let inv_det = 1.0 / det;
-        let dpdu = &(&dp12 * dv02 - &dp02 * dv12) * inv_det;
-        let dpdv = &(&dp02 * du12 - &dp12 * du02) * inv_det;
-
-        /*
-            let edge12 = p1 - p2;  // ∂M/∂β
-            let edge02 = p0 - p2;  // ∂M/∂α
-
-            let duv12 = uv1 - uv2; // (Δu₂, Δv₂)
-            let duv02 = uv0 - uv2; // (Δu₁, Δv₁)
-
-            let det = duv12.u * duv02.v - duv12.v * duv02.u;
-
-            if det != 0.0 {
-                let inv_det = 1.0 / det;
-
-                let dp_du = inv_det * (duv02.v * edge12 - duv12.v * edge02);
-                let dp_dv = inv_det * (duv12.u * edge02 - duv02.u * edge12);
+        if let Some(TriangleIntersection { t, u, v, w }) = self.intersect_ray(ray) {
+            if t < near || t > far {
+                return IntersectionResult::new();
             }
-        */
 
-        /*
-        Float determinant = DifferenceOfProducts(du02, dv12, dv02, du12);
-        cd = dv02 * du12;
-        det = du02 * dv12 - dv02 * du12;
-        */
+            let hit = &ray.origin + &(&ray.direction * t);
 
-        res.push(Intersection {
-            p: hit,
-            d: t,
-            n: normal,
-            wo: &ray.direction * -1.0,
-            // nonsense : TODO: compute correct UV values
-            u,
-            v,
-            dpdu,
-            dpdv,
-        });
+            let edge1 = self.p1 - self.p0;
+            let edge2 = self.p2 - self.p0;
+            let normal = vector3::cross(&edge1, &edge2).normalized();
+            let mut res = IntersectionResult::new();
 
-        res
+            let u0: f64 = 0.0;
+            let v0: f64 = 0.0;
+            let u1: f64 = 1.0;
+            let v1: f64 = 0.0;
+            let u2: f64 = 1.0;
+            let v2: f64 = 1.0;
+
+            let u = w * u0 + u * u1 + v * u2;
+            let v = w * v0 + u * v1 + v * v2;
+
+            let du02 = u0 - u2;
+            let dv02 = v0 - v2;
+            let du12 = u1 - u2;
+            let dv12 = v1 - v2;
+
+            let dp02 = self.p0 - self.p2;
+            let dp12 = self.p1 - self.p2;
+
+            let det = du12 * dv02 - dv12 * du02;
+
+            let (dpdu, dpdv) = if det.abs() < 1e-8 {
+                // Degenerate case : colinear uv coordinates
+                // We can compute a normal and two orthogonal vectors
+
+                let normal = vector3::cross(&edge1, &edge2);
+                let tangent = if normal.x.abs() < 0.9 {
+                    vector3::cross(&Vector3f { x: 1.0, y: 0.0, z: 0.0 }, &normal)
+                }
+                else {
+                    vector3::cross(&Vector3f { x: 0.0, y: 1.0, z: 0.0 }, &normal)
+                };
+                let bitangent = vector3::cross(&normal, &tangent);
+                (tangent, bitangent)
+            }
+            else {
+                // Regular case : we can compute the derivatives
+                // using the determinant of the Jacobian matrix
+
+                let inv_det = 1.0 / det;
+                let dpdu = &(&dp12 * dv02 - &dp02 * dv12) * inv_det;
+                let dpdv = &(&dp02 * du12 - &dp12 * du02) * inv_det;
+
+                (dpdu, dpdv)
+            };
+
+            res.push(Intersection {
+                p: hit,
+                d: t,
+                n: normal,
+                wo: &ray.direction * -1.0,
+                // nonsense : TODO: compute correct UV values
+                u,
+                v,
+                dpdu,
+                dpdv,
+            });
+
+            res
+        }
+        else {
+            return IntersectionResult::new();
+        }
     }
 
     fn contain_point(&self, _point: &Vector3f) -> bool {
@@ -135,5 +116,47 @@ impl AABound for Triangle {
         let max_z = self.p0.z.max(self.p1.z).max(self.p2.z);
 
         AABoundingBox::new(&Vector3f::new(min_x, min_y, min_z), &Vector3f::new(max_x, max_y, max_z))
+    }
+}
+
+struct TriangleIntersection {
+    t: f64,
+    u: f64,
+    v: f64,
+    w: f64,
+}
+
+impl Triangle {
+    fn intersect_ray(&self, ray: &Ray) -> Option<TriangleIntersection> {
+        // Compute barycentric coordinates u and v
+        // and t for the intersection point
+
+        let edge1 = self.p1 - self.p0;
+        let edge2 = self.p2 - self.p0;
+        let direction_cross_edge2 = vector3::cross(&ray.direction, &edge2);
+        let det = vector3::dot(&edge1, &direction_cross_edge2);
+
+        if det.abs() < 1e-8 {
+            return None;
+        }
+
+        let inv_det = 1.0 / det;
+        let s = ray.origin - self.p0;
+        let u = inv_det * vector3::dot(&s, &direction_cross_edge2);
+
+        if u < 0.0 || u > 1.0 {
+            return None;
+        }
+
+        let s_cross_edge1 = vector3::cross(&s, &edge1);
+        let v = inv_det * vector3::dot(&ray.direction, &s_cross_edge1);
+
+        if v < 0.0 || u + v > 1.0 {
+            return None;
+        }
+
+        let t = inv_det * vector3::dot(&edge2, &s_cross_edge1);
+
+        Some(TriangleIntersection { t, u, v, w: 1.0 - u - v })
     }
 }
