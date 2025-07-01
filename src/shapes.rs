@@ -4,6 +4,7 @@ use crate::geom::intersectable::Intersectable;
 pub trait Shape: Intersectable + AABound {}
 
 mod aabox;
+mod bvh;
 mod cylinder;
 mod plane;
 mod rectangle;

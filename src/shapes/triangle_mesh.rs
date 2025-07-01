@@ -1,26 +1,44 @@
-use std::f64::MAX;
-
 use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult};
 use crate::geom::ray::Ray;
-use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2f;
-use crate::geom::vector3::{self, Vector3, Vector3f};
+use crate::geom::vector3::{self, Vector3f};
 
-use super::{triangle, Shape};
+use super::bvh::{Accumulator, BVHTree};
+use super::Shape;
+
+struct TriangleAccumulator {
+    triangles: Vec<usize>,
+}
+
+impl TriangleAccumulator {
+    pub fn new() -> Self {
+        Self { triangles: Vec::new() }
+    }
+}
+
+impl Accumulator for TriangleAccumulator {
+    fn accumulate(&mut self, items: &Vec<usize>) -> () {
+        self.triangles.extend(items)
+    }
+}
 
 pub struct TriangleMesh {
+    bvh: BVHTree,
+    indices: Vec<usize>,
     vertices: Vec<f64>,
-    indices: Vec<u32>,
     normals: Option<Vec<f64>>,
     uvs: Option<Vec<f64>>,
 }
 
 impl TriangleMesh {
-    pub fn new(vertices: Vec<f64>, indices: Vec<u32>, normals: Option<Vec<f64>>, uvs: Option<Vec<f64>>) -> Self {
+    pub fn new(vertices: Vec<f64>, indices: Vec<usize>, normals: Option<Vec<f64>>, uvs: Option<Vec<f64>>) -> Self {
+        let bvh = BVHTree::new(&vertices, &indices);
+
         Self {
-            vertices,
+            bvh,
             indices,
+            vertices,
             normals,
             uvs,
         }
@@ -42,7 +60,7 @@ pub fn unit_cube() -> TriangleMesh {
 
     // Indices des triangles (2 triangles par face, 12 triangles au total)
     // Convention: sens antihoraire vu de l'extérieur
-    let indices: Vec<u32> = vec![
+    let indices: Vec<usize> = vec![
         // Face arrière (z = -0.5)
         0, 1, 2, 0, 2, 3, // Face avant (z = +0.5)
         4, 6, 5, 4, 7, 6, // Face gauche (x = -0.5)
@@ -63,14 +81,18 @@ static DEFAULT_UV2: Vector2f = Vector2f { x: 1.0, y: 1.0 };
 
 impl Intersectable for TriangleMesh {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
+        let mut acc: TriangleAccumulator = TriangleAccumulator::new();
+        self.bvh.query(ray, near, far, &mut acc);
+
         let mut min_t = f64::MAX;
         let mut res: Box<IntersectionResult> = Box::new(IntersectionResult::new());
 
-        for i in (0..self.indices.len()).step_by(3) {
+        for i in (0..acc.triangles.len()) {
+            let base = acc.triangles[i];
             // Triangle vertices indices in data arrays
-            let i0 = self.indices[i] as usize;
-            let i1 = self.indices[i + 1] as usize;
-            let i2 = self.indices[i + 2] as usize;
+            let i0 = self.indices[base] as usize;
+            let i1 = self.indices[base + 1] as usize;
+            let i2 = self.indices[base + 2] as usize;
 
             // Vertices 3D coords
             let ip0 = i0 * 3;

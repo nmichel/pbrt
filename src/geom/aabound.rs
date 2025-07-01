@@ -3,7 +3,7 @@ use super::transform::{Transform, Transformable};
 use super::vector3::Vector3f;
 use std::mem::swap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct AABoundingBox {
     pub bmin: Vector3f,
     pub bmax: Vector3f,
@@ -25,6 +25,10 @@ impl AABoundingBox {
             bmin: *lower,
             bmax: lower + &diff,
         }
+    }
+
+    pub fn centroid(&self) -> Vector3f {
+        (self.bmax + self.bmin) * 0.5
     }
 
     /// Borrowed from https://raytracing.github.io/books/RayTracingTheNextWeek.html#boundingvolumehierarchies
