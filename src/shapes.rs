@@ -4,15 +4,13 @@ use crate::geom::intersectable::Intersectable;
 pub trait Shape: Intersectable + AABound {}
 
 mod aabox;
-mod bvh;
+pub mod csg;
 mod cylinder;
 mod plane;
 mod rectangle;
 mod sphere;
 mod triangle;
-pub(crate) mod triangle_mesh;
-
-pub mod csg;
+pub mod triangle_mesh;
 
 pub use self::aabox::AABox;
 pub use self::cylinder::Cylinder;

@@ -49,7 +49,7 @@ impl BVHNode {
 }
 
 pub struct BVHTree {
-    pub root: BVHNode,
+    root: BVHNode,
 }
 
 #[derive(Clone, Copy)]
