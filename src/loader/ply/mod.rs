@@ -1,18 +1,48 @@
 mod ply_data_type;
+mod ply_event_observer;
+mod ply_prop_type;
+
+use ply_data_type::PlyDataType;
+use ply_event_observer::PlyEventObserver;
+use ply_prop_type::ElementProps;
 
 use std::fs::File;
 use std::io::Read;
 
-use ply_data_type::PlyDataType;
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-enum PropertyDesc {
-    SimplePropertyDesc { name: String, data_type: PlyDataType },
-    ListPropertyDesc { name: String, data_type: PlyDataType },
+#[derive(Debug, Clone)]
+pub enum PropertyType {
+    Scalar(PlyDataType),
+    List(PlyDataType, PlyDataType),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-struct ElementDesc {
+#[derive(Debug)]
+pub enum PropertyValue {
+    Int8(i8),
+    UInt8(u8),
+    Int16(i16),
+    UInt16(u16),
+    Int32(i32),
+    UInt32(u32),
+    Float32(f32),
+    Float64(f64),
+    ListInt8(Vec<i8>),
+    ListUInt8(Vec<u8>),
+    ListInt16(Vec<i16>),
+    ListUInt16(Vec<u16>),
+    ListInt32(Vec<i32>),
+    ListUInt32(Vec<u32>),
+    ListFloat32(Vec<f32>),
+    ListFloat64(Vec<f64>),
+}
+
+#[derive(Debug, Clone)]
+pub struct PropertyDesc {
+    name: ElementProps,
+    data_type: PropertyType,
+}
+
+#[derive(Debug, Clone)]
+pub struct ElementDesc {
     name: String,
     count: usize,
     properties: Vec<PropertyDesc>,
@@ -38,31 +68,10 @@ enum State {
 }
 
 #[derive(Debug)]
-struct ArraySizes {
-    vertex: usize,
-    normal: usize,
-    color: usize,
-    uv: usize,
-    indices: usize,
-}
-
-impl ArraySizes {
-    fn new() -> Self {
-        ArraySizes {
-            vertex: 0,
-            normal: 0,
-            color: 0,
-            uv: 0,
-            indices: 0,
-        }
-    }
-}
-#[derive(Debug)]
 struct Builder {
     state: State,
     elements: Vec<ElementDesc>,
     current_element: Option<ElementDesc>,
-    sizes: ArraySizes,
     current_element_index: usize,
     current_element_count: usize,
 }
@@ -75,7 +84,6 @@ impl Builder {
             state: State::Header,
             elements: Vec::new(),
             current_element: None,
-            sizes: ArraySizes::new(),
             current_element_index: 0,
             current_element_count: 0,
         }
@@ -101,95 +109,102 @@ impl Builder {
         self.current_element = None;
     }
 
-    fn prepare_arrays(&mut self) -> () {
-        for element in &self.elements {
-            match &element.name[..] {
-                "vertex" => process_element_vertex(&mut self.sizes, &element),
-                _ => {}
-            }
-        }
-    }
-
-    fn load_data_line(&mut self, index: usize, segments: &Vec<&str>) {
+    fn load_data_line(&mut self, index: usize, segments: &Vec<&str>, observer: &mut dyn PlyEventObserver) {
         let element_desc: &ElementDesc = &self.elements[index];
         match &element_desc.name[..] {
-            "vertex" => load_element_vertex(element_desc, segments),
-            "face" => load_element_face(element_desc, segments),
+            "vertex" => load_element_vertex(element_desc, segments, observer),
+            "face" => load_element_face(element_desc, segments, observer),
             _ => {}
         }
     }
 }
 
-fn load_element_vertex(element_desc: &ElementDesc, segments: &Vec<&str>) {
+fn read_scalar_value(data_type: &PlyDataType, segments: &[&str]) -> PropertyValue {
+    match data_type {
+        PlyDataType::Int8 => PropertyValue::Int8(segments[0].parse::<i8>().unwrap()),
+        PlyDataType::UInt8 => PropertyValue::UInt8(segments[0].parse::<u8>().unwrap()),
+        PlyDataType::Int16 => PropertyValue::Int16(segments[0].parse::<i16>().unwrap()),
+        PlyDataType::UInt16 => PropertyValue::UInt16(segments[0].parse::<u16>().unwrap()),
+        PlyDataType::Int32 => PropertyValue::Int32(segments[0].parse::<i32>().unwrap()),
+        PlyDataType::UInt32 => PropertyValue::UInt32(segments[0].parse::<u32>().unwrap()),
+        PlyDataType::Float32 => PropertyValue::Float32(segments[0].parse::<f32>().unwrap()),
+        PlyDataType::Float64 => PropertyValue::Float64(segments[0].parse::<f64>().unwrap()),
+    }
+}
+
+fn read_list_value(count: usize, data_type: &PlyDataType, segments: &[&str]) -> PropertyValue {
+    // Closure cannot be generic, hence we create a local helper function    //
+    fn parse_list<T, F>(count: usize, segments: &[&str], parse: F) -> Vec<T>
+    where
+        F: Fn(&str) -> T,
+    {
+        segments[0..count].iter().map(|s| parse(s)).collect()
+    }
+
+    match data_type {
+        PlyDataType::Int8 => PropertyValue::ListInt8(parse_list(count, segments, |s| s.parse::<i8>().unwrap())),
+        PlyDataType::UInt8 => PropertyValue::ListUInt8(parse_list(count, segments, |s| s.parse::<u8>().unwrap())),
+        PlyDataType::Int16 => PropertyValue::ListInt16(parse_list(count, segments, |s| s.parse::<i16>().unwrap())),
+        PlyDataType::UInt16 => PropertyValue::ListUInt16(parse_list(count, segments, |s| s.parse::<u16>().unwrap())),
+        PlyDataType::Int32 => PropertyValue::ListInt32(parse_list(count, segments, |s| s.parse::<i32>().unwrap())),
+        PlyDataType::UInt32 => PropertyValue::ListUInt32(parse_list(count, segments, |s| s.parse::<u32>().unwrap())),
+        PlyDataType::Float32 => PropertyValue::ListFloat32(parse_list(count, segments, |s| s.parse::<f32>().unwrap())),
+        PlyDataType::Float64 => PropertyValue::ListFloat64(parse_list(count, segments, |s| s.parse::<f64>().unwrap())),
+    }
+}
+
+fn read_value(segments: &[&str], data_type: &PropertyType) -> (usize, PropertyValue) {
+    match data_type {
+        PropertyType::Scalar(data_type) => (1, read_scalar_value(data_type, segments)),
+        PropertyType::List(_count_type, _data_type) => {
+            let count = segments[0].parse::<usize>().unwrap();
+            (count + 1, read_list_value(count, _data_type, &segments[1..]))
+        }
+    }
+}
+
+fn dispatch_event(
+    element_desc: &ElementDesc,
+    segments: &Vec<&str>,
+    observer: &mut dyn PlyEventObserver,
+    handler: fn(&ElementProps, PropertyValue, &mut dyn PlyEventObserver),
+) {
+    let mut current_index = 0;
     for i in 0..element_desc.properties.len() {
+        let segs = &segments[current_index..segments.len()];
         let property = &element_desc.properties[i];
-        let str = segments.get(i).expect("Missing data for property");
-        match property {
-            PropertyDesc::SimplePropertyDesc { name, .. } => {
-                match &name[..] {
-                    "x" | "y" | "z" => println!("Vertex coordinate {}: {}", name, str),
-                    "nx" | "ny" | "nz" => println!("Vertex normal: {}: {}", name, str),
-                    "red" | "tgreen" | "blue" => println!("Vertex color: {}: {}", name, str),
-                    "u" | "v" | "s" | "t" => println!("Vertex uv: {}: {}", name, str),
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
+        let (consumed, value) = read_value(segs, &property.data_type);
+        let name = &property.name;
+        handler(name, value, observer);
+        current_index += consumed;
     }
 }
 
-fn load_element_face(element_desc: &ElementDesc, segments: &Vec<&str>) {
-    for i in 0..element_desc.properties.len() {
-        let property = &element_desc.properties[i];
-        match property {
-            PropertyDesc::ListPropertyDesc { name, .. } => {
-                let count = segments.get(0).expect("Missing vertex count for face");
-                let indices = segments[1..].iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
-                match &name[..] {
-                    "vertex_index" | "vertex_indices" => println!("Face vertex indices {} | {:#?}", count, indices),
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
+fn load_element_vertex(element_desc: &ElementDesc, segments: &Vec<&str>, observer: &mut dyn PlyEventObserver) {
+    fn handler(name: &ElementProps, value: PropertyValue, observer: &mut dyn PlyEventObserver) {
+        observer.on_vertex_event(name, value);
     }
+
+    dispatch_event(element_desc, segments, observer, handler);
 }
 
-fn process_element_vertex(sizes: &mut ArraySizes, element_desc: &ElementDesc) {
-    for property in &element_desc.properties {
-        match property {
-            PropertyDesc::SimplePropertyDesc { name, .. } => {
-                match &name[..] {
-                    "x" | "y" | "z" => {
-                        sizes.vertex += element_desc.count;
-                    }
-                    "nx" | "ny" | "nz" => {
-                        sizes.normal += element_desc.count;
-                    }
-                    "red" | "green" | "blue" => {
-                        sizes.color += element_desc.count;
-                    }
-                    "u" | "v" => {
-                        sizes.uv += element_desc.count;
-                    }
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
+fn load_element_face(element_desc: &ElementDesc, segments: &Vec<&str>, observer: &mut dyn PlyEventObserver) {
+    fn handler(name: &ElementProps, value: PropertyValue, observer: &mut dyn PlyEventObserver) {
+        observer.on_face_event(name, value);
     }
+
+    dispatch_event(element_desc, segments, observer, handler);
 }
 
-pub fn read_ply_file(path: &str) -> Result<Builder, &'static str> {
+fn read_ply_file(path: &str, observer: &mut dyn PlyEventObserver) -> Result<Builder, &'static str> {
     let mut f: File = File::open(path).unwrap();
     let mut buffer = String::new();
     f.read_to_string(&mut buffer).unwrap();
 
-    read_ply_data(&buffer)
+    read_ply_data(&buffer, observer)
 }
 
-pub fn read_ply_data(data: &str) -> Result<Builder, &'static str> {
+pub fn read_ply_data(data: &str, observer: &mut dyn PlyEventObserver) -> Result<Builder, &'static str> {
     let mut state = Builder::new();
 
     let res = data
@@ -197,21 +212,23 @@ pub fn read_ply_data(data: &str) -> Result<Builder, &'static str> {
         .map(|x| x.trim())
         .filter(|x| !x.is_empty())
         .filter(|x| !x.starts_with("comment"))
-        .try_fold(&mut state, |state, line| read_line(line, state));
+        .try_fold(&mut state, |state, line| read_line(line, state, observer));
 
     if res.is_err() {
         return Err(res.err().unwrap());
     }
 
+    observer.on_data_complete();
+
     Ok(state)
 }
 
-fn read_line<'a>(line: &'a str, state: &'a mut Builder) -> Result<&'a mut Builder, &'static str> {
+fn read_line<'a>(line: &'a str, state: &'a mut Builder, observer: &mut dyn PlyEventObserver) -> Result<&'a mut Builder, &'static str> {
     let segments: Vec<&str> = line.split(" ").into_iter().map(|x| x.trim()).collect();
-    parse_segments(&segments, state)
+    parse_segments(&segments, state, observer)
 }
 
-fn parse_segments<'a>(segments: &Vec<&str>, state: &'a mut Builder) -> Result<&'a mut Builder, &'static str> {
+fn parse_segments<'a>(segments: &Vec<&str>, state: &'a mut Builder, observer: &mut dyn PlyEventObserver) -> Result<&'a mut Builder, &'static str> {
     match state.state {
         State::Header => {
             match segments[..] {
@@ -245,7 +262,8 @@ fn parse_segments<'a>(segments: &Vec<&str>, state: &'a mut Builder) -> Result<&'
                 }
                 ["end_header"] => {
                     state.end_element();
-                    state.prepare_arrays();
+
+                    observer.on_header_complete(&state.elements);
 
                     state.state = State::Data;
                     Ok(state)
@@ -256,29 +274,29 @@ fn parse_segments<'a>(segments: &Vec<&str>, state: &'a mut Builder) -> Result<&'
         State::Property => {
             if segments[0] != "property" {
                 state.state = State::Element;
-                return parse_segments(segments, state);
+                return parse_segments(segments, state, observer);
             }
 
             match segments[..] {
                 ["property", data_type, name] => {
                     state.state = State::Property;
-                    state.current_element.as_mut().unwrap().properties.push(PropertyDesc::SimplePropertyDesc {
-                        name: name.to_string(),
-                        data_type: data_type.parse::<PlyDataType>().unwrap(),
+                    state.current_element.as_mut().unwrap().properties.push(PropertyDesc {
+                        name: name.parse::<ElementProps>().unwrap(),
+                        data_type: PropertyType::Scalar(data_type.parse::<PlyDataType>().unwrap()),
                     });
                     Ok(state)
                 }
-                ["property", "list", _count_type, data_type, name] => {
+                ["property", "list", count_type, data_type, name] => {
                     state.state = State::Property;
-                    state.current_element.as_mut().unwrap().properties.push(PropertyDesc::ListPropertyDesc {
-                        name: name.to_string(),
-                        data_type: data_type.parse::<PlyDataType>().unwrap(),
+                    state.current_element.as_mut().unwrap().properties.push(PropertyDesc {
+                        name: name.parse::<ElementProps>().unwrap(),
+                        data_type: PropertyType::List(count_type.parse::<PlyDataType>().unwrap(), data_type.parse::<PlyDataType>().unwrap()),
                     });
                     Ok(state)
                 }
                 _ => {
                     state.state = State::Element;
-                    return parse_segments(segments, state);
+                    return parse_segments(segments, state, observer);
                 }
             }
         }
@@ -288,19 +306,48 @@ fn parse_segments<'a>(segments: &Vec<&str>, state: &'a mut Builder) -> Result<&'
                 state.current_element_index += 1;
                 state.current_element_count = 0;
             }
-            state.load_data_line(state.current_element_index, segments);
-
-            {
-                state.state = State::Data;
-                Ok(state)
-            }
+            state.load_data_line(state.current_element_index, segments, observer);
+            Ok(state)
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::read_ply_data;
+    use super::ply_event_observer::PlyEventObserver;
+    use super::ply_prop_type::*;
+    use super::{read_ply_data, read_ply_file, ElementDesc, PropertyValue};
+
+    struct MockEventObserver {}
+
+    impl MockEventObserver {
+        fn new() -> Self {
+            MockEventObserver {}
+        }
+    }
+
+    impl PlyEventObserver for MockEventObserver {
+        fn on_header_complete(self: &mut Self, header: &Vec<ElementDesc>) {
+            for element in header {
+                println!("Element: {}", element.name);
+                for property in &element.properties {
+                    println!("  Property: {:?}", property);
+                }
+            }
+        }
+
+        fn on_vertex_event(self: &mut Self, props: &ElementProps, value: PropertyValue) {
+            println!("Vertex Event for Property: {:?} with Value: {:?}", props, value);
+        }
+
+        fn on_face_event(self: &mut Self, props: &ElementProps, value: PropertyValue) {
+            println!("Face Event for Property: {:?} with Value: {:?}", props, value);
+        }
+
+        fn on_data_complete(self: &mut Self) {
+            println!("Data Complete");
+        }
+    }
 
     #[test]
     fn test_ply_reader_no_ply() {
@@ -308,7 +355,7 @@ mod test {
         not ply
         ";
 
-        assert!(read_ply_data(input).is_err());
+        assert!(read_ply_data(input, &mut MockEventObserver::new()).is_err());
     }
 
     #[test]
@@ -317,7 +364,7 @@ mod test {
         ply suffix
         ";
 
-        assert!(read_ply_data(input).is_err());
+        assert!(read_ply_data(input, &mut MockEventObserver::new()).is_err());
     }
 
     #[test]
@@ -350,7 +397,7 @@ mod test {
         4 3 7 4 0
         ";
 
-        assert!(read_ply_data(input).is_ok());
+        assert!(read_ply_data(input, &mut MockEventObserver::new()).is_ok());
     }
 
     #[test]
@@ -393,6 +440,13 @@ mod test {
         4 10 9 0 12
         ";
 
-        assert!(read_ply_data(input).is_ok());
+        assert!(read_ply_data(input, &mut MockEventObserver::new()).is_ok());
+    }
+
+    #[test]
+    fn test_read_bunny() {
+        let filename = "./test_files/bun_zipper.ply";
+        let mut observer = MockEventObserver::new();
+        assert!(read_ply_file(&filename, &mut observer).is_ok());
     }
 }
