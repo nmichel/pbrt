@@ -59,7 +59,7 @@ impl Intersectable for TriangleMesh {
         let mut min_t = f64::MAX;
         let mut res: Box<IntersectionResult> = Box::new(IntersectionResult::new());
 
-        for i in (0..acc.triangles.len()) {
+        for i in 0..acc.triangles.len() {
             let base = acc.triangles[i];
             // Triangle vertices indices in data arrays
             let i0 = self.indices[base] as usize;

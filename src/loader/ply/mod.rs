@@ -4,5 +4,5 @@ mod ply_loader;
 mod ply_prop_type;
 
 pub use ply_event_observer::PlyEventObserver;
-pub use ply_loader::{read_ply_data, read_ply_file, ElementDesc, PropertyValue};
-pub use ply_prop_type::ElementProps;
+pub use ply_loader::{read_ply_file, ElementDesc as PlyElementDesc, PropertyValue as PlyPropertyValue};
+pub use ply_prop_type::ElementProps as PlyElementProps;

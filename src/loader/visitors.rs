@@ -18,6 +18,8 @@ pub trait Visitor {
     fn visit_shape_csg_substraction(self: &mut Self, node: &CSGShapeSubstractionNode);
     fn visit_shape_csg_union(self: &mut Self, node: &CSGShapeUnionNode);
     fn visit_shape_cylinder(self: &mut Self, node: &CylinderShapeNode);
+    fn visit_shape_mesh(self: &mut Self, node: &MeshShapeNode);
+
     fn visit_shape_plane(self: &mut Self, node: &PlaneShapeNode);
     fn visit_shape_rectangle(self: &mut Self, node: &RectangleShapeNode);
     fn visit_shape_sphere(self: &mut Self, node: &SphereShapeNode);

@@ -95,6 +95,24 @@ impl AABoxShapeNode {
     }
 }
 
+pub struct MeshShapeNode {
+    pub filename: String,
+}
+
+impl ShapeNode for MeshShapeNode {}
+
+impl Node for MeshShapeNode {
+    fn visit(self: &Self, visitor: &mut dyn Visitor) {
+        visitor.visit_shape_mesh(self);
+    }
+}
+
+impl MeshShapeNode {
+    pub fn new(filename: String) -> Self {
+        MeshShapeNode { filename: filename }
+    }
+}
+
 // csg
 
 pub struct CSGShapeElemNode {

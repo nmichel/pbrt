@@ -146,6 +146,7 @@ impl<'a> Parser<'a> {
             Some(Token::KWAABox) => self.parse_shape_aabox(),
             Some(Token::KWCSG) => self.parse_shape_csg(),
             Some(Token::KWCylinder) => self.parse_shape_cylinder(),
+            Some(Token::KWMesh) => self.parse_shape_mesh(),
             Some(Token::KWPlane) => self.parse_shape_plane(),
             Some(Token::KWRectangle) => self.parse_shape_rectangle(),
             Some(Token::KWSphere) => self.parse_shape_sphere(),
@@ -209,6 +210,15 @@ impl<'a> Parser<'a> {
             }
         }
         panic!("Expected cylinder");
+    }
+
+    fn parse_shape_mesh(self: &mut Self) -> Box<dyn ShapeNode> {
+        if let Token::KWFile = self.tokenizer.next_token().expect("Expected file") {
+            if let Token::String(filename) = self.tokenizer.next_token().expect("Expected filename") {
+                return Box::new(MeshShapeNode::new(filename));
+            }
+        }
+        panic!("Expected mesh file");
     }
 
     fn parse_shape_plane(self: &mut Self) -> Box<dyn ShapeNode> {
@@ -369,49 +379,49 @@ mod test {
                 transform {
                   translate -0.5 0 -0.5
                 }
-  
+
               elem
                 sphere 0.4
                 transform {
                   translate 0 0 -0.5
                 }
-        
+
               elem
                 sphere 0.4
                 transform {
                   translate 0.5 0 -0.5
                 }
-        
+
               elem
                 sphere 0.4
                 transform {
                   translate -0.5 0 0
                 }
-  
+
               elem
                 sphere 0.4
                 transform {
                   translate 0 0 0
                 }
-  
+
               elem
                 sphere 0.4
                 transform {
                   translate 0.5 0 0
                 }
-        
+
               elem
                 sphere 0.4
                 transform {
                   translate -0.5 0 0.5
                 }
-        
+
               elem
                 sphere 0.4
                 transform {
                   translate 0 0 0.5
                 }
-        
+
               elem
                 sphere 0.4
                 transform {

@@ -8,10 +8,12 @@ pub enum Token {
     KWDielectric,
     KWDiffuseLight,
     KWElem,
+    KWFile,
     KWFocalLength,
     KWIntersection,
     KWLook,
     KWMetal,
+    KWMesh,
     KWPos,
     KWPinHole,
     KWThinLens,
@@ -24,6 +26,7 @@ pub enum Token {
     Comment,
     SquareOpen,
     SquareClose,
+    String(String),
     ParenOpen,
     ParenClose,
     Number(f64),
@@ -58,11 +61,13 @@ impl<'a> From<&'a str> for Token {
             "dielectric" => Token::KWDielectric,
             "diffuse_light" => Token::KWDiffuseLight,
             "elem" => Token::KWElem,
+            "file" => Token::KWFile,
             "focal_length" => Token::KWFocalLength,
             "intersection" => Token::KWIntersection,
             "lambertian" => Token::KWLambertian,
             "look" => Token::KWLook,
             "metal" => Token::KWMetal,
+            "mesh" => Token::KWMesh,
             "object" => Token::KWObject,
             "pos" => Token::KWPos,
             "pin_hole" => Token::KWPinHole,
@@ -140,6 +145,7 @@ impl<'a> Tokenizer<'a> {
             }
             else {
                 match c {
+                    '"' => self.tokenize_string(),
                     '0'..='9' | '-' | '+' => self.tokenize_number(),
                     m if m.is_alphabetic() => self.tokenize_identifier(),
                     _ => None,
@@ -162,6 +168,25 @@ impl<'a> Tokenizer<'a> {
             '#' => Some(Token::Comment),
             _ => None,
         }
+    }
+
+    fn tokenize_string(self: &mut Self) -> Option<Token> {
+        self.next(); // skip the opening quote
+        let mut read_one_more = false;
+        let mut r = None;
+        if let Some(s) = self.take_while(|c| *c != '"') {
+            read_one_more = true;
+            r = Some(Token::String(s.to_string()));
+        }
+        else {
+            r = None;
+        }
+
+        if read_one_more {
+            self.next(); // skip the closing quote
+        }
+
+        r
     }
 
     fn tokenize_number(self: &mut Self) -> Option<Token> {
@@ -351,9 +376,9 @@ mod test {
 
     #[test]
     fn test_token_list() {
-        let input = "     
+        let input = "
 
-    hello world 
+    hello world
         bla_bla
           aabox 1.6 2.3 3.4
           cylinder 1.6
@@ -383,10 +408,10 @@ mod test {
 
     #[test]
     fn test_comment() {
-        let input = "     
+        let input = "
         # sphere comment
     sphere # end of line comment
-      Löf 
+      Löf
       # Comment alone";
 
         let mut tokenizer = Tokenizer::new(input);

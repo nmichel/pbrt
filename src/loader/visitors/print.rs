@@ -1,4 +1,5 @@
 use super::super::ast::*;
+use super::super::ply::{read_ply_file, PlyElementDesc, PlyElementProps, PlyEventObserver, PlyPropertyValue};
 use super::Visitor;
 
 pub struct PrintVisitor {
@@ -121,6 +122,24 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("sphere {}", node.radius));
     }
 
+    fn visit_shape_mesh(self: &mut Self, node: &MeshShapeNode) {
+        struct PlyObserver {}
+
+        impl PlyEventObserver for PlyObserver {
+            fn on_vertex_event(self: &mut Self, props: &PlyElementProps, value: PlyPropertyValue) {
+                println!("Vertex Event for Property: {:?} with Value: {:?}", props, value);
+            }
+
+            fn on_face_event(self: &mut Self, props: &PlyElementProps, value: PlyPropertyValue) {
+                println!("Face Event for Property: {:?} with Value: {:?}", props, value);
+            }
+        }
+
+        read_ply_file(&node.filename, &mut PlyObserver {}).unwrap();
+
+        self.stack.push(format!("mesh {}", node.filename));
+    }
+
     fn visit_material_dielectric(self: &mut Self, node: &DielectricMaterialNode) {
         let texture = self.stack.pop().unwrap();
         self.stack.push(format!("dielectric {} {}", node.index, texture));
@@ -189,6 +208,10 @@ mod test {
 
       object simple
         rectangle 255.0 123
+        lambertian color 0.1 0.8 0.4
+
+      object simple
+        mesh file \"./test_files/bun_zipper.ply\"
         lambertian color 0.1 0.8 0.4
     ";
 

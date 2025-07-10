@@ -2,6 +2,7 @@ use super::ply_data_type::PlyDataType;
 use super::ply_event_observer::PlyEventObserver;
 use super::ply_prop_type::ElementProps;
 
+use std::convert::TryFrom;
 use std::fs::File;
 use std::io::Read;
 
@@ -29,6 +30,18 @@ pub enum PropertyValue {
     ListUInt32(Vec<u32>),
     ListFloat32(Vec<f32>),
     ListFloat64(Vec<f64>),
+}
+
+impl TryFrom<&PropertyValue> for f64 {
+    type Error = &'static str;
+
+    fn try_from(value: &PropertyValue) -> Result<Self, Self::Error> {
+        match value {
+            PropertyValue::Float32(f) => Ok(*f as f64),
+            PropertyValue::Float64(f) => Ok(*f),
+            _ => Err("Cannot convert non-float value to f64"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -71,8 +84,6 @@ struct Builder {
     current_element_index: usize,
     current_element_count: usize,
 }
-
-type ElementParserFn = fn(&mut Builder, usize);
 
 impl Builder {
     fn new() -> Builder {
@@ -192,7 +203,7 @@ fn load_element_face(element_desc: &ElementDesc, segments: &Vec<&str>, observer:
     dispatch_event(element_desc, segments, observer, handler);
 }
 
-pub fn read_ply_file(path: &str, observer: &mut dyn PlyEventObserver) -> Result<Builder, &'static str> {
+pub fn read_ply_file(path: &str, observer: &mut dyn PlyEventObserver) -> Result<(), &'static str> {
     let mut f: File = File::open(path).unwrap();
     let mut buffer = String::new();
     f.read_to_string(&mut buffer).unwrap();
@@ -200,7 +211,7 @@ pub fn read_ply_file(path: &str, observer: &mut dyn PlyEventObserver) -> Result<
     read_ply_data(&buffer, observer)
 }
 
-pub fn read_ply_data(data: &str, observer: &mut dyn PlyEventObserver) -> Result<Builder, &'static str> {
+pub fn read_ply_data(data: &str, observer: &mut dyn PlyEventObserver) -> Result<(), &'static str> {
     let mut state = Builder::new();
 
     let res = data
@@ -216,7 +227,7 @@ pub fn read_ply_data(data: &str, observer: &mut dyn PlyEventObserver) -> Result<
 
     observer.on_data_complete();
 
-    Ok(state)
+    Ok(())
 }
 
 fn read_line<'a>(line: &'a str, state: &'a mut Builder, observer: &mut dyn PlyEventObserver) -> Result<&'a mut Builder, &'static str> {
