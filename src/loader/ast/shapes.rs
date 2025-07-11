@@ -97,6 +97,7 @@ impl AABoxShapeNode {
 
 pub struct MeshShapeNode {
     pub filename: String,
+    pub reverse: bool,
 }
 
 impl ShapeNode for MeshShapeNode {}
@@ -109,7 +110,14 @@ impl Node for MeshShapeNode {
 
 impl MeshShapeNode {
     pub fn new(filename: String) -> Self {
-        MeshShapeNode { filename: filename }
+        MeshShapeNode {
+            filename: filename,
+            reverse: false,
+        }
+    }
+
+    pub fn set_reverse(&mut self, reverse: bool) {
+        self.reverse = reverse;
     }
 }
 

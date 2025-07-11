@@ -29,9 +29,14 @@ scene
       translate 0 0.0 -2.0
     }
 
-  object simple
-    mesh file "test_files/cube_2.ply"
-    dielectric 1.5 color 0 0.6470588235294118 1
+  object transformed
+    object simple
+        mesh file "test_files/cube.ply" reverse
+        dielectric 1.5 color 0 0.6470588235294118 1
+    transform {
+      rotate_x 0.707
+      rotate_y 0.707
+    }
 
   # light source
   object transformed

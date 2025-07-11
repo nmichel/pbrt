@@ -19,6 +19,7 @@ use crate::textures::*;
 struct PlyObserver {
     vertices: Vec<f64>,
     faces: Vec<usize>,
+    reverse: bool,
 }
 
 impl PlyEventObserver for PlyObserver {
@@ -40,14 +41,21 @@ impl PlyEventObserver for PlyObserver {
     fn on_face_start(&mut self) {}
 
     fn on_face_event(self: &mut Self, props: &PlyElementProps, value: PlyPropertyValue) {
-        fn push_to_faces<T>(list: &[T], faces: &mut Vec<usize>)
+        fn push_to_faces<T>(list: &[T], faces: &mut Vec<usize>, reverse: bool)
         where
             usize: TryFrom<T>,
             T: Copy,
             <usize as TryFrom<T>>::Error: Debug,
         {
-            for index in list {
-                faces.push(usize::try_from(*index).unwrap());
+            if reverse {
+                for index in list.iter().rev() {
+                    faces.push(usize::try_from(*index).unwrap());
+                }
+            }
+            else {
+                for index in list.iter() {
+                    faces.push(usize::try_from(*index).unwrap());
+                }
             }
         }
 
@@ -55,10 +63,10 @@ impl PlyEventObserver for PlyObserver {
             PlyElementProps::FaceVertexIndices => {
                 match value {
                     PlyPropertyValue::ListUInt32(list) => {
-                        push_to_faces(&list[..], &mut self.faces);
+                        push_to_faces(&list[..], &mut self.faces, self.reverse);
                     }
                     PlyPropertyValue::ListInt32(list) => {
-                        push_to_faces(&list[..], &mut self.faces);
+                        push_to_faces(&list[..], &mut self.faces, self.reverse);
                     }
                     _ => {}
                 }
@@ -222,6 +230,7 @@ impl Visitor for SceneBuilderVisitor<'_> {
         let mut observer = PlyObserver {
             vertices: Vec::new(),
             faces: Vec::new(),
+            reverse: node.reverse,
         };
 
         read_ply_file(&node.filename, &mut observer).unwrap();

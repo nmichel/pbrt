@@ -215,7 +215,13 @@ impl<'a> Parser<'a> {
     fn parse_shape_mesh(self: &mut Self) -> Box<dyn ShapeNode> {
         if let Token::KWFile = self.tokenizer.next_token().expect("Expected file") {
             if let Token::String(filename) = self.tokenizer.next_token().expect("Expected filename") {
-                return Box::new(MeshShapeNode::new(filename));
+                let mut r = Box::new(MeshShapeNode::new(filename));
+                match self.tokenizer.next_token() {
+                    Some(Token::KWReverse) => r.set_reverse(true),
+                    Some(token) => self.tokenizer.take_back(token),
+                    _ => {}
+                }
+                return r;
             }
         }
         panic!("Expected mesh file");

@@ -36,6 +36,7 @@ pub enum Token {
     KWPlane,
     KWRadius,
     KWRectangle,
+    KWReverse,
     KWSimple,
     KWTransform,
     KWTransformed,
@@ -53,6 +54,7 @@ impl<'a> From<&'a str> for Token {
         match other {
             "aabox" => Token::KWAABox,
             "camera" => Token::KWCamera,
+            "reverse" => Token::KWReverse,
             "checkerboard" => Token::KWCheckerboard,
             "color" => Token::KWColor,
             "csg" => Token::KWCSG,
