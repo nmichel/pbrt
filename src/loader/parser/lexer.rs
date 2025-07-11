@@ -105,6 +105,7 @@ pub struct Tokenizer<'a> {
     pos: usize,
     line: usize,
     col: usize,
+    store: Option<Token>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -116,6 +117,7 @@ impl<'a> Tokenizer<'a> {
             pos: 0,
             line: 0,
             col: 0,
+            store: None,
         }
     }
 
@@ -126,8 +128,34 @@ impl<'a> Tokenizer<'a> {
     /// * `self` - The tokenizer
     /// ```
     pub fn next_token(self: &mut Self) -> Option<Token> {
+        if let Some(token) = self.store.take() {
+            self.store = None;
+            return Some(token);
+        }
+
         self.skip_whitespace();
         self.parse_next_token()
+    }
+
+    /// Pushes a token back into the tokenizer's internal store.
+    ///
+    /// This allows a previously returned token to be "un-read" so that it will be returned again
+    /// on the next call to `next_token`. Only one token can be stored at a time; attempting to
+    /// push back a token when one is already stored will cause a panic.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a token is already stored in the tokenizer.
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - The `Token` to be pushed back into the tokenizer.
+    pub fn take_back(self: &mut Self, token: Token) {
+        if self.store.is_some() {
+            panic!("A token is already stored !")
+        }
+
+        self.store = Some(token);
     }
 
     fn parse_next_token(self: &mut Self) -> Option<Token> {
