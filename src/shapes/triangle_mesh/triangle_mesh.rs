@@ -4,6 +4,7 @@ use crate::geom::ray::Ray;
 use crate::geom::vector2::Vector2f;
 use crate::geom::vector3::{self, Vector3f};
 use crate::shapes::Shape;
+use std::sync::Arc;
 
 use super::bvh::{Accumulator, BVHTree};
 
@@ -26,14 +27,16 @@ impl Accumulator for TriangleAccumulator {
 pub struct TriangleMesh {
     bvh: BVHTree,
     indices: Vec<usize>,
-    vertices: Vec<f64>,
+    vertices: Arc<Vec<f64>>,
     normals: Option<Vec<f64>>,
     uvs: Option<Vec<f64>>,
 }
 
 impl TriangleMesh {
     pub fn new(vertices: Vec<f64>, indices: Vec<usize>, normals: Option<Vec<f64>>, uvs: Option<Vec<f64>>) -> Self {
-        let bvh = BVHTree::new(&vertices, &indices);
+        let vertices = Arc::new(vertices);
+        let mut bvh = BVHTree::new(Arc::clone(&vertices), &indices);
+        bvh.build();
 
         Self {
             bvh,
@@ -53,14 +56,9 @@ static DEFAULT_UV2: Vector2f = Vector2f { x: 1.0, y: 1.0 };
 
 impl Intersectable for TriangleMesh {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
-        let mut acc: TriangleAccumulator = TriangleAccumulator::new();
-        self.bvh.query(ray, near, far, &mut acc);
+        if let Some((intersection, current_tri_idx)) = self.bvh.query(ray, near, far) {
+            let base = current_tri_idx * 3;
 
-        let mut min_t = f64::MAX;
-        let mut res: Box<IntersectionResult> = Box::new(IntersectionResult::new());
-
-        for i in 0..acc.triangles.len() {
-            let base = acc.triangles[i];
             // Triangle vertices indices in data arrays
             let i0 = self.indices[base] as usize;
             let i1 = self.indices[base + 1] as usize;
@@ -75,22 +73,6 @@ impl Intersectable for TriangleMesh {
             let p0 = Vector3f::new(coords[ip0], coords[ip0 + 1], coords[ip0 + 2]);
             let p1 = Vector3f::new(coords[ip1], coords[ip1 + 1], coords[ip1 + 2]);
             let p2 = Vector3f::new(coords[ip2], coords[ip2 + 1], coords[ip2 + 2]);
-
-            let intersection_opt = intersect_ray(ray, &p0, &p1, &p2);
-            if intersection_opt.is_none() {
-                continue;
-            }
-
-            // Compute the intersection point (if any)
-            let intersection: TriangleIntersection = intersection_opt.unwrap();
-
-            if intersection.t < near || intersection.t > far {
-                continue; // Intersection is outside the ray segment
-            }
-
-            if intersection.t >= min_t {
-                continue;
-            }
 
             let hit = &ray.origin + &(&ray.direction * intersection.t);
 
@@ -127,11 +109,11 @@ impl Intersectable for TriangleMesh {
                 dpdv,
             });
 
-            res = Box::new(result);
-            min_t = intersection.t;
+            result
         }
-
-        *res
+        else {
+            return IntersectionResult::new();
+        }
     }
 
     fn contain_point(&self, _point: &Vector3f) -> bool {
@@ -165,14 +147,14 @@ impl AABound for TriangleMesh {
     }
 }
 
-struct TriangleIntersection {
-    t: f64,
-    u: f64,
-    v: f64,
-    w: f64,
+pub struct TriangleIntersection {
+    pub t: f64,
+    pub u: f64,
+    pub v: f64,
+    pub w: f64,
 }
 
-fn intersect_ray(ray: &Ray, p0: &Vector3f, p1: &Vector3f, p2: &Vector3f) -> Option<TriangleIntersection> {
+pub fn intersect_ray(ray: &Ray, p0: &Vector3f, p1: &Vector3f, p2: &Vector3f) -> Option<TriangleIntersection> {
     // Möller–Trumbore algorithm for ray-triangle intersection
     // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     //

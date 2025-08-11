@@ -1,3 +1,5 @@
+use num_traits::Float;
+
 use super::ray::Ray;
 use super::transform::{Transform, Transformable};
 use super::vector3::Vector3f;
@@ -16,6 +18,13 @@ pub trait AABound {
 }
 
 impl AABoundingBox {
+    pub fn new_invalid() -> Self {
+        Self {
+            bmin: Vector3f::max(),
+            bmax: Vector3f::min(),
+        }
+    }
+
     pub fn new(lower: &Vector3f, higher: &Vector3f) -> Self {
         let mut diff = higher - lower;
         diff.x = diff.x.max(0.01);
@@ -27,12 +36,17 @@ impl AABoundingBox {
         }
     }
 
+    pub fn half_area(&self) -> f64 {
+        let d = self.bmax - self.bmin;
+        d.x * d.y + d.y * d.z + d.z * d.x
+    }
+
     pub fn centroid(&self) -> Vector3f {
         (self.bmax + self.bmin) * 0.5
     }
 
     /// Borrowed from https://raytracing.github.io/books/RayTracingTheNextWeek.html#boundingvolumehierarchies
-    pub fn hit(&self, ray: &Ray, mut tmin: f64, mut tmax: f64) -> bool {
+    pub fn hit(&self, ray: &Ray, mut tmin: f64, mut tmax: f64) -> Option<f64> {
         for i in 0..3 {
             let inv_dir = 1.0 / ray.direction[i];
             let mut t0 = (self.bmin[i] - ray.origin[i]) * inv_dir;
@@ -44,10 +58,10 @@ impl AABoundingBox {
             tmax = f64::min(t1, tmax);
 
             if tmax <= tmin {
-                return false;
+                return None;
             }
         }
-        true
+        Some(tmin)
     }
 
     /// Update self such as it encompass itself and other.
@@ -157,7 +171,12 @@ mod tests {
         ];
 
         for (ray, expected_res) in tests.iter() {
-            assert_eq!(bbox.hit(&ray, 0.0, 1000.0), *expected_res);
+            if *expected_res {
+                assert!(bbox.hit(ray, 0.0, 1000.0).is_some(), "Ray {:?} should hit the bounding box", ray);
+            }
+            else {
+                assert!(bbox.hit(ray, 0.0, 1000.0).is_none(), "Ray {:?} should not hit the bounding box", ray);
+            }
         }
     }
 }

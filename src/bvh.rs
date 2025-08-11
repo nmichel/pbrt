@@ -54,7 +54,7 @@ impl<T: AABound + Clone> BVHNode<T> {
     }
 
     pub fn query(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
-        if !self.aabbox.hit(ray, near, far) {
+        if self.aabbox.hit(ray, near, far).is_none() {
             return;
         }
 

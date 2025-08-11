@@ -49,15 +49,15 @@ impl<T> Vector3<T> {
 }
 
 impl Vector3<f64> {
-    pub const fn zero() -> Self {
+    pub fn zero() -> Self {
         Self::new(0.0, 0.0, 0.0)
     }
 
-    pub const fn min() -> Self {
+    pub fn min() -> Self {
         Self::new(f64::MIN, f64::MIN, f64::MIN)
     }
 
-    pub const fn max() -> Self {
+    pub fn max() -> Self {
         Self::new(f64::MAX, f64::MAX, f64::MAX)
     }
 
@@ -94,7 +94,7 @@ impl Vector3<f64> {
 
     /// Update each compoment of self with respect to other, such as
     /// each compoment is the minimum found in self or other.
-    ///  
+    ///
     /// # Example
     /// ```
     /// use pbrt::geom::vector3::Vector3f;
@@ -114,7 +114,7 @@ impl Vector3<f64> {
 
     /// Update each compoment of self with respect to other, such as
     /// each compoment is the maximum found in self or other.
-    ///  
+    ///
     /// # Example
     /// ```
     /// use pbrt::geom::vector3::Vector3f;
