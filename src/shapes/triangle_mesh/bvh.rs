@@ -101,38 +101,24 @@ impl BVHTree {
     }
 
     fn subdivide(&mut self, node_idx: usize) {
-        // Clone node data needed for split search
-        // Do not keep a reference to the node, as it may be moved in memory
-        // (and thus compiler does not allow mutable borrow)
-        let (left_first, tri_count, bbox) = {
-            let node = &self.nodes[node_idx];
-            (node.left_first, node.tri_count, node.bbox)
-        };
+        let node = &self.nodes[node_idx];
 
-        let mut best_axis = 0;
-        let mut best_pos = 0.0;
-        let mut best_cost = f64::MAX;
-
-        // Extensively search for the best split
-        for axis in 0..3 {
-            for i in left_first..(left_first + tri_count) {
-                let tri = &self.tris[self.tri_idx[i]];
-                let candidate_pos = tri.centroid[axis];
-                let cost = self.evaluate_sah(node_idx, axis, candidate_pos);
-                if cost < best_cost {
-                    best_cost = cost;
-                    best_axis = axis;
-                    best_pos = candidate_pos;
-                }
-            }
-        }
+        // Find the best split plane for the current node
+        let (best_axis, best_pos, best_cost) = self.find_best_split_plane(node);
 
         // Check that splitting is worth it
-        let current_area = bbox.half_area();
-        let current_cost = current_area * tri_count as f64;
+        let current_cost = self.calculate_node_cost(node);
         if best_cost >= current_cost {
             return; // splitting is not worth it
         }
+
+        // Clone node data needed for split search
+        // Do not keep a reference to the node, as it may be moved in memory
+        // (and thus compiler does not allow mutable borrow)
+        let (left_first, tri_count, _bbox) = {
+            let node = &self.nodes[node_idx];
+            (node.left_first, node.tri_count, node.bbox)
+        };
 
         // In place triangle set partitioning with respect to the best axis and position
         let mut i = left_first;
@@ -182,9 +168,7 @@ impl BVHTree {
         self.subdivide(left_node_idx + 1);
     }
 
-    fn evaluate_sah(&self, node_idx: usize, axis: usize, pos: f64) -> f64 {
-        let node = &self.nodes[node_idx];
-
+    fn evaluate_sah(&self, node: &BVHNode, axis: usize, pos: f64) -> f64 {
         let mut left_box: AABoundingBox = AABoundingBox::new_invalid();
         let mut right_box: AABoundingBox = AABoundingBox::new_invalid();
         let mut left_count: usize = 0;
@@ -302,5 +286,36 @@ impl BVHTree {
         centroid += vertex2;
         centroid *= 1.0 / 3.0;
         centroid
+    }
+
+    /// Finds the best split plane for the given node.
+    /// Returns (best_axis, best_pos, best_cost).
+    fn find_best_split_plane(&self, node: &BVHNode) -> (usize, f64, f64) {
+        let left_first = node.left_first;
+        let tri_count = node.tri_count;
+
+        let mut best_axis = 0;
+        let mut best_pos = 0.0;
+        let mut best_cost = f64::MAX;
+
+        for axis in 0..3 {
+            for i in left_first..(left_first + tri_count) {
+                let tri = &self.tris[self.tri_idx[i]];
+                let candidate_pos = tri.centroid[axis];
+                let cost = self.evaluate_sah(node, axis, candidate_pos);
+                if cost < best_cost {
+                    best_cost = cost;
+                    best_axis = axis;
+                    best_pos = candidate_pos;
+                }
+            }
+        }
+        (best_axis, best_pos, best_cost)
+    }
+
+    /// Calculates the cost of the current node by node_idx.
+    fn calculate_node_cost(&self, node: &BVHNode) -> f64 {
+        let current_area = node.bbox.half_area();
+        current_area * node.tri_count as f64
     }
 }
