@@ -6,23 +6,7 @@ use crate::geom::vector3::{self, Vector3f};
 use crate::shapes::Shape;
 use std::sync::Arc;
 
-use super::bvh::{Accumulator, BVHTree};
-
-struct TriangleAccumulator {
-    triangles: Vec<usize>,
-}
-
-impl TriangleAccumulator {
-    pub fn new() -> Self {
-        Self { triangles: Vec::new() }
-    }
-}
-
-impl Accumulator for TriangleAccumulator {
-    fn accumulate(&mut self, items: &Vec<usize>) -> () {
-        self.triangles.extend(items)
-    }
-}
+use super::bvh::BVHTree;
 
 pub struct TriangleMesh {
     bvh: BVHTree,

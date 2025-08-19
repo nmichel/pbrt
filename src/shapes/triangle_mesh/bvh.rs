@@ -5,10 +5,6 @@ use crate::geom::vector3::Vector3f;
 use std::sync::Arc;
 use std::vec;
 
-pub trait Accumulator {
-    fn accumulate(&mut self, items: &Vec<usize>) -> ();
-}
-
 struct BVHNode {
     bbox: AABoundingBox,
     left_first: usize,
