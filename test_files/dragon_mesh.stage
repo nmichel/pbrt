@@ -1,0 +1,50 @@
+camera pin_hole
+  pos 0.0 0.1 0.2
+  look 0.0 0.1 0.0
+  up 0.0 0.1 0.0
+
+scene
+  # floor
+  object transformed
+    object simple
+      rectangle 3 3
+      lambertian checkerboard
+        0.65 0.0 0.0
+        0.65 0.65 0.65
+        2.0
+    transform {
+      translate 0 -0.6 0
+    }
+
+  # wall
+  object transformed
+    object simple
+      rectangle 3 3
+      lambertian checkerboard
+        0.65 0.0 0.0
+        0.65 0.65 0.65
+        2.0
+    transform {
+      rotate_x 1.5708
+      translate 0 0.0 -2.0
+    }
+
+  object transformed
+    object simple
+        mesh file "test_files/dragon_vrip.ply" reverse
+        metal 0.0 color 0.9 0.9 0.9
+        # dielectric 1.5 color 1.0 1.0 1.0
+    transform {
+      translate 0.0 -0.05 0.0
+      rotate_y 0.707
+    }
+
+  # light source
+  object transformed
+    object simple
+      rectangle 3 3
+      diffuse_light color 5.0 5.0 5.0
+    transform {
+      rotate_y 3.1416
+      translate 0.0 3.0 0.0
+    }
