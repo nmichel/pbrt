@@ -3,6 +3,7 @@ use crate::geom::aabound::AABoundingBox;
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 use std::sync::Arc;
+use std::vec;
 
 pub trait Accumulator {
     fn accumulate(&mut self, items: &Vec<usize>) -> ();
@@ -34,6 +35,12 @@ pub struct BVHTree {
     nodes: Vec<BVHNode>,
     vertices: Arc<Vec<f64>>,
     next_node_idx: usize,
+}
+
+#[derive(Copy, Clone)]
+struct Bin {
+    bounds: AABoundingBox,
+    tri_count: usize,
 }
 
 impl BVHTree {
@@ -123,7 +130,7 @@ impl BVHTree {
         // In place triangle set partitioning with respect to the best axis and position
         let mut i = left_first;
         let mut j = i + tri_count - 1;
-        while i <= j {
+        while i <= j && j != usize::MAX {
             if self.tris[self.tri_idx[i]].centroid[best_axis] < best_pos {
                 i += 1;
             }
@@ -291,22 +298,68 @@ impl BVHTree {
     /// Finds the best split plane for the given node.
     /// Returns (best_axis, best_pos, best_cost).
     fn find_best_split_plane(&self, node: &BVHNode) -> (usize, f64, f64) {
-        let left_first = node.left_first;
-        let tri_count = node.tri_count;
-
+        let mut best_cost = f64::MAX;
         let mut best_axis = 0;
         let mut best_pos = 0.0;
-        let mut best_cost = f64::MAX;
 
         for axis in 0..3 {
-            for i in left_first..(left_first + tri_count) {
+            let mut bound_min: f64 = f64::MAX;
+            let mut bound_max: f64 = f64::MIN;
+            for i in node.left_first..(node.left_first + node.tri_count) {
                 let tri = &self.tris[self.tri_idx[i]];
                 let candidate_pos = tri.centroid[axis];
-                let cost = self.evaluate_sah(node, axis, candidate_pos);
-                if cost < best_cost {
-                    best_cost = cost;
+                bound_min = bound_min.min(candidate_pos);
+                bound_max = bound_max.max(candidate_pos);
+            }
+            if bound_min == bound_max {
+                continue; // No valid split
+            }
+
+            let scale = (bound_max - bound_min) / 8.0;
+            let mut bins: [Bin; 8] = [Bin {
+                bounds: AABoundingBox::new_invalid(),
+                tri_count: 0,
+            }; 8];
+
+            for i in node.left_first..(node.left_first + node.tri_count) {
+                let tri = &self.tris[self.tri_idx[i]];
+                let candidate_pos = tri.centroid[axis];
+                let bin_idx = (((candidate_pos - bound_min) / scale).floor() as usize).clamp(0, 7);
+                let bin = &mut bins[bin_idx];
+                bin.bounds
+                    .combine_with(&self.aabound_from_triangle(tri.vertex0_idx, tri.vertex1_idx, tri.vertex2_idx));
+                bin.tri_count += 1;
+            }
+
+            let mut left_areas = vec![0.0; 7];
+            let mut right_areas = vec![0.0; 7];
+            let mut left_count = vec![0; 7];
+            let mut right_count = vec![0; 7];
+            let mut left_box: AABoundingBox = AABoundingBox::new_invalid();
+            let mut right_box: AABoundingBox = AABoundingBox::new_invalid();
+            let mut left_sum = 0;
+            let mut right_sum = 0;
+            for i in 0..7 {
+                let left_bin = &bins[i];
+                left_sum += left_bin.tri_count;
+                left_count[i] = left_sum;
+                left_box.combine_with(&left_bin.bounds);
+                left_areas[i] = left_bin.bounds.half_area();
+
+                let right_bin = &bins[7 - i];
+                right_sum += right_bin.tri_count;
+                right_count[6 - i] = right_sum;
+                right_box.combine_with(&right_bin.bounds);
+                right_areas[6 - i] = right_bin.bounds.half_area();
+            }
+
+            let inv_scale = (bound_max - bound_min) / 8.0;
+            for i in 0..7 {
+                let plane_cost = left_areas[i] * left_count[i] as f64 + right_areas[i] * right_count[i] as f64;
+                if plane_cost < best_cost {
+                    best_cost = plane_cost;
                     best_axis = axis;
-                    best_pos = candidate_pos;
+                    best_pos = bound_min + (i as f64) * inv_scale;
                 }
             }
         }
