@@ -63,9 +63,15 @@ impl Intersectable for Rectangle {
 }
 
 impl AABound for Rectangle {
+    /// The rectangle lies in the y = 0 plane, so its bound is flat along y.
+    ///
+    /// It used to be padded to y ∈ [-1, 1] — a two-unit-thick box around a surface with no
+    /// thickness — to work around `AABoundingBox::hit` rejecting degenerate slabs. That
+    /// test now reports tangential hits, so the faithful bound is both correct and a much
+    /// tighter fit for the acceleration structure.
     fn get_bounding_box(&self) -> AABoundingBox {
-        let bmin = Vector3f::new(-self.half_width, -1.0, -self.half_height);
-        let bmax = Vector3f::new(self.half_width, 1.0, self.half_height);
+        let bmin = Vector3f::new(-self.half_width, 0.0, -self.half_height);
+        let bmax = Vector3f::new(self.half_width, 0.0, self.half_height);
         AABoundingBox::new(&bmin, &bmax)
     }
 }
