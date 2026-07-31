@@ -33,20 +33,114 @@ departure from a physical model, (3) is a prerequisite to *validating* (2) and (
 ### BVH — mesh (the branch's current subject)
 
 - [ ] **SAH cost is computed from the wrong box.**
-      [bvh.rs:343](src/shapes/triangle_mesh/bvh.rs#L343) and
-      [bvh.rs:349](src/shapes/triangle_mesh/bvh.rs#L349) use `left_bin.bounds.half_area()`
+      [bvh.rs:457](src/shapes/triangle_mesh/bvh.rs#L457) and
+      [bvh.rs:463](src/shapes/triangle_mesh/bvh.rs#L463) use `left_bin.bounds.half_area()`
       — the area of the *single* bin — where the SAH needs the area of the union of all
       bins on that side of the plane. `left_box`/`right_box` are accumulated correctly at
-      [bvh.rs:334](src/shapes/triangle_mesh/bvh.rs#L334) and then never read. The cost
+      [bvh.rs:448](src/shapes/triangle_mesh/bvh.rs#L448) and then never read. The cost
       being minimised is therefore not the SAH, and the chosen splits are not the best
       ones. Affects tree quality only, not the image.
 - [ ] **First candidate plane is degenerate.**
-      [bvh.rs:358](src/shapes/triangle_mesh/bvh.rs#L358): `best_pos = bound_min + i * inv_scale`
+      [bvh.rs:472](src/shapes/triangle_mesh/bvh.rs#L472): `best_pos = bound_min + i * inv_scale`
       with `i` starting at 0 puts the first plane exactly on `bound_min`, so the left side
       is empty; the `left_count == 0` guard then returns and subdivision stops early. The
       boundary of bin `i` is at `bound_min + (i + 1) * scale`.
 - [ ] `evaluate_sah` is dead code (build warning) — the binned path replaced it. Remove or
       keep as the reference implementation a test can check the binned version against.
+      If kept as the oracle it needs fixing first: it returns `f64::MAX` when the cost is
+      `0.0`, commented "Avoid division by zero" although it performs no division — a
+      leftover from a version normalised by `A_node`. A zero cost is legitimate (a flat box,
+      or every triangle on one side), so the oracle currently rejects valid splits too.
+- [ ] **Each node's box is tested twice.** The traversal tests a child's box before pushing
+      it ([bvh.rs:319-320](src/shapes/triangle_mesh/bvh.rs#L319-L320)) and tests the same box
+      again after popping it ([bvh.rs:294](src/shapes/triangle_mesh/bvh.rs#L294)). Visible
+      in the baseline: box tests per ray runs at 2.2× nodes visited per ray. Either push the
+      distance alongside the index, or drop the pre-push test and let the pop handle it.
+- [ ] **An empty mesh makes the build recurse into a node that does not exist.** `build`
+      leaves a root with `tri_count == 0`, which `is_leaf` reports as an interior node, so
+      every walk of the tree — `subdivide`, and now `build_stats` — follows `left_first` into
+      an empty `nodes`. Same family as the `BVHNode::new`-on-empty-vector defect listed
+      under *BVH — scene*: emptiness is not represented anywhere.
+
+#### Baseline — 2026-07-30
+
+Instrumentation is in place: `TraversalStats` and `BuildStats` in
+[bvh.rs](src/shapes/triangle_mesh/bvh.rs), exposed through
+`TriangleMesh::intersect_instrumented` / `build_stats`, driven by
+[src/bin/bvh_stats.rs](src/bin/bvh_stats.rs). The ray set is the primary rays of 6 pinhole
+cameras on a deterministic orbit, 200×200 each — 240 000 rays, no RNG, reproducible to the
+unit.
+
+```
+cargo run --release --bin bvh_stats -- test_files/<mesh>.ply
+```
+
+| mesh | tris | nodes (leaves) | depth | leaf tris mean / max | nodes/ray | box tests/ray | **tri tests/ray** |
+|---|---|---|---|---|---|---|---|
+| `cube.ply` | 12 | 1 (1) | 1 | 12.0 / 12 | 1.00 | 1.00 | 5.80 |
+| `bun_zipper_res4.ply` | 948 | 3 (2) | 2 | 474.0 / 716 | 1.51 | 2.45 | 254.41 |
+| `bunny.ply` | 69 451 | 121 (61) | 14 | 1138.5 / 37 469 | 2.63 | 5.80 | 7464.08 |
+| `dragon_vrip_res4.ply` | 11 102 | 351 (176) | 19 | 63.1 / 3143 | 3.20 | 7.36 | 517.28 |
+| `dragon_vrip_res3.ply` | 47 794 | 1021 (511) | 22 | 93.5 / 15 949 | 2.98 | 6.68 | 3622.88 |
+| `dragon_vrip.ply` | 871 414 | 2301 (1151) | 27 | 757.1 / 316 949 | 2.89 | 6.45 | 66 649.36 |
+
+Hit rate is 18–20 % on the organic meshes, 48 % on the cubes, so the averages are over ray
+sets that really do reach the geometry.
+
+**What the numbers say.** The tree barely filters anything: on the full dragon a ray is
+charged 66 649 triangle tests, i.e. **7.6 % of the whole mesh**, and a single leaf holds
+316 949 of the 871 414 triangles — 36 % of the model. `cube.ply` is not subdivided at all
+(1 node). Subdivision stops almost immediately, which is the signature of the degenerate
+first candidate plane: `best_pos = bound_min` leaves the left side empty, the
+`left_count == 0` guard returns, and the node stays a leaf. The two defects compound — the
+cost being minimised is not the SAH, and the winning plane is unusable.
+
+For scale: 240 000 primary rays against `dragon_vrip.ply` take **2 min 17 s**. A correct
+binned SAH should bring triangle tests per ray down to the tens.
+
+**Ray set caveat.** Primary rays only, and they are coherent. Secondary rays start anywhere
+and point everywhere and stress a tree differently; measuring those needs the seeded
+sampler (item 3 of the order of work). So this baseline tracks the right direction but
+understates the gain.
+
+#### How to go about it
+
+**Prerequisite, satisfied.** `half_area` now reports the true area (commit `6211906`).
+Before that every box was inflated to a 0.01 minimum extent per axis, so repairing the
+accumulation alone would have left the cost wrong anyway.
+
+**Measure first — done.** See the baseline above. Re-run `bvh_stats` over the same meshes
+after every change to the build and put the before/after figures in the commit message.
+
+**Four traps, all verified while reviewing:**
+
+- **`new_invalid().half_area()` is `+inf`.** `bmax - bmin` overflows to `-inf`, so the sum
+  of products comes back `+inf`. Two consequences, and the second is the one that bites:
+  an *accumulated* side that is still empty gives `inf * 0 = NaN`, and `NaN < best_cost` is
+  false, so the candidate is dropped — which is the outcome one wants, by accident. But with
+  the areas read per bin as they are today, **any** empty bin poisons its candidate with
+  `inf * N = +inf`, count non-zero or not. So it is not a rare NaN edge case: every plane
+  whose bin happens to be empty is discarded, which biases the choice systematically.
+  Fix both properly: reject empty sides explicitly,
+  `left_count[i] == 0 || right_count[i] == 0`, and make the empty box report an area of `0`
+  rather than `+inf` — the area of the empty set is zero, and `AABoundingBox` currently has
+  no way to say "empty" at all (see the empty-mesh and empty-scene defects above).
+- **`inv_scale` is misnamed.** It holds the bin width `(bound_max - bound_min) / 8`,
+  identical to the `scale` computed a few lines above, and is the inverse of nothing. The
+  misnomer is very likely what made `bound_min + i * inv_scale` read as plausible. Rename
+  it and drop the duplicate.
+- **Keep the cost convention.** `find_best_split_plane` returns `A_L·N_L + A_R·N_R` and
+  `subdivide` compares it against `calculate_node_cost` = `A_node·N`. Neither is normalised
+  by `A_node`, so the comparison is consistent as it stands — changing one side alone
+  silently redefines the "is splitting worth it" test.
+- **`next_node_idx` duplicates `nodes.len()`.** They stay in step only because every
+  `push` happens to be paired with an increment. Worth collapsing while in the area.
+
+**Documentation expected**, per `CLAUDE.md` §4: the SAH is a concept, so the surface-area
+heuristic itself should be derived in the doc comment — why cost goes as area × primitive
+count, what the probability argument behind it is, and why the areas must be those of the
+*unions* either side of the plane rather than of the individual bins. That derivation is
+precisely what would have made the current bug visible on reading.
 
 ### BVH — scene
 

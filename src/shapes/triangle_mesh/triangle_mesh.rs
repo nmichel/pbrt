@@ -6,7 +6,7 @@ use crate::geom::vector3::{self, Vector3f};
 use crate::shapes::Shape;
 use std::sync::Arc;
 
-use super::bvh::BVHTree;
+use super::bvh::{BVHTree, BuildStats, TraversalStats};
 
 pub struct TriangleMesh {
     bvh: BVHTree,
@@ -29,6 +29,28 @@ impl TriangleMesh {
             normals,
             uvs,
         }
+    }
+
+    /// Distance to the nearest intersection of `ray` with the mesh, adding the work the
+    /// acceleration structure did to `stats`.
+    ///
+    /// This exists to measure the tree, not to render: it skips the shading quantities
+    /// `Intersectable::intersect` derives, which are independent of tree quality and would
+    /// only dilute the measurement. Both go through the same traversal.
+    pub fn intersect_instrumented(&self, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> Option<f64> {
+        self.bvh
+            .query_instrumented(ray, near, far, stats)
+            .map(|(intersection, _tri_idx)| intersection.t)
+    }
+
+    /// Number of triangles in the mesh.
+    pub fn triangle_count(&self) -> usize {
+        self.bvh.triangle_count()
+    }
+
+    /// Description of the acceleration structure the build produced over the mesh.
+    pub fn build_stats(&self) -> BuildStats {
+        self.bvh.build_stats()
     }
 }
 

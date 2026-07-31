@@ -5,6 +5,66 @@ use crate::geom::vector3::Vector3f;
 use std::sync::Arc;
 use std::vec;
 
+/// Work counters for traversals of the tree.
+///
+/// The quality of a BVH is invisible in the rendered image: a poor split plane produces
+/// exactly the same picture, only more slowly. These counters are therefore the only
+/// observable against which a change to the split heuristic can be judged.
+///
+/// They are exactly reproducible for a given set of rays — a traversal draws no random
+/// numbers — which is why tree quality can be measured today, while the sampler is still
+/// unseeded and every lighting result is still statistical.
+///
+/// Read them as work *per ray*: accumulate over a ray set, then divide by its size.
+#[derive(Default, Clone, Copy)]
+pub struct TraversalStats {
+    /// Nodes taken off the traversal stack.
+    pub nodes_visited: usize,
+
+    /// Ray/box tests. Deliberately counted apart from `nodes_visited`, because the
+    /// traversal does not perform one test per visited node: it tests a child's box
+    /// before pushing it and tests the same box again after popping it. The two figures
+    /// are not interchangeable, and only this one reflects the cost actually paid.
+    pub box_tests: usize,
+
+    /// Ray/triangle tests, i.e. calls to `intersect_ray`. This is the figure a better
+    /// tree is meant to bring down: it counts the primitives the tree failed to exclude.
+    pub triangle_tests: usize,
+}
+
+/// Exact description of the tree the build produced.
+///
+/// The counterpart of [`TraversalStats`], and read differently: this is a complete reading
+/// of a single tree, taken once after `build`, whereas traversal counters are summed over a
+/// ray set and reported per ray. Nothing here is averaged or accumulated — hence the
+/// prefix, which names the moment of the BVH's life being described rather than the
+/// quantity.
+///
+/// [`TraversalStats`] says how much work a ray did; this says why it did it.
+///
+/// A tree that is deep but has few triangles in its leaves is not the same as one that is
+/// shallow but has many triangles in its leaves.
+///
+/// A heuristic that lowers the traversal counters while doubling the depth, or
+/// that leaves 200-triangle leaves behind, is not the same improvement as one that does
+/// neither — and only these figures tell the two apart.
+#[derive(Default, Clone, Copy)]
+pub struct BuildStats {
+    pub node_count: usize,
+    pub leaf_count: usize,
+
+    /// Depth of the deepest leaf, root counted as depth 1.
+    pub max_depth: usize,
+
+    /// Triangles in the largest leaf: the worst case a single ray can be charged for.
+    pub max_leaf_tri_count: usize,
+
+    /// Triangles summed over all leaves. Every triangle belongs to exactly one leaf, so
+    /// this must equal the mesh's triangle count — a partition that loses or duplicates a
+    /// triangle shows up here and nowhere else.
+    pub total_leaf_tri_count: usize,
+}
+
 struct BVHNode {
     bbox: AABoundingBox,
     left_first: usize,
@@ -197,7 +257,30 @@ impl BVHTree {
         }
     }
 
+    /// Nearest intersection of `ray` with the mesh, within `[near, far]`.
     pub fn query(&self, ray: &Ray, near: f64, far: f64) -> Option<(TriangleIntersection, usize)> {
+        self.traverse(ray, near, far, &mut TraversalStats::default())
+    }
+
+    /// Same as [`BVHTree::query`], but adds the work done to `stats`.
+    ///
+    /// Both entry points run the very same `traverse`, so the measured traversal is the
+    /// one the renderer performs — a separate instrumented copy would be free to drift
+    /// away from it and would measure nothing trustworthy.
+    pub fn query_instrumented(&self, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> Option<(TriangleIntersection, usize)> {
+        self.traverse(ray, near, far, stats)
+    }
+
+    /// Tests `node`'s bounding box against `ray` and records the test.
+    ///
+    /// Every ray/box test in the traversal goes through here, so `box_tests` cannot drift
+    /// out of step with the tests actually performed.
+    fn hit_box(node: &BVHNode, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> Option<f64> {
+        stats.box_tests += 1;
+        node.bbox.hit(ray, near, far)
+    }
+
+    fn traverse(&self, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> Option<(TriangleIntersection, usize)> {
         let verts = self.vertices.as_ref();
         let mut min_t: f64 = f64::MAX;
         let mut current_intersection: Option<TriangleIntersection> = None;
@@ -206,8 +289,9 @@ impl BVHTree {
         stack.push(0);
 
         while let Some(node_idx) = stack.pop() {
+            stats.nodes_visited += 1;
             let node = &self.nodes[node_idx];
-            if let Some(t) = node.bbox.hit(ray, near, far) {
+            if let Some(t) = BVHTree::hit_box(node, ray, near, far, stats) {
                 if t >= min_t {
                     continue;
                 }
@@ -219,6 +303,7 @@ impl BVHTree {
                         let p0 = BVHTree::build_vertex(verts, tri.vertex0_idx);
                         let p1 = BVHTree::build_vertex(verts, tri.vertex1_idx);
                         let p2 = BVHTree::build_vertex(verts, tri.vertex2_idx);
+                        stats.triangle_tests += 1;
                         if let Some(intersection) = intersect_ray(ray, &p0, &p1, &p2) {
                             if intersection.t < min_t && intersection.t >= near && intersection.t <= far {
                                 min_t = intersection.t;
@@ -231,8 +316,8 @@ impl BVHTree {
                 else {
                     let left_node = &self.nodes[node.left_first];
                     let right_node = &self.nodes[node.left_first + 1];
-                    let left_hit = left_node.bbox.hit(ray, near, far);
-                    let right_hit = right_node.bbox.hit(ray, near, far);
+                    let left_hit = BVHTree::hit_box(left_node, ray, near, far, stats);
+                    let right_hit = BVHTree::hit_box(right_node, ray, near, far, stats);
                     match (&left_hit, &right_hit) {
                         (Some(ref d1), Some(ref d2)) => {
                             if *d1 < *d2 {
@@ -265,6 +350,35 @@ impl BVHTree {
         match current_intersection {
             Some(intersection) => Some((intersection, current_tri_idx)),
             _ => return None,
+        }
+    }
+
+    /// Number of triangles the tree was built over.
+    pub fn triangle_count(&self) -> usize {
+        self.tris.len()
+    }
+
+    /// Walks the finished tree and reports its shape.
+    pub fn build_stats(&self) -> BuildStats {
+        let mut stats = BuildStats::default();
+        let root_depth = 1;
+        self.collect_build_stats(0, root_depth, &mut stats);
+        stats
+    }
+
+    fn collect_build_stats(&self, node_idx: usize, depth: usize, stats: &mut BuildStats) {
+        let node = &self.nodes[node_idx];
+        stats.node_count += 1;
+        stats.max_depth = stats.max_depth.max(depth);
+
+        if node.is_leaf() {
+            stats.leaf_count += 1;
+            stats.total_leaf_tri_count += node.tri_count;
+            stats.max_leaf_tri_count = stats.max_leaf_tri_count.max(node.tri_count);
+        }
+        else {
+            self.collect_build_stats(node.left_first, depth + 1, stats);
+            self.collect_build_stats(node.left_first + 1, depth + 1, stats);
         }
     }
 
