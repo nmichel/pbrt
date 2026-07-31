@@ -269,8 +269,15 @@ precisely what would have made the current bug visible on reading.
       collects every candidate, then tests them all. The BVH filters but does not order.
 - [ ] **Split plane is a median split on a randomly chosen axis**
       ([bvh.rs:77](src/bvh.rs#L77)). The mesh BVH's binned SAH is the design to port here.
-- [ ] **`BVHNode::new` on an empty vector** falls into the `_` arm and recurses forever;
-      `Scene::commit` on an empty scene hits this.
+- [x] **`BVHNode::new` on an empty vector** fell into the `_` arm and recursed forever;
+      `Scene::commit` on an empty scene hit it. *Done.* Measured failure mode, by removing the
+      guard: `fatal runtime error: stack overflow`, SIGABRT — not a hang. `Scene::build_bvh` now
+      returns `None` for an empty primitive list, which is where emptiness belongs: the `Option`
+      already carries it, so `BVHNode` never has to, and `intersect` reads `None` as "nothing to
+      hit" without a single box test. `BVHNode::new` states the precondition and asserts it,
+      same reasoning as `AABoundingBox::hit`. Three tests, including one that builds over seven
+      primitives and checks the root box encloses them all — the split axis being drawn at
+      random, it exercises a different partition on every run.
 - [ ] **No `intersect_p`.** Shadow rays go through the full nearest-hit-plus-material
       search when a boolean with an early-out would do — the main cost of NEE.
 - [ ] **`Plane` reports an unbounded box**, `±f64::MAX` on x and z

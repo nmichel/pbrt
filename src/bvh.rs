@@ -20,7 +20,26 @@ pub trait Accumulator<T> {
 }
 
 impl<T: AABound + Clone> BVHNode<T> {
+    /// Builds a subtree over `primitives`, which is consumed as the recursion partitions it.
+    ///
+    /// # Precondition: `primitives` must not be empty
+    ///
+    /// A tree over nothing is not a thing this type can represent — its root would need a
+    /// bounding box, and the empty box is not one a traversal may be given. Emptiness belongs
+    /// one level up, in the `Option` that `Scene::build_bvh` returns, so it is asserted here
+    /// rather than handled. Same reasoning as `AABoundingBox::hit`: "does a ray hit nothing" and
+    /// "what does a tree over nothing look like" are questions with no useful answer.
+    ///
+    /// The assert also replaces a crash. On an empty vector the `match` below fell to its `_`
+    /// arm, `len() / 2` was 0, `drain(0..)` moved everything — that is, nothing — to the right,
+    /// and the left side recursed on the same empty vector until the stack overflowed. Measured:
+    /// `fatal runtime error: stack overflow`, SIGABRT.
     pub fn new(primitives: &mut Vec<T>) -> Self {
+        debug_assert!(
+            !primitives.is_empty(),
+            "BVHNode::new needs at least one primitive; an empty scene is a `None` tree, see Scene::build_bvh"
+        );
+
         // Sort primitive with respect to a comparator randomly chosen
         primitives.sort_by(Self::choose_comparator());
 
@@ -129,37 +148,57 @@ where
     }
 }
 
-/*
 #[cfg(test)]
-mod test {
-    use std::sync::Arc;
-
-    use crate::colors;
-    use crate::geom::transform::Transform;
-    use crate::geom::vector3::Vector3f;
-    use crate::materials::{Lambertian, Material};
-    use crate::shapes::Sphere;
-    use crate::textures::PlainColor;
-
+mod tests {
     use super::*;
+    use crate::geom::vector3::Vector3f;
 
+    /// The smallest `AABound + Clone` there is: a bounding box standing in for a primitive.
+    ///
+    /// The tree is generic and knows nothing about what it holds beyond its box — that is the
+    /// whole point of the `AABound` seam — so nothing else is needed here. Testing with spheres
+    /// and materials would only prove that the seam had been crossed.
+    #[derive(Clone)]
+    struct Boxed(AABoundingBox);
+
+    impl AABound for Boxed {
+        fn get_bounding_box(&self) -> AABoundingBox {
+            self.0
+        }
+    }
+
+    /// A unit box whose lower x corner sits at `x`.
+    fn unit_box_at(x: f64) -> Boxed {
+        Boxed(AABoundingBox::new(&Vector3f::new(x, 0.0, 0.0), &Vector3f::new(x + 1.0, 1.0, 1.0)))
+    }
+
+    /// One primitive is a leaf: it keeps the primitive and has no children.
     #[test]
-    fn test_bvh_build() {
-        let material: Arc<dyn Material> = Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::ORANGE))));
-        let mut prims = vec![
-            Arc::new(Primitive::new(
-                Box::new(Sphere::new(1.0)),
-                Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-                Arc::clone(&material),
-            )),
-            Arc::new(Primitive::new(
-                Box::new(Sphere::new(2.0)),
-                Box::new(Transform::translation(Vector3f::new(-2.0, 0.0, 0.0))),
-                Arc::clone(&material),
-            )),
-        ];
-        let bvh = BVHNode::new(&mut prims);
-        println!("Node \n{}", &bvh);
+    fn test_single_primitive_is_a_leaf() {
+        let mut primitives = vec![unit_box_at(0.0)];
+        let tree = BVHNode::new(&mut primitives);
+
+        assert_eq!(tree.primitives.len(), 1);
+        assert!(tree.left.is_none() && tree.right.is_none());
+    }
+
+    /// Building must terminate, and the root box must enclose every primitive.
+    ///
+    /// The termination half is not idle: the split axis is drawn at random, so this exercises a
+    /// different partition on every run.
+    #[test]
+    fn test_build_encloses_every_primitive() {
+        let mut primitives: Vec<Boxed> = (0..7).map(|i| unit_box_at(i as f64 * 3.0)).collect();
+
+        // `new` drains the vector, so the expected bound is taken first.
+        let expected = primitives.iter().fold(AABoundingBox::empty(), |mut acc, primitive| {
+            acc.combine_with(&primitive.get_bounding_box());
+            acc
+        });
+
+        let tree = BVHNode::new(&mut primitives);
+
+        assert_eq!(tree.aabbox.bmin, expected.bmin);
+        assert_eq!(tree.aabbox.bmax, expected.bmax);
     }
 }
-*/

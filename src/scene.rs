@@ -135,7 +135,17 @@ impl Scene {
             .collect()
     }
 
+    /// Builds the acceleration structure over `prim`, or `None` when there is nothing to
+    /// accelerate.
+    ///
+    /// An empty scene has no tree, and that is how emptiness is represented here: `Option`
+    /// already carries it, so `BVHNode` never has to. `intersect` reads `None` as "nothing to
+    /// hit" and returns without a single box test.
     fn build_bvh(prim: &mut Vec<Wrapper<dyn Object>>) -> Option<BVHNode<Wrapper<dyn Object>>> {
+        if prim.is_empty() {
+            return None;
+        }
+
         Some(BVHNode::new(prim))
     }
 }
@@ -148,5 +158,26 @@ impl Accumulator<Wrapper<dyn Object>> for ObjectAccumulator {
     fn accumulate(&mut self, items: &mut Vec<Wrapper<dyn Object>>) -> () {
         self.acc.append(items);
         ()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geom::vector3::Vector3f;
+
+    /// A scene with no object has no tree, and `intersect` must say so.
+    ///
+    /// This did not use to fail, it aborted: `commit` handed an empty vector to `BVHNode::new`,
+    /// whose median split left the left half empty and recursed on it until the stack overflowed.
+    /// Verified by removing the guard — `fatal runtime error: stack overflow`, SIGABRT.
+    #[test]
+    fn test_empty_scene_intersects_nothing() {
+        let mut scene = Scene::new();
+        scene.commit();
+
+        let ray = Ray::new(&Vector3f::zero(), &Vector3f::new(0.0, 0.0, 1.0));
+
+        assert!(scene.intersect(&ray, 0.0001, 1000.0).is_none());
     }
 }
