@@ -56,12 +56,13 @@ departure from a physical model, (3) is a prerequisite to *validating* (2) and (
       could be scored on a partition that never happened. *Done.* `SplitCandidate` carries the
       boundary index and the binning parameters rather than a position, and both paths call the
       same `bin_index`. Not in the original review — found while planning the fix.
-- [ ] **Each node's box is tested twice.** The traversal tests a child's box before pushing
-      it ([bvh.rs:379-380](src/shapes/triangle_mesh/bvh.rs#L379-L380)) and tests the same box
-      again after popping it ([bvh.rs:354](src/shapes/triangle_mesh/bvh.rs#L354)). Box tests
-      per ray runs at ~2.6× nodes visited per ray. Either push the distance alongside the
-      index, or drop the pre-push test and let the pop handle it. **Next up** — deliberately
-      kept out of the SAH commit so its before/after stayed attributable.
+- [x] **Each node's box was tested twice**, once before its parent pushed it and once again
+      after it was popped. *Done.* The stack now carries `StackEntry { node_idx,
+      entry_distance }`: the distance is measured when the parent orders its children — which
+      it has to do anyway — and travels with the index instead of being recomputed. The pop
+      still re-examines that distance against `min_t`, which is the useful half of the old
+      re-test and costs no box test at all. The root is tested once outside the loop, so a ray
+      missing the mesh entirely costs exactly one box test. Figures below.
 - [ ] **Leaves hold a single triangle**, so the tree has ~2 nodes per triangle: 1 724 381 nodes
       for `dragon_vrip.ply`. That is the `t_trav = 0` of `[5]`
       ([docs/heuristique_aire_surface.md](docs/heuristique_aire_surface.md) §6) — with
@@ -186,6 +187,40 @@ brute-force test above is the real guarantee.
 **Where the time goes now.** `bunny_mesh.stage` at 120×90×4 takes 53 s, which is no longer the
 mesh's fault — the scene BVH clones its primitives into a `Vec` per ray and tests them all,
 unordered. That is the next bottleneck, and it is the *BVH — scene* section below.
+
+#### After removing the double box test — 2026-07-31
+
+| mesh | box tests/ray | tri tests/ray | nodes visited/ray |
+|---|---|---|---|
+| `cube.ply` | 8.62 → **5.83** (−32 %) | 1.18 → 1.19 | 3.79 → 3.01 |
+| `bun_zipper_res4.ply` | 15.27 → **10.04** (−34 %) | 0.77 → 0.77 | 6.23 → 5.25 |
+| `bunny.ply` | 21.48 → **14.19** (−34 %) | 0.58 → 0.58 | 8.29 → 7.17 |
+| `dragon_vrip_res4.ply` | 18.22 → **12.01** (−34 %) | 0.63 → 0.63 | 7.22 → 6.11 |
+| `dragon_vrip_res3.ply` | 20.87 → **13.75** (−34 %) | 0.60 → 0.60 | 8.12 → 6.96 |
+| `dragon_vrip.ply` | 24.76 → **16.31** (−34 %) | 0.58 → 0.58 | 9.45 → 8.23 |
+
+A flat −34 % across every organic mesh, which is what one expects: the removed test was one of
+roughly three per node. Triangle tests are untouched, as they must be — this changes how a node
+is reached, never which triangles a leaf holds. Hit counts identical to the unit again.
+
+**Two caveats on reading this table.**
+
+`nodes_visited` **changed definition** in the same commit, so its column mixes two effects and
+is not a measure of anything gained. It used to count every pop; it now counts nodes whose
+contents were actually examined, excluding those a shrunken `min_t` discards at pop and the root
+of a ray that misses the mesh. Only `box_tests` and `triangle_tests` are comparable across this
+commit — and `box_tests` is the one the commit is about. The pairing is now exact and
+verifiable: `box_tests = 2 · (interior nodes examined) + 1`.
+
+`cube.ply` moves from 1.18 to 1.19 triangle tests because **the tie-break order flipped**. When
+two children are entered at exactly the same distance the old code visited the right one first,
+the new code the left. Neither is better founded, both find the same nearest hit — the
+brute-force test guarantees that — and only axis-aligned geometry produces enough exact ties for
+it to show at all.
+
+Indicatively, `bunny_mesh.stage` at 120×90×4 goes from 53 s to 40 s. Not a controlled
+measurement, since an unseeded sampler means the two runs traced different paths; the box-test
+count is the controlled figure.
 
 #### How to go about it
 

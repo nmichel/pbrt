@@ -17,13 +17,28 @@ use std::sync::Arc;
 /// Read them as work *per ray*: accumulate over a ray set, then divide by its size.
 #[derive(Default, Clone, Copy)]
 pub struct TraversalStats {
-    /// Nodes taken off the traversal stack.
+    /// Nodes whose contents were examined — triangles tested, or the two children's boxes
+    /// tested.
+    ///
+    /// A node taken off the stack and immediately dropped because `min_t` has shrunk past its
+    /// entry distance is *not* counted: no work was done on it. Nor is one whose box the ray
+    /// misses, since it never reaches the stack. What those cost is a box test, and
+    /// `box_tests` counts that.
     pub nodes_visited: usize,
 
-    /// Ray/box tests. Deliberately counted apart from `nodes_visited`, because the
-    /// traversal does not perform one test per visited node: it tests a child's box
-    /// before pushing it and tests the same box again after popping it. The two figures
-    /// are not interchangeable, and only this one reflects the cost actually paid.
+    /// Ray/box tests, the dominant cost of an interior node.
+    ///
+    /// Counted apart from `nodes_visited` because the two do not move together. An *interior*
+    /// node examined performs two box tests, one per child; a leaf performs none, testing
+    /// triangles instead; a node discarded at pop performs none either. So
+    ///
+    /// ```text
+    /// box_tests = 2 · (interior nodes examined) + 1
+    /// ```
+    ///
+    /// the `+ 1` being the root, which has no parent to test it. The two counters together
+    /// therefore split a traversal into its interior and leaf halves, which is more than
+    /// either says alone.
     pub box_tests: usize,
 
     /// Ray/triangle tests, i.e. calls to `intersect_ray`. This is the figure a better
@@ -64,10 +79,24 @@ pub struct BuildStats {
     pub total_leaf_tri_count: usize,
 }
 
+/// The root is the first node pushed by `build`, hence always at index 0.
+const ROOT_NODE_IDX: usize = 0;
+
 struct BVHNode {
     bbox: AABoundingBox,
     left_first: usize,
     tri_count: usize,
+}
+
+/// A node still to visit, and the distance at which the ray enters its box.
+///
+/// Carrying the distance is what lets each box be tested once: it is measured when the parent
+/// looks at its children — which it must do anyway, to order them — and travels here instead
+/// of being recomputed at pop. See `BVHTree::traverse`.
+#[derive(Copy, Clone)]
+struct StackEntry {
+    node_idx: usize,
+    entry_distance: f64,
 }
 
 impl BVHNode {
@@ -340,68 +369,86 @@ impl BVHTree {
         node.bbox.hit(ray, near, far)
     }
 
+    /// Ordered depth-first traversal, nearest child first.
+    ///
+    /// **Each node's box is tested exactly once.** The distance at which the ray enters a box
+    /// is what decides the visiting order, so it has to be known before a child is pushed;
+    /// carrying it on the stack means the pop does not have to test the box again to recover
+    /// it. Re-testing was the previous shape of this loop, and it cost one redundant test per
+    /// node — about 60 % of all box tests.
+    ///
+    /// The distance is still worth re-examining at pop, but only against `min_t`: a hit found
+    /// since the push may have brought the nearest intersection closer than this whole node,
+    /// in which case its subtree cannot contribute and is skipped without any test at all.
+    /// That is the entire point of visiting the near child first — it gives `min_t` the best
+    /// chance of shrinking before the far child is considered.
     fn traverse(&self, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> Option<(TriangleIntersection, usize)> {
         let verts = self.vertices.as_ref();
         let mut min_t: f64 = f64::MAX;
         let mut current_intersection: Option<TriangleIntersection> = None;
         let mut current_tri_idx: usize = 0;
-        let mut stack: Vec<usize> = Vec::with_capacity(64);
-        stack.push(0);
 
-        while let Some(node_idx) = stack.pop() {
+        // The root has no parent to test it, so it is tested here — the one box test outside
+        // the loop, and the reason a ray that misses the mesh entirely costs exactly one.
+        let root_distance = match BVHTree::hit_box(&self.nodes[ROOT_NODE_IDX], ray, near, far, stats) {
+            Some(distance) => distance,
+            None => return None,
+        };
+
+        let mut stack: Vec<StackEntry> = Vec::with_capacity(64);
+        stack.push(StackEntry {
+            node_idx: ROOT_NODE_IDX,
+            entry_distance: root_distance,
+        });
+
+        while let Some(entry) = stack.pop() {
+            if entry.entry_distance >= min_t {
+                continue;
+            }
+
             stats.nodes_visited += 1;
-            let node = &self.nodes[node_idx];
-            if let Some(t) = BVHTree::hit_box(node, ray, near, far, stats) {
-                if t >= min_t {
-                    continue;
-                }
+            let node = &self.nodes[entry.node_idx];
 
-                if node.is_leaf() {
-                    for i in 0..node.tri_count {
-                        let tri_idx = node.left_first + i;
-                        let tri: &Tri = &self.tris[self.tri_idx[tri_idx]];
-                        let p0 = BVHTree::build_vertex(verts, tri.vertex0_idx);
-                        let p1 = BVHTree::build_vertex(verts, tri.vertex1_idx);
-                        let p2 = BVHTree::build_vertex(verts, tri.vertex2_idx);
-                        stats.triangle_tests += 1;
-                        if let Some(intersection) = intersect_ray(ray, &p0, &p1, &p2) {
-                            if intersection.t < min_t && intersection.t >= near && intersection.t <= far {
-                                min_t = intersection.t;
-                                current_intersection.replace(intersection);
-                                current_tri_idx = self.tri_idx[tri_idx];
-                            }
+            if node.is_leaf() {
+                for i in 0..node.tri_count {
+                    let tri_idx = node.left_first + i;
+                    let tri: &Tri = &self.tris[self.tri_idx[tri_idx]];
+                    let p0 = BVHTree::build_vertex(verts, tri.vertex0_idx);
+                    let p1 = BVHTree::build_vertex(verts, tri.vertex1_idx);
+                    let p2 = BVHTree::build_vertex(verts, tri.vertex2_idx);
+                    stats.triangle_tests += 1;
+                    if let Some(intersection) = intersect_ray(ray, &p0, &p1, &p2) {
+                        if intersection.t < min_t && intersection.t >= near && intersection.t <= far {
+                            min_t = intersection.t;
+                            current_intersection.replace(intersection);
+                            current_tri_idx = self.tri_idx[tri_idx];
                         }
                     }
                 }
-                else {
-                    let left_node = &self.nodes[node.left_first];
-                    let right_node = &self.nodes[node.left_first + 1];
-                    let left_hit = BVHTree::hit_box(left_node, ray, near, far, stats);
-                    let right_hit = BVHTree::hit_box(right_node, ray, near, far, stats);
-                    match (&left_hit, &right_hit) {
-                        (Some(ref d1), Some(ref d2)) => {
-                            if *d1 < *d2 {
-                                if *d2 < min_t {
-                                    stack.push(node.left_first + 1);
-                                }
-                                if *d1 < min_t {
-                                    stack.push(node.left_first);
-                                }
-                            }
-                            else {
-                                if *d1 < min_t {
-                                    stack.push(node.left_first);
-                                }
-                                if *d2 < min_t {
-                                    stack.push(node.left_first + 1);
-                                }
-                            }
+            }
+            else {
+                let left_idx = node.left_first;
+                let right_idx = node.left_first + 1;
+                let left = (left_idx, BVHTree::hit_box(&self.nodes[left_idx], ray, near, far, stats));
+                let right = (right_idx, BVHTree::hit_box(&self.nodes[right_idx], ray, near, far, stats));
+
+                // Order the two children so the nearer is examined first. Only their entry
+                // distances are compared: a child the ray misses at all never gets pushed, so
+                // its position in the order is irrelevant.
+                let (nearer, farther) = match (left.1, right.1) {
+                    (Some(left_distance), Some(right_distance)) if right_distance < left_distance => (right, left),
+                    _ => (left, right),
+                };
+
+                // The stack is LIFO, so pushing the farther child first pops the nearer first.
+                for (child_idx, child_hit) in [farther, nearer] {
+                    if let Some(entry_distance) = child_hit {
+                        if entry_distance < min_t {
+                            stack.push(StackEntry {
+                                node_idx: child_idx,
+                                entry_distance,
+                            });
                         }
-                        (Some(ref d), None) if *d < min_t => stack.push(node.left_first),
-                        (Some(_), None) => continue,
-                        (None, Some(ref d)) if *d < min_t => stack.push(node.left_first + 1),
-                        (None, Some(_)) => continue,
-                        (None, None) => continue,
                     }
                 }
             }
