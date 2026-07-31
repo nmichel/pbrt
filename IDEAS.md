@@ -263,10 +263,21 @@ precisely what would have made the current bug visible on reading.
 
 ### BVH — scene
 
-- [ ] **`query` clones the primitives it finds** into an accumulator `Vec`
-      ([bvh.rs:62](src/bvh.rs#L62)) — one allocation plus N atomic refcount bumps per ray.
-- [ ] **No ordered traversal, no `far` narrowing, no early-out.** `Scene::intersect`
-      collects every candidate, then tests them all. The BVH filters but does not order.
+- [ ] **`query` clones the primitives it finds** into an accumulator `Vec` — one allocation plus
+      one atomic refcount bump per candidate. Measured below: **under one candidate per primary
+      ray**, so the cost is real but small. The review's "N atomic refcount bumps per ray" read as
+      if N were large; it is not.
+- [ ] **No ordered traversal, no `far` narrowing, no early-out.** `Scene::intersect` collects every
+      candidate, then tests them all. The BVH filters but does not order. Measured below: box tests
+      per ray equal the tree's whole node count on the mesh scenes — **every node, every ray** —
+      so the pruning that is missing is at the interior level, not among the candidates.
+- [ ] **Every shape's `intersect` returns a freshly built `Vec<Intersection>`**
+      (`IntersectionResult`), and `Transformed::intersect` builds a second one to hold the
+      transformed copies. So a hit costs one or two heap allocations that are read once and
+      dropped. Misses are free — `Vec::new()` does not allocate until pushed. Not in the original
+      review; noticed while taking the scene baseline. This is the per-test cost that the counters
+      cannot see, and the reason `intersect_p` is worth more than its effect on `object_tests`
+      suggests.
 - [ ] **Split plane is a median split on a randomly chosen axis**
       ([bvh.rs:77](src/bvh.rs#L77)). The mesh BVH's binned SAH is the design to port here.
 - [x] **`BVHNode::new` on an empty vector** fell into the `_` arm and recursed forever;
@@ -285,7 +296,54 @@ precisely what would have made the current bug visible on reading.
       would poison any SAH cost the moment a `Plane` sits in the scene BVH. Not a bounding
       bug as such but a design question: an unbounded primitive has no business inside an
       acceleration structure (pbrt keeps them out of the accelerator). **Blocks the port of
-      the binned SAH to the scene BVH** — decide when doing that work.
+      the binned SAH to the scene BVH** — decided: keep unbounded primitives in a separate list on
+      `Scene`, tested for every ray, and let the accelerator assert that what it holds is bounded.
+
+#### Baseline — 2026-07-31
+
+`bvh_stats` now has a scene mode, told apart by the file extension: a `.ply` has no camera and the
+tool has to invent a ray set, a `.stage` carries its own and the ray set is simply the render's.
+`Loader::load_scene` hands back that camera, so the rays are one per pixel centre of a 200×150
+render at the renderer's default settings. Two sets are counted **apart**: the camera's primary
+rays, and one shadow ray from each point they hit, aimed at the `PointLight` that
+`Loader::load_scene` hard-codes at (0, 2, 1) — the segment NEE actually casts.
+
+```
+cargo run --release --bin bvh_stats -- test_files/<scene>.stage
+```
+
+| scene | prims | ray set | nodes/ray | box tests/ray | object tests/ray | hit |
+|---|---|---|---|---|---|---|
+| `default.stage` | 2 | primary | 1.27 | 2.90 | 0.32 | 31.8 % |
+| | | shadow | 1.84 | 3.00 | 0.84 | 83.8 % |
+| `cornell_box.stage` | 8 | primary | 5.18 | 9.63 | 0.87 | 76.0 % |
+| | | shadow | 9.16 | 15.00 | **2.16** | 95.9 % |
+| `bunny_mesh.stage` | 4 | primary | 3.85 | 7.00 | 0.85 | 54.5 % |
+| | | shadow | 3.28 | 7.00 | 0.28 | 9.0 % |
+| `dragon_mesh.stage` | 4 | primary | 4.23 | 7.00 | 1.23 | 54.5 % |
+| | | shadow | 2.99 | 6.39 | 0.30 | 11.0 % |
+
+**What the numbers correct.** The plan for these steps assumed the accumulator was expensive
+because it hands out many candidates. It does not: **object tests per ray stay under 1.3** on every
+scene, primary rays included. At four to eight primitives the accelerator is simply not where a
+primary ray spends its time.
+
+Two things the table does say:
+
+- **The interior of the tree prunes nothing.** A 4-primitive tree has 7 nodes, and the mesh scenes
+  test 7.00 boxes per ray — every node, every ray. The 3×3 floor and wall rectangles overlap the
+  whole view, so the root and both its children are hit by nearly every ray, and only the leaves
+  ever reject anything. `cornell_box` does better, 9.63 of 15 nodes. This is what ordering and
+  interval narrowing can attack.
+- **Shadow rays are the worst case, and `cornell_box` shows why.** 95.9 % of them are occluded, and
+  the current `unoccluded` still searches for the *nearest* hit rather than stopping at the first:
+  2.16 object tests where one would do.
+
+**And a limit to state plainly.** The gain from `intersect_p` is mostly *inside* each object test —
+the `Vec<Intersection>` allocated, the shading normal, the texture coordinates, the ∂p/∂u and ∂p/∂v
+computed and thrown away — and no counter here can see that. Expect `object_tests` on shadow rays
+to fall by roughly half on `cornell_box` and barely move on the mesh scenes, while the wall clock
+falls further. Saying so now avoids reading a modest counter movement as a failure.
 
 ### Correctness / robustness
 

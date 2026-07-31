@@ -1,7 +1,7 @@
 use crate::lights::LightType;
 use crate::objects::Object;
 
-use super::bvh::{Accumulator, BVHNode};
+use super::bvh::{Accumulator, BVHNode, TraversalStats};
 use super::geom::aabound::{AABound, AABoundingBox};
 use super::geom::intersectable::{Intersectable, IntersectionResult};
 use super::geom::ray::Ray;
@@ -86,17 +86,36 @@ impl Scene {
         self
     }
 
+    /// Nearest interaction of `ray` with the scene, within `[near, far]`.
     pub fn intersect(&self, ray: &Ray, near: f64, far: f64) -> Option<Interaction> {
+        self.find_nearest(ray, near, far, &mut TraversalStats::default())
+    }
+
+    /// Same as [`Scene::intersect`], but adds the work done to `stats`.
+    ///
+    /// Both entry points run the very same `find_nearest`, so the measured search is the one the
+    /// renderer performs.
+    pub fn intersect_instrumented(&self, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> Option<Interaction> {
+        self.find_nearest(ray, near, far, stats)
+    }
+
+    /// Number of primitives the accelerator was built over, or zero for an empty scene.
+    pub fn primitive_count(&self) -> usize {
+        self.bvh.as_ref().map_or(0, |bvh_node| bvh_node.primitive_count())
+    }
+
+    fn find_nearest(&self, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> Option<Interaction> {
         let mut accumulator = ObjectAccumulator { acc: Vec::new() };
 
         match &self.bvh {
             None => None,
             Some(bvh_node) => {
                 // Ask the acceleration structure for potentially hit items
-                bvh_node.query(ray, near, far, &mut accumulator);
+                bvh_node.query_instrumented(ray, near, far, &mut accumulator, stats);
 
                 // Iterate through candidates to find the nearest interaction
                 accumulator.acc.iter().fold(Option::<Interaction>::None, |acc, primitive| {
+                    stats.object_tests += 1;
                     match (acc, Object::intersect(primitive, ray, near, far)) {
                         (acc, None) => acc,
                         (None, interaction) => interaction,

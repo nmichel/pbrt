@@ -19,6 +19,35 @@ pub trait Accumulator<T> {
     fn accumulate(&mut self, items: &mut Vec<T>) -> ();
 }
 
+/// Work counters for traversals of the scene accelerator.
+///
+/// Same purpose as [`crate::shapes::triangle_mesh::TraversalStats`], and deliberately a separate
+/// type: the work units differ — objects tested here, triangles there — and the two traversals
+/// are not yet the same algorithm. Merging them now would abstract over a difference that still
+/// exists; the moment to do it is when this tree has been flattened and ordered like the mesh's,
+/// and not before.
+///
+/// Reproducible to the unit for a given ray set, a traversal drawing no random numbers. Read as
+/// work *per ray*: accumulate over a ray set, then divide by its size.
+#[derive(Default, Clone, Copy)]
+pub struct TraversalStats {
+    /// Nodes whose contents were examined. A node whose box the ray misses is not counted — what
+    /// it cost is a box test, which `box_tests` counts.
+    pub nodes_visited: usize,
+
+    /// Ray/box tests. Every node entered performs exactly one, on its own box, so this figure
+    /// also counts the nodes the traversal reached at all.
+    pub box_tests: usize,
+
+    /// Objects handed to `Object::intersect`.
+    ///
+    /// Today this is also the number of primitives *cloned out of the tree*: the accelerator
+    /// returns every candidate it cannot exclude, one allocation and one atomic refcount bump
+    /// each, and the scene then tests all of them in whatever order they arrived. The two figures
+    /// coincide only because nothing prunes between them — which is the defect, not a property.
+    pub object_tests: usize,
+}
+
 impl<T: AABound + Clone> BVHNode<T> {
     /// Builds a subtree over `primitives`, which is consumed as the recursion partitions it.
     ///
@@ -72,24 +101,54 @@ impl<T: AABound + Clone> BVHNode<T> {
         }
     }
 
+    /// Hands every primitive the ray might meet to `accumulator`.
     pub fn query(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
+        self.traverse(ray, near, far, accumulator, &mut TraversalStats::default())
+    }
+
+    /// Same as [`BVHNode::query`], but adds the work done to `stats`.
+    ///
+    /// Both entry points run the very same `traverse`, so the measured traversal is the one the
+    /// renderer performs — a separate instrumented copy would be free to drift away from it and
+    /// would measure nothing trustworthy.
+    pub fn query_instrumented(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>, stats: &mut TraversalStats) -> () {
+        self.traverse(ray, near, far, accumulator, stats)
+    }
+
+    /// Number of primitives held across every leaf of this subtree.
+    pub fn primitive_count(&self) -> usize {
+        self.primitives.len()
+            + self.left.as_ref().map_or(0, |node| node.primitive_count())
+            + self.right.as_ref().map_or(0, |node| node.primitive_count())
+    }
+
+    fn traverse(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>, stats: &mut TraversalStats) -> () {
+        stats.box_tests += 1;
         if self.aabbox.hit(ray, near, far).is_none() {
             return;
         }
+        stats.nodes_visited += 1;
 
         if self.primitives.len() > 0 {
             accumulator.accumulate(&mut self.primitives.clone())
         }
         else {
-            Self::query_subnode(&self.left, ray, near, far, accumulator);
-            Self::query_subnode(&self.right, ray, near, far, accumulator);
+            Self::traverse_subnode(&self.left, ray, near, far, accumulator, stats);
+            Self::traverse_subnode(&self.right, ray, near, far, accumulator, stats);
         }
     }
 
-    fn query_subnode<'a>(node: &'a Option<Box<BVHNode<T>>>, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
+    fn traverse_subnode<'a>(
+        node: &'a Option<Box<BVHNode<T>>>,
+        ray: &Ray,
+        near: f64,
+        far: f64,
+        accumulator: &mut dyn Accumulator<T>,
+        stats: &mut TraversalStats,
+    ) -> () {
         match &node {
             None => (),
-            Some(node) => node.query(ray, near, far, accumulator),
+            Some(node) => node.traverse(ray, near, far, accumulator, stats),
         }
     }
 

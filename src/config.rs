@@ -103,7 +103,13 @@ fn parse_renderer(config: &mut Config, value: &String) {
     }
 }
 
-fn default_config() -> Config {
+/// The settings a run uses when the command line says nothing.
+///
+/// Public because a second binary needs them: `bvh_stats` loads a `.stage` scene through
+/// `Loader::load_scene`, which takes a `Config` to build the camera from. Measuring the rays the
+/// renderer would actually cast means starting from the renderer's own defaults rather than
+/// inventing a parallel set.
+pub fn default_config() -> Config {
     Config {
         input_filename: "input".to_string(),
         output_filename: "output.png".to_string(),
