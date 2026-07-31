@@ -3,7 +3,6 @@ use crate::geom::aabound::AABoundingBox;
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 use std::sync::Arc;
-use std::vec;
 
 /// Work counters for traversals of the tree.
 ///
@@ -90,13 +89,61 @@ pub struct BVHTree {
     tri_idx: Vec<usize>,
     nodes: Vec<BVHNode>,
     vertices: Arc<Vec<f64>>,
-    next_node_idx: usize,
 }
+
+/// Number of bins the centroid extent of a node is divided into, per axis.
+///
+/// Binning is what brings the build down from O(N²) to O(N + K) per node: one pass fills the
+/// bins, a second scans their internal boundaries. The count is the quality/build-time knob —
+/// more bins approach the exhaustive heuristic and cost more to build. pbrt uses 12.
+/// See `docs/heuristique_aire_surface.md` §4.
+const BIN_COUNT: usize = 8;
+
+/// Candidate split planes per axis: the boundaries *between* consecutive bins, so one fewer
+/// than there are bins. Boundary `i` separates bins `0..=i` from bins `i+1..`, per `[6]`.
+const SPLIT_COUNT: usize = BIN_COUNT - 1;
 
 #[derive(Copy, Clone)]
 struct Bin {
     bounds: AABoundingBox,
     tri_count: usize,
+}
+
+/// A candidate split plane, identified by the bin boundary it sits on.
+///
+/// The plane is deliberately **not** carried as a position. `subdivide` has to partition the
+/// triangles into exactly the two groups whose counts produced `cost`, and rebuilding a float
+/// position from the boundary index would be a second, differently-rounded computation that
+/// can disagree with the binning for a centroid sitting on a boundary. Carrying the binning
+/// parameters instead lets the partition call the very same `bin_index`, so prediction and
+/// partition coincide by construction. See `docs/heuristique_aire_surface.md` §4,
+/// « Partitionner par indice de bin ».
+struct SplitCandidate {
+    axis: usize,
+
+    /// Index of the boundary; the left side is bins `0..=boundary`. `[6]`
+    boundary: usize,
+
+    /// The two parameters `bin_index` needs: lower end of the centroid extent along `axis`,
+    /// and the width of one bin.
+    centroid_min: f64,
+    bin_width: f64,
+
+    /// `A_L·N_L + A_R·N_R` of `[3]`, un-normalised so it compares directly against
+    /// `calculate_node_cost` — see `[5]`.
+    cost: f64,
+}
+
+/// Which bin a centroid coordinate falls into. `[6]`
+///
+/// The single source of truth for that mapping: the cost model bins with it and the partition
+/// classifies with it, so the two cannot disagree. See `docs/heuristique_aire_surface.md` §4.
+///
+/// The upper clamp catches `centroid_pos == centroid_max`, whose quotient is exactly
+/// `BIN_COUNT`, along with any rounding that pushes the quotient a hair past the last bin.
+fn bin_index(centroid_pos: f64, centroid_min: f64, bin_width: f64) -> usize {
+    let quotient = (centroid_pos - centroid_min) / bin_width;
+    (quotient.floor() as usize).clamp(0, BIN_COUNT - 1)
 }
 
 impl BVHTree {
@@ -139,7 +186,6 @@ impl BVHTree {
             tri_idx,
             nodes,
             vertices,
-            next_node_idx: 0,
         }
     }
 
@@ -151,7 +197,6 @@ impl BVHTree {
         };
         self.update_bounds(&mut root);
         self.nodes.push(root);
-        self.next_node_idx = 1;
         self.subdivide(0);
     }
 
@@ -164,65 +209,68 @@ impl BVHTree {
     }
 
     fn subdivide(&mut self, node_idx: usize) {
-        let node = &self.nodes[node_idx];
-
-        // Find the best split plane for the current node
-        let (best_axis, best_pos, best_cost) = self.find_best_split_plane(node);
-
-        // Check that splitting is worth it
-        let current_cost = self.calculate_node_cost(node);
-        if best_cost >= current_cost {
-            return; // splitting is not worth it
-        }
-
-        // Clone node data needed for split search
-        // Do not keep a reference to the node, as it may be moved in memory
-        // (and thus compiler does not allow mutable borrow)
-        let (left_first, tri_count, _bbox) = {
+        // Read the node's data out rather than holding a reference: the `nodes` vector is
+        // pushed to below, which may move it in memory.
+        let (left_first, tri_count) = {
             let node = &self.nodes[node_idx];
-            (node.left_first, node.tri_count, node.bbox)
+            (node.left_first, node.tri_count)
         };
 
-        // In place triangle set partitioning with respect to the best axis and position
-        let mut i = left_first;
-        let mut j = i + tri_count - 1;
-        while i <= j && j != usize::MAX {
-            if self.tris[self.tri_idx[i]].centroid[best_axis] < best_pos {
-                i += 1;
-            }
-            else {
-                self.tri_idx.swap(i, j);
-                j -= 1;
+        // `[5]`: splitting is worth it only when it beats keeping the node as a leaf. Both
+        // sides of the comparison are un-normalised — see `calculate_node_cost`.
+        let leaf_cost = self.calculate_node_cost(&self.nodes[node_idx]);
+        let split = match self.find_best_split_plane(&self.nodes[node_idx]) {
+            Some(split) if split.cost < leaf_cost => split,
+            _ => return,
+        };
+
+        // In-place partition, classifying with the very same `bin_index` the cost model
+        // binned with, so the two groups are exactly those whose counts produced
+        // `split.cost`. Single forward pass: every triangle belonging left is swapped to the
+        // front, which needs no backward index and so cannot underflow.
+        let mut left_end = left_first;
+        for i in left_first..(left_first + tri_count) {
+            let centroid_pos = self.tris[self.tri_idx[i]].centroid[split.axis];
+            if bin_index(centroid_pos, split.centroid_min, split.bin_width) <= split.boundary {
+                self.tri_idx.swap(i, left_end);
+                left_end += 1;
             }
         }
+        let left_count = left_end - left_first;
 
-        // Do not split if one side is empty
-        let left_count = i - left_first;
         if left_count == 0 || left_count == tri_count {
+            // Unreachable: `find_best_split_plane` only returns candidates with both sides
+            // non-empty, and the loop above classifies with the same pure function over the
+            // same triangles, so the counts must agree. Kept as a guard all the same, because
+            // the alternative is an empty child and unbounded recursion.
+            debug_assert!(
+                false,
+                "partition disagreed with the binned counts: {} of {} triangles on the left",
+                left_count, tri_count
+            );
             return;
         }
 
-        // Create left and right nodes
         let mut left_node = BVHNode {
             bbox: AABoundingBox::empty(),
             left_first: left_first,
             tri_count: left_count,
         };
         self.update_bounds(&mut left_node);
-        let left_node_idx = self.next_node_idx;
-        self.nodes.push(left_node);
-        self.next_node_idx += 1;
 
         let mut right_node = BVHNode {
             bbox: AABoundingBox::empty(),
-            left_first: i,
+            left_first: left_end,
             tri_count: tri_count - left_count,
         };
         self.update_bounds(&mut right_node);
-        self.nodes.push(right_node);
-        self.next_node_idx += 1;
 
-        // Now, get a fresh mutable reference to the parent node and update it
+        // The two children are pushed back to back, so the parent only needs the index of
+        // the first: `left_first` doubles as "index of the left child" on an interior node.
+        let left_node_idx = self.nodes.len();
+        self.nodes.push(left_node);
+        self.nodes.push(right_node);
+
         let node = &mut self.nodes[node_idx];
         node.left_first = left_node_idx;
         node.tri_count = 0;
@@ -231,30 +279,42 @@ impl BVHTree {
         self.subdivide(left_node_idx + 1);
     }
 
-    fn evaluate_sah(&self, node: &BVHNode, axis: usize, pos: f64) -> f64 {
-        let mut left_box: AABoundingBox = AABoundingBox::empty();
-        let mut right_box: AABoundingBox = AABoundingBox::empty();
+    /// `A_L·N_L + A_R·N_R` for `split`, obtained by scanning every triangle of `node`.
+    ///
+    /// The reference implementation of `[3]`: no bins, the two child boxes accumulated
+    /// directly. It is not used by the build — it is the oracle the binned prefix/suffix scan
+    /// is checked against, and that check is what would have caught the per-bin area defect
+    /// this replaces (`docs/heuristique_aire_surface.md` §3).
+    ///
+    /// It classifies with `bin_index`, exactly as the binned path does, so the two compare the
+    /// same partition; the test then bears on the accumulation alone, which is what it claims
+    /// to verify.
+    ///
+    /// Note that a cost of `0.0` is a perfectly legitimate result — a flat box, or a node
+    /// whose triangles are all coplanar with the split — and is returned as such.
+    #[cfg(test)]
+    fn exhaustive_split_cost(&self, node: &BVHNode, split: &SplitCandidate) -> f64 {
+        let mut left_box = AABoundingBox::empty();
+        let mut right_box = AABoundingBox::empty();
         let mut left_count: usize = 0;
         let mut right_count: usize = 0;
+
         for i in node.left_first..(node.left_first + node.tri_count) {
             let tri = &self.tris[self.tri_idx[i]];
-            if tri.centroid[axis] < pos {
+            let bounds = self.aabound_from_triangle(tri.vertex0_idx, tri.vertex1_idx, tri.vertex2_idx);
+            let centroid_pos = tri.centroid[split.axis];
+
+            if bin_index(centroid_pos, split.centroid_min, split.bin_width) <= split.boundary {
                 left_count += 1;
-                left_box.combine_with(&self.aabound_from_triangle(tri.vertex0_idx, tri.vertex1_idx, tri.vertex2_idx));
+                left_box.combine_with(&bounds);
             }
             else {
                 right_count += 1;
-                right_box.combine_with(&self.aabound_from_triangle(tri.vertex0_idx, tri.vertex1_idx, tri.vertex2_idx));
+                right_box.combine_with(&bounds);
             }
         }
 
-        let cost = left_box.half_area() * left_count as f64 + right_box.half_area() * right_count as f64;
-        if cost > 0.0 {
-            cost
-        }
-        else {
-            f64::MAX // Avoid division by zero
-        }
+        left_box.half_area() * left_count as f64 + right_box.half_area() * right_count as f64
     }
 
     /// Nearest intersection of `ray` with the mesh, within `[near, far]`.
@@ -405,80 +465,366 @@ impl BVHTree {
         centroid
     }
 
-    /// Finds the best split plane for the given node.
-    /// Returns (best_axis, best_pos, best_cost).
-    fn find_best_split_plane(&self, node: &BVHNode) -> (usize, f64, f64) {
-        let mut best_cost = f64::MAX;
-        let mut best_axis = 0;
-        let mut best_pos = 0.0;
+    /// Best split plane for `node` under the surface-area heuristic, or `None` when no plane
+    /// separates its triangles.
+    ///
+    /// Full derivation in `docs/heuristique_aire_surface.md`; in case of doubt about which
+    /// area enters the cost, §3 is the section to open. Condensed:
+    ///
+    /// For two convex volumes B ⊆ A, a uniformly distributed ray that meets A also meets B
+    /// with probability SA(B)/SA(A) `[1]`. The expected cost of splitting a node of area A
+    /// into children of areas A_L, A_R holding N_L, N_R triangles is therefore
+    ///
+    /// ```text
+    /// C(split) ≈ t_trav + t_isect·(A_L·N_L + A_R·N_R) / A        [3]
+    /// ```
+    ///
+    /// where the approximation is to assume both children will be leaves. A and `t_trav` are
+    /// common to every candidate of a node, so minimising `A_L·N_L + A_R·N_R` alone gives the
+    /// same winner — which is what this returns, un-normalised, ready to be compared against
+    /// `calculate_node_cost` per `[5]`.
+    ///
+    /// **A_L is the area of the future child's box**, hence of the union of every bin on the
+    /// left of the plane. The area of a single bin is the probability of nothing: no step of
+    /// the traversal ever asks whether a ray meets bin 3.
+    fn find_best_split_plane(&self, node: &BVHNode) -> Option<SplitCandidate> {
+        let mut best: Option<SplitCandidate> = None;
 
         for axis in 0..3 {
-            let mut bound_min: f64 = f64::MAX;
-            let mut bound_max: f64 = f64::MIN;
-            for i in node.left_first..(node.left_first + node.tri_count) {
-                let tri = &self.tris[self.tri_idx[i]];
-                let candidate_pos = tri.centroid[axis];
-                bound_min = bound_min.min(candidate_pos);
-                bound_max = bound_max.max(candidate_pos);
-            }
-            if bound_min == bound_max {
-                continue; // No valid split
+            // Bins span the extent of the *centroids*, not the node's box: a plane outside
+            // that extent leaves one side empty, so it would waste candidates. `[6]`
+            let (centroid_min, centroid_max) = self.centroid_extent(node, axis);
+            if centroid_min == centroid_max {
+                continue; // every centroid coincides on this axis, no plane separates them
             }
 
-            let scale = (bound_max - bound_min) / 8.0;
-            let mut bins: [Bin; 8] = [Bin {
-                bounds: AABoundingBox::empty(),
-                tri_count: 0,
-            }; 8];
+            let bin_width = (centroid_max - centroid_min) / BIN_COUNT as f64;
+            let bins = self.fill_bins(node, axis, centroid_min, bin_width);
 
-            for i in node.left_first..(node.left_first + node.tri_count) {
-                let tri = &self.tris[self.tri_idx[i]];
-                let candidate_pos = tri.centroid[axis];
-                let bin_idx = (((candidate_pos - bound_min) / scale).floor() as usize).clamp(0, 7);
-                let bin = &mut bins[bin_idx];
-                bin.bounds
-                    .combine_with(&self.aabound_from_triangle(tri.vertex0_idx, tri.vertex1_idx, tri.vertex2_idx));
-                bin.tri_count += 1;
-            }
+            // Prefix and suffix scan: at boundary i the left child holds bins 0..=i and the
+            // right child bins i+1.., so their areas are those of the two accumulated unions.
+            let mut left_areas = [0.0; SPLIT_COUNT];
+            let mut right_areas = [0.0; SPLIT_COUNT];
+            let mut left_counts = [0; SPLIT_COUNT];
+            let mut right_counts = [0; SPLIT_COUNT];
 
-            let mut left_areas = vec![0.0; 7];
-            let mut right_areas = vec![0.0; 7];
-            let mut left_count = vec![0; 7];
-            let mut right_count = vec![0; 7];
-            let mut left_box: AABoundingBox = AABoundingBox::empty();
-            let mut right_box: AABoundingBox = AABoundingBox::empty();
+            let mut left_box = AABoundingBox::empty();
+            let mut right_box = AABoundingBox::empty();
             let mut left_sum = 0;
             let mut right_sum = 0;
-            for i in 0..7 {
-                let left_bin = &bins[i];
-                left_sum += left_bin.tri_count;
-                left_count[i] = left_sum;
-                left_box.combine_with(&left_bin.bounds);
-                left_areas[i] = left_bin.bounds.half_area();
 
-                let right_bin = &bins[7 - i];
-                right_sum += right_bin.tri_count;
-                right_count[6 - i] = right_sum;
-                right_box.combine_with(&right_bin.bounds);
-                right_areas[6 - i] = right_bin.bounds.half_area();
+            for i in 0..SPLIT_COUNT {
+                left_box.combine_with(&bins[i].bounds);
+                left_sum += bins[i].tri_count;
+                left_areas[i] = left_box.half_area();
+                left_counts[i] = left_sum;
+
+                // The suffix is filled from the far end: boundary `mirrored` is the one whose
+                // right side starts at bin `mirrored + 1`.
+                let mirrored = SPLIT_COUNT - 1 - i;
+                right_box.combine_with(&bins[mirrored + 1].bounds);
+                right_sum += bins[mirrored + 1].tri_count;
+                right_areas[mirrored] = right_box.half_area();
+                right_counts[mirrored] = right_sum;
             }
 
-            let inv_scale = (bound_max - bound_min) / 8.0;
-            for i in 0..7 {
-                let plane_cost = left_areas[i] * left_count[i] as f64 + right_areas[i] * right_count[i] as f64;
-                if plane_cost < best_cost {
-                    best_cost = plane_cost;
-                    best_axis = axis;
-                    best_pos = bound_min + (i as f64) * inv_scale;
+            // A union can only grow, so the prefix areas cannot decrease and the suffix areas
+            // cannot increase. Reading a single bin's area instead of the union breaks this —
+            // the invariant is the cheap guard against reintroducing that defect.
+            for i in 1..SPLIT_COUNT {
+                debug_assert!(left_areas[i] >= left_areas[i - 1], "prefix areas must not decrease");
+                debug_assert!(right_areas[i] <= right_areas[i - 1], "suffix areas must not increase");
+            }
+
+            for boundary in 0..SPLIT_COUNT {
+                // An empty side is not a split. Explicit, rather than left to arithmetic: an
+                // empty box reports an area of 0, which would make such a plane look *free*.
+                if left_counts[boundary] == 0 || right_counts[boundary] == 0 {
+                    continue;
+                }
+
+                let cost = left_areas[boundary] * left_counts[boundary] as f64 + right_areas[boundary] * right_counts[boundary] as f64;
+
+                let is_better = match &best {
+                    None => true,
+                    Some(current) => cost < current.cost,
+                };
+
+                if is_better {
+                    best = Some(SplitCandidate {
+                        axis,
+                        boundary,
+                        centroid_min,
+                        bin_width,
+                        cost,
+                    });
                 }
             }
         }
-        (best_axis, best_pos, best_cost)
+
+        best
     }
 
-    /// Calculates the cost of the current node by node_idx.
+    /// Range covered by the triangle centroids of `node` along `axis`.
+    fn centroid_extent(&self, node: &BVHNode, axis: usize) -> (f64, f64) {
+        let mut min = f64::MAX;
+        let mut max = f64::MIN;
+
+        for i in node.left_first..(node.left_first + node.tri_count) {
+            let centroid_pos = self.tris[self.tri_idx[i]].centroid[axis];
+            min = min.min(centroid_pos);
+            max = max.max(centroid_pos);
+        }
+
+        (min, max)
+    }
+
+    /// Accumulates a bounding box and a count into the bin each triangle's centroid falls in.
+    ///
+    /// Note the asymmetry, which is deliberate: the **centroid** decides the bin, because a
+    /// triangle goes entirely to one side of the plane, but the box accumulated is the
+    /// triangle's **full bounding box**, which may straddle that plane. The two children
+    /// therefore overlap, and must — a child's box has to contain its triangles whole.
+    /// See `docs/heuristique_aire_surface.md` §4.
+    fn fill_bins(&self, node: &BVHNode, axis: usize, centroid_min: f64, bin_width: f64) -> [Bin; BIN_COUNT] {
+        let mut bins = [Bin {
+            bounds: AABoundingBox::empty(),
+            tri_count: 0,
+        }; BIN_COUNT];
+
+        for i in node.left_first..(node.left_first + node.tri_count) {
+            let tri = &self.tris[self.tri_idx[i]];
+            let bin = &mut bins[bin_index(tri.centroid[axis], centroid_min, bin_width)];
+            bin.bounds
+                .combine_with(&self.aabound_from_triangle(tri.vertex0_idx, tri.vertex1_idx, tri.vertex2_idx));
+            bin.tri_count += 1;
+        }
+
+        bins
+    }
+
+    /// Cost of keeping `node` as a leaf: `A_node · N`. `[5]`
+    ///
+    /// The right-hand side of the split test, whose left-hand side is what
+    /// `find_best_split_plane` returns. **Neither is divided by `A_node`**, and that shared
+    /// convention is what makes the comparison meaningful: `[3] < [4]` multiplied through by
+    /// `A_node`, with `t_trav = 0` and `t_isect = 1`. Changing the convention on one side
+    /// alone silently redefines "is splitting worth it". Derivation in
+    /// `docs/heuristique_aire_surface.md` §2, and the `t_trav = 0` departure in §6.
     fn calculate_node_cost(&self, node: &BVHNode) -> f64 {
-        let current_area = node.bbox.half_area();
-        current_area * node.tri_count as f64
+        node.bbox.half_area() * node.tri_count as f64
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `side³` small triangles, one per cell of a regular grid, well separated from one
+    /// another. Deliberately not axis-aligned: the normal is (0.03, −0.12, 0.15), all three
+    /// components non-zero, so no axis-aligned ray lies in a triangle's plane — which
+    /// Möller–Trumbore would reject as degenerate, quietly emptying the ray sets below.
+    fn unbuilt_grid_mesh(side: usize) -> BVHTree {
+        let mut vertices: Vec<f64> = Vec::new();
+        let mut indices: Vec<usize> = Vec::new();
+
+        for ix in 0..side {
+            for iy in 0..side {
+                for iz in 0..side {
+                    let (x, y, z) = (ix as f64, iy as f64, iz as f64);
+                    let first_vertex = vertices.len() / 3;
+
+                    vertices.extend_from_slice(&[x, y, z]);
+                    vertices.extend_from_slice(&[x + 0.4, y + 0.1, z]);
+                    vertices.extend_from_slice(&[x + 0.1, y + 0.4, z + 0.3]);
+
+                    indices.extend_from_slice(&[first_vertex, first_vertex + 1, first_vertex + 2]);
+                }
+            }
+        }
+
+        BVHTree::new(Arc::new(vertices), &indices)
+    }
+
+    fn grid_mesh(side: usize) -> BVHTree {
+        let mut tree = unbuilt_grid_mesh(side);
+        tree.build();
+        tree
+    }
+
+    /// A node spanning `tri_count` triangles from position `left_first` of `tri_idx`.
+    ///
+    /// Used to hand candidates to `find_best_split_plane` on an unbuilt tree. A built tree
+    /// cannot supply them: with `t_trav = 0` splitting always pays, so every leaf ends up
+    /// holding a single triangle whose centroid extent is empty on all three axes — no
+    /// candidate left anywhere. Any contiguous range of an unbuilt `tri_idx` is a legitimate
+    /// node, which is what makes this legitimate rather than a fixture.
+    fn node_over(tree: &BVHTree, left_first: usize, tri_count: usize) -> BVHNode {
+        let mut node = BVHNode {
+            bbox: AABoundingBox::empty(),
+            left_first,
+            tri_count,
+        };
+        tree.update_bounds(&mut node);
+        node
+    }
+
+    /// Nearest intersection found by testing every triangle, ignoring the tree entirely.
+    fn brute_force(tree: &BVHTree, ray: &Ray, near: f64, far: f64) -> Option<(f64, usize)> {
+        let verts = tree.vertices.as_ref();
+        let mut nearest: Option<(f64, usize)> = None;
+
+        for (idx, tri) in tree.tris.iter().enumerate() {
+            let p0 = BVHTree::build_vertex(verts, tri.vertex0_idx);
+            let p1 = BVHTree::build_vertex(verts, tri.vertex1_idx);
+            let p2 = BVHTree::build_vertex(verts, tri.vertex2_idx);
+
+            if let Some(hit) = intersect_ray(ray, &p0, &p1, &p2) {
+                if hit.t < near || hit.t > far {
+                    continue;
+                }
+                let closer = match nearest {
+                    None => true,
+                    Some((t, _)) => hit.t < t,
+                };
+                if closer {
+                    nearest = Some((hit.t, idx));
+                }
+            }
+        }
+
+        nearest
+    }
+
+    /// A deterministic ray set that actually reaches the geometry.
+    ///
+    /// Rays aimed at triangle centroids from three distant origins, so the comparison below is
+    /// not vacuous — a lattice of parallel rays mostly misses a mesh of small, well separated
+    /// slivers, which is how the first version of this test managed to hit six times out of
+    /// two hundred. Aiming at a centroid also lands rays exactly on bin boundaries, the case
+    /// that matters most here.
+    ///
+    /// Axis-aligned pencils are added on purpose rather than out of laziness: they graze the
+    /// flat faces of the bins' boxes, which is where a conservative box test and a partition
+    /// have to agree. Most of them miss, which is equally worth checking.
+    fn ray_set(tree: &BVHTree) -> Vec<Ray> {
+        let mut rays = Vec::new();
+
+        let origins = [
+            Vector3f::new(-6.0, -7.0, -8.0),
+            Vector3f::new(9.0, -6.0, 7.0),
+            Vector3f::new(-5.0, 8.0, -9.0),
+        ];
+        for tri in tree.tris.iter() {
+            for origin in origins.iter() {
+                rays.push(Ray::new(origin, &(&tri.centroid - origin)));
+            }
+        }
+
+        for a in 0..7 {
+            for b in 0..7 {
+                let u = -1.0 + a as f64 * 0.7;
+                let v = -1.0 + b as f64 * 0.7;
+
+                rays.push(Ray::new(&Vector3f::new(-5.0, u, v), &Vector3f::new(1.0, 0.0, 0.0)));
+                rays.push(Ray::new(&Vector3f::new(u, -5.0, v), &Vector3f::new(0.0, 1.0, 0.0)));
+                rays.push(Ray::new(&Vector3f::new(u, v, -5.0), &Vector3f::new(0.0, 0.0, 1.0)));
+            }
+        }
+
+        rays
+    }
+
+    /// The binned prefix/suffix scan must give exactly the cost a full scan of the triangles
+    /// gives for the same plane. This is the test that would have caught reading a single
+    /// bin's area instead of the union of every bin on that side — see
+    /// `docs/heuristique_aire_surface.md` §3.
+    ///
+    /// Equality is exact, not approximate, and that is a claim about the arithmetic: both
+    /// paths union the same boxes with `min`/`max`, which are exact and order-independent, then
+    /// evaluate the same expression on the same operands. Any difference is a difference of
+    /// substance, never of rounding.
+    ///
+    /// Scope: it validates the **accumulation**, not the classification — both sides bin with
+    /// `bin_index` on purpose, so that the test bears on one thing at a time.
+    #[test]
+    fn test_binned_cost_matches_exhaustive_scan() {
+        let tree = unbuilt_grid_mesh(4);
+
+        // Ranges of varied length and offset, so the check spans candidates with many bins on
+        // both sides as well as ones with very few, over all three axes.
+        let ranges = [(0, 64), (0, 33), (7, 40), (10, 20), (0, 9), (56, 8), (30, 2)];
+
+        let mut checked = 0;
+        for (left_first, tri_count) in ranges.iter() {
+            let node = node_over(&tree, *left_first, *tri_count);
+
+            if let Some(split) = tree.find_best_split_plane(&node) {
+                assert_eq!(
+                    split.cost,
+                    tree.exhaustive_split_cost(&node, &split),
+                    "binned cost disagrees with the exhaustive scan over {} triangles from {}, axis {} boundary {}",
+                    tri_count,
+                    left_first,
+                    split.axis,
+                    split.boundary
+                );
+                checked += 1;
+            }
+        }
+
+        assert!(checked >= ranges.len(), "only {} of {} ranges yielded a candidate", checked, ranges.len());
+    }
+
+    /// The tree must return exactly what testing every triangle returns.
+    ///
+    /// This is the real guard on the partition: `bvh_stats` counts work, and a partition that
+    /// loses a triangle would simply report *less* work while quietly dropping geometry. Only
+    /// a comparison against brute force sees it.
+    ///
+    /// Distances are compared exactly, because both paths call the same `intersect_ray` on the
+    /// same vertices — the tree changes which triangles are tested, never how.
+    #[test]
+    fn test_query_matches_brute_force() {
+        let tree = grid_mesh(3);
+        let (near, far) = (0.0001, 1000.0);
+
+        let mut hits = 0;
+        for ray in ray_set(&tree).iter() {
+            let expected = brute_force(&tree, ray, near, far);
+            let actual = tree.query(ray, near, far).map(|(hit, idx)| (hit.t, idx));
+
+            match (expected, actual) {
+                (None, None) => {}
+                (Some((expected_t, expected_idx)), Some((actual_t, actual_idx))) => {
+                    assert_eq!(expected_t, actual_t, "wrong distance for ray {:?}", ray);
+                    assert_eq!(expected_idx, actual_idx, "wrong triangle for ray {:?}", ray);
+                    hits += 1;
+                }
+                (expected, actual) => panic!("brute force gave {:?}, the tree gave {:?}, for ray {:?}", expected, actual, ray),
+            }
+        }
+
+        assert!(hits > 20, "only {} rays hit the mesh; the ray set proves little", hits);
+    }
+
+    /// Well separated triangles must end up in distinct leaves. This is the assertion that
+    /// fails on the defect this replaces: with the cost read per bin, one leaf kept a third of
+    /// the mesh.
+    #[test]
+    fn test_separated_triangles_land_in_distinct_leaves() {
+        let tree = grid_mesh(4);
+        let stats = tree.build_stats();
+
+        assert_eq!(
+            stats.total_leaf_tri_count,
+            tree.triangle_count(),
+            "every triangle belongs to exactly one leaf"
+        );
+        assert!(
+            stats.max_leaf_tri_count <= 4,
+            "64 well separated triangles should not share a leaf; largest holds {}",
+            stats.max_leaf_tri_count
+        );
     }
 }

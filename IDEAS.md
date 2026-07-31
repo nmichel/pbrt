@@ -32,35 +32,48 @@ departure from a physical model, (3) is a prerequisite to *validating* (2) and (
 
 ### BVH — mesh (the branch's current subject)
 
-- [ ] **SAH cost is computed from the wrong box.**
-      [bvh.rs:457](src/shapes/triangle_mesh/bvh.rs#L457) and
-      [bvh.rs:463](src/shapes/triangle_mesh/bvh.rs#L463) use `left_bin.bounds.half_area()`
-      — the area of the *single* bin — where the SAH needs the area of the union of all
-      bins on that side of the plane. `left_box`/`right_box` are accumulated correctly at
-      [bvh.rs:448](src/shapes/triangle_mesh/bvh.rs#L448) and then never read. The cost
-      being minimised is therefore not the SAH, and the chosen splits are not the best
-      ones. Affects tree quality only, not the image.
-- [ ] **First candidate plane is degenerate.**
-      [bvh.rs:472](src/shapes/triangle_mesh/bvh.rs#L472): `best_pos = bound_min + i * inv_scale`
-      with `i` starting at 0 puts the first plane exactly on `bound_min`, so the left side
-      is empty; the `left_count == 0` guard then returns and subdivision stops early. The
-      boundary of bin `i` is at `bound_min + (i + 1) * scale`.
-- [ ] `evaluate_sah` is dead code (build warning) — the binned path replaced it. Remove or
-      keep as the reference implementation a test can check the binned version against.
-      If kept as the oracle it needs fixing first: it returns `f64::MAX` when the cost is
-      `0.0`, commented "Avoid division by zero" although it performs no division — a
-      leftover from a version normalised by `A_node`. A zero cost is legitimate (a flat box,
-      or every triangle on one side), so the oracle currently rejects valid splits too.
+- [x] **SAH cost was computed from the wrong box.** `left_bin.bounds.half_area()` — the area
+      of a *single* bin — where the SAH needs the area of the union of all bins on that side
+      of the plane. `left_box`/`right_box` were accumulated correctly and then never read.
+      *Done.* The prefix/suffix scan now reads the accumulated unions. The derivation is in
+      [docs/heuristique_aire_surface.md](docs/heuristique_aire_surface.md), whose §3 carries
+      the counter-example that settles it: for eight equally populated bins of growing spread,
+      the per-bin cost is not merely imprecise, it is **constant** — it distinguishes nothing,
+      ties on all seven planes, and the strict comparison then elects the first, i.e. the
+      degenerate one. A `debug_assert!` now guards the invariant the per-bin form lacks: a
+      union can only grow, so prefix areas cannot decrease and suffix areas cannot increase.
+- [x] **First candidate plane was degenerate.** `bound_min + i * inv_scale` with `i` from 0 put
+      the first plane exactly on `bound_min`, left side empty, the `left_count == 0` guard
+      returning and subdivision stopping. *Done.* Boundary `i` is at
+      `centroid_min + (i + 1) · bin_width`, and `inv_scale` — the misnamed duplicate of
+      `scale` that made the wrong formula read as plausible — is gone.
+- [x] `evaluate_sah` was dead code, and buggy: `f64::MAX` for a zero cost under a comment about
+      a division it does not perform. *Done.* Fixed, renamed `exhaustive_split_cost`, marked
+      `#[cfg(test)]`, and used as the oracle of `test_binned_cost_matches_exhaustive_scan` —
+      which fails on the per-bin defect, verified by reintroducing it.
+- [x] **The partition compared a reconstructed float position** while the cost was derived from
+      bin counts, so the two could disagree for a centroid on a boundary and the winning plane
+      could be scored on a partition that never happened. *Done.* `SplitCandidate` carries the
+      boundary index and the binning parameters rather than a position, and both paths call the
+      same `bin_index`. Not in the original review — found while planning the fix.
 - [ ] **Each node's box is tested twice.** The traversal tests a child's box before pushing
-      it ([bvh.rs:319-320](src/shapes/triangle_mesh/bvh.rs#L319-L320)) and tests the same box
-      again after popping it ([bvh.rs:294](src/shapes/triangle_mesh/bvh.rs#L294)). Visible
-      in the baseline: box tests per ray runs at 2.2× nodes visited per ray. Either push the
-      distance alongside the index, or drop the pre-push test and let the pop handle it.
-- [ ] **An empty mesh makes the build recurse into a node that does not exist.** `build`
-      leaves a root with `tri_count == 0`, which `is_leaf` reports as an interior node, so
-      every walk of the tree — `subdivide`, and now `build_stats` — follows `left_first` into
-      an empty `nodes`. Same family as the `BVHNode::new`-on-empty-vector defect listed
-      under *BVH — scene*: emptiness is not represented anywhere.
+      it ([bvh.rs:379-380](src/shapes/triangle_mesh/bvh.rs#L379-L380)) and tests the same box
+      again after popping it ([bvh.rs:354](src/shapes/triangle_mesh/bvh.rs#L354)). Box tests
+      per ray runs at ~2.6× nodes visited per ray. Either push the distance alongside the
+      index, or drop the pre-push test and let the pop handle it. **Next up** — deliberately
+      kept out of the SAH commit so its before/after stayed attributable.
+- [ ] **Leaves hold a single triangle**, so the tree has ~2 nodes per triangle: 1 724 381 nodes
+      for `dragon_vrip.ply`. That is the `t_trav = 0` of `[5]`
+      ([docs/heuristique_aire_surface.md](docs/heuristique_aire_surface.md) §6) — with
+      traversal counted free, splitting always wins. Giving it pbrt's weight of ~1/8 of an
+      intersection would shorten the tree and cut the memory, at some cost in triangle tests.
+      Worth measuring both ways now that measuring is cheap.
+- [ ] **An empty mesh makes `build_stats` recurse into a node that does not exist.** `build`
+      leaves a root with `tri_count == 0`, which `is_leaf` reports as an interior node, so a
+      walk follows `left_first` into an empty `nodes`. `subdivide` is no longer affected — the
+      explicit rejection of empty sides makes it return at once — but the representation
+      problem stands. Same family as the `BVHNode::new`-on-empty-vector defect listed under
+      *BVH — scene*: emptiness is not represented in `BVHTree` at all.
 
 #### Baseline — 2026-07-30
 
@@ -131,6 +144,48 @@ every plane there.
 
 Conclusion for the next step: the empty box had to be fixed, but the gain is entirely in the
 cost function itself.
+
+#### After the SAH fix — 2026-07-31
+
+The cost now reads the areas of the accumulated **unions** either side of the plane, candidate
+planes sit on the right bin boundaries, empty sides are rejected explicitly, and the partition
+classifies with the same `bin_index` the cost model binned with.
+
+| mesh | nodes (leaves) | depth | max leaf | **tri tests/ray** | box tests/ray |
+|---|---|---|---|---|---|
+| `cube.ply` | 11 (6) | 6 | 2 | 5.80 → **1.18** | 1.00 → 8.62 |
+| `bun_zipper_res4.ply` | 1811 (906) | 14 | 4 | 254.41 → **0.77** | 2.45 → 15.27 |
+| `bunny.ply` | 138 881 (69 441) | 21 | 2 | 7464.08 → **0.58** | 5.80 → 21.48 |
+| `dragon_vrip_res4.ply` | 21 137 (10 569) | 19 | 5 | 517.28 → **0.63** | 7.36 → 18.22 |
+| `dragon_vrip_res3.ply` | 92 929 (46 465) | 21 | 5 | 3622.88 → **0.60** | 6.68 → 20.87 |
+| `dragon_vrip.ply` | 1 724 381 (862 191) | 29 | 6 | 66 649.36 → **0.58** | 6.45 → 24.76 |
+
+Four to five orders of magnitude on the large meshes. The dominant leaf of `dragon_vrip.ply`
+goes from 316 949 triangles — 36 % of the model — to 6. Measuring the six meshes took 2 min 17 s
+for the dragon alone before; the whole set now runs in seconds.
+
+**The partition is intact, checked two ways.** Raw hit counts are identical *to the unit* on all
+six meshes (`cube` 116 004, `bun_zipper_res4` 47 693, `bunny` 46 904, `dragon_res4` 42 797,
+`dragon_res3` 43 451, `dragon_vrip` 43 269) — `bvh_stats` now prints the raw count, not only the
+rounded percentage, precisely so this comparison is possible. And a unit test compares
+`BVHTree::query` against brute-force intersection of every triangle, requiring exact equality of
+distance *and* triangle index; the hit count alone would not notice a ray that found a farther
+triangle.
+
+**Two costs, both expected.** Box tests per ray rise by a factor of 3 to 4: a deeper tree means
+more nodes to reject, which is the trade the SAH makes and wins by a wide margin. And the node
+count is now ~2× the triangle count, so leaves hold a single triangle on average — that is the
+`t_trav = 0` departure showing (`docs/heuristique_aire_surface.md` §6): with traversal counted
+free, splitting always looks worth it. Giving `t_trav` its real weight would shorten the tree
+and cut the memory; deliberately left for later so this before/after measures one thing.
+
+**A render is unchanged**, verified by rendering `cube_mesh.stage` from the previous commit and
+from this one. A pixel-exact comparison is impossible while the sampler is unseeded, so the
+brute-force test above is the real guarantee.
+
+**Where the time goes now.** `bunny_mesh.stage` at 120×90×4 takes 53 s, which is no longer the
+mesh's fault — the scene BVH clones its primitives into a `Vec` per ray and tests them all,
+unordered. That is the next bottleneck, and it is the *BVH — scene* section below.
 
 #### How to go about it
 

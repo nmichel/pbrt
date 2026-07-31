@@ -109,7 +109,16 @@ fn report(path: &str) {
         );
     }
 
-    println!("  rays                     {} ({:.1} % hit the mesh)", cast.ray_count, 100.0 * hit_ratio);
+    // The raw count, not only the rounded percentage: it is the invariant that guards the
+    // partition across a change to the build. Which rays reach the mesh is a property of the
+    // geometry alone — a better tree changes the work done to find the hit, never the hit. A
+    // count that moves means a triangle was lost.
+    println!(
+        "  rays                     {} ({} hit the mesh, {:.1} %)",
+        cast.ray_count,
+        cast.hit_count,
+        100.0 * hit_ratio
+    );
     println!("  nodes visited / ray      {:.2}", per_ray(cast.stats.nodes_visited));
     println!("  box tests / ray          {:.2}", per_ray(cast.stats.box_tests));
     println!("  triangle tests / ray     {:.2}", per_ray(cast.stats.triangle_tests));

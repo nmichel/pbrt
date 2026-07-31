@@ -601,7 +601,9 @@ suffisante. À comparer avec ce qu'elle a remplacé, un gonflage de boîte à 0,
 ordres de grandeur de trop, et surtout une valeur absolue, donc à la fois excessive près de
 l'origine et insuffisante loin d'elle. Ce gonflage faussait de plus toute évaluation du SAH,
 puisqu'une boîte épaissie déclare une aire qu'elle n'a pas ; c'est ce que verrouille
-`test_degenerate_box_area_is_faithful`.
+`test_degenerate_box_area_is_faithful`. Pourquoi cette aire gouverne le choix d'un plan de
+découpe, et ce que le débordement d'une boîte vide y provoquait, sont traités dans
+[heuristique_aire_surface.md](heuristique_aire_surface.md) §1 et §5.
 
 `test_rounding_bound_magnitude` garde les constantes : si γ(3) sortait de [3u, 4u], ou si
 `SLAB_WIDENING` dépassait 10⁻¹⁵, c'est que l'élargissement serait redevenu l'epsilon
