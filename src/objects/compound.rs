@@ -58,7 +58,7 @@ impl Intersectable for Compound {
 
 impl AABound for Compound {
     fn get_bounding_box(&self) -> AABoundingBox {
-        self.objects.iter().fold(AABoundingBox::new_invalid(), |mut acc, object| {
+        self.objects.iter().fold(AABoundingBox::empty(), |mut acc, object| {
             acc.combine_with(&mut object.get_bounding_box());
             acc
         })

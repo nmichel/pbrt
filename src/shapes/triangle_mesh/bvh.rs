@@ -145,7 +145,7 @@ impl BVHTree {
 
     pub fn build(&mut self) {
         let mut root = BVHNode {
-            bbox: AABoundingBox::new_invalid(),
+            bbox: AABoundingBox::empty(),
             left_first: 0,
             tri_count: self.tris.len(),
         };
@@ -204,7 +204,7 @@ impl BVHTree {
 
         // Create left and right nodes
         let mut left_node = BVHNode {
-            bbox: AABoundingBox::new_invalid(),
+            bbox: AABoundingBox::empty(),
             left_first: left_first,
             tri_count: left_count,
         };
@@ -214,7 +214,7 @@ impl BVHTree {
         self.next_node_idx += 1;
 
         let mut right_node = BVHNode {
-            bbox: AABoundingBox::new_invalid(),
+            bbox: AABoundingBox::empty(),
             left_first: i,
             tri_count: tri_count - left_count,
         };
@@ -232,8 +232,8 @@ impl BVHTree {
     }
 
     fn evaluate_sah(&self, node: &BVHNode, axis: usize, pos: f64) -> f64 {
-        let mut left_box: AABoundingBox = AABoundingBox::new_invalid();
-        let mut right_box: AABoundingBox = AABoundingBox::new_invalid();
+        let mut left_box: AABoundingBox = AABoundingBox::empty();
+        let mut right_box: AABoundingBox = AABoundingBox::empty();
         let mut left_count: usize = 0;
         let mut right_count: usize = 0;
         for i in node.left_first..(node.left_first + node.tri_count) {
@@ -427,7 +427,7 @@ impl BVHTree {
 
             let scale = (bound_max - bound_min) / 8.0;
             let mut bins: [Bin; 8] = [Bin {
-                bounds: AABoundingBox::new_invalid(),
+                bounds: AABoundingBox::empty(),
                 tri_count: 0,
             }; 8];
 
@@ -445,8 +445,8 @@ impl BVHTree {
             let mut right_areas = vec![0.0; 7];
             let mut left_count = vec![0; 7];
             let mut right_count = vec![0; 7];
-            let mut left_box: AABoundingBox = AABoundingBox::new_invalid();
-            let mut right_box: AABoundingBox = AABoundingBox::new_invalid();
+            let mut left_box: AABoundingBox = AABoundingBox::empty();
+            let mut right_box: AABoundingBox = AABoundingBox::empty();
             let mut left_sum = 0;
             let mut right_sum = 0;
             for i in 0..7 {

@@ -39,15 +39,34 @@ const GAMMA_3: f64 = 3.0 * UNIT_ROUNDOFF / (1.0 - 3.0 * UNIT_ROUNDOFF);
 const SLAB_WIDENING: f64 = 2.0 * GAMMA_3;
 
 impl AABoundingBox {
-    /// An empty box, built so that `combine_with` yields the other operand unchanged.
+    /// The empty box — the identity element of the union `combine_with`.
     ///
-    /// `bmin`/`bmax` are deliberately inverted: this is not a valid box and must not be
-    /// passed to `hit` or `half_area` before being combined with at least one real box.
-    pub fn new_invalid() -> Self {
+    /// It is a perfectly meaningful value, not a broken one: combining it with any box `b`
+    /// yields `b`, which is exactly what an accumulator needs to start from. Emptiness is
+    /// encoded by **inverted bounds** (`bmin > bmax` on every axis), the one state `new`
+    /// refuses to build, so it cannot collide with any real box. `is_empty` is the only
+    /// way to ask.
+    ///
+    /// Its area is zero, per `half_area`. It must not be passed to `hit`: see the
+    /// precondition there.
+    pub fn empty() -> Self {
         Self {
             bmin: Vector3f::max(),
             bmax: Vector3f::min(),
         }
+    }
+
+    /// Whether the box bounds nothing at all.
+    ///
+    /// One inverted axis is enough: a box whose extent is negative along x contains no
+    /// point, whatever the other two axes do.
+    ///
+    /// Not to be confused with a *flat* box, which is degenerate but not empty — it still
+    /// contains points, and generally still has a non-zero area. The surface-area
+    /// heuristic depends on telling the two apart; see
+    /// `docs/heuristique_aire_surface.md` §5.
+    pub fn is_empty(&self) -> bool {
+        self.bmin.x > self.bmax.x || self.bmin.y > self.bmax.y || self.bmin.z > self.bmax.z
     }
 
     /// Build a box from its two extreme corners.
@@ -60,7 +79,7 @@ impl AABoundingBox {
     pub fn new(lower: &Vector3f, higher: &Vector3f) -> Self {
         debug_assert!(
             lower.x <= higher.x && lower.y <= higher.y && lower.z <= higher.z,
-            "AABoundingBox::new expects lower <= higher componentwise, got {:?} and {:?} (use new_invalid() for an empty box)",
+            "AABoundingBox::new expects lower <= higher componentwise, got {:?} and {:?} (use empty() for an empty box)",
             lower,
             higher
         );
@@ -68,7 +87,26 @@ impl AABoundingBox {
         Self { bmin: *lower, bmax: *higher }
     }
 
+    /// Half the surface area of the box: dx·dy + dy·dz + dz·dx.
+    ///
+    /// The missing factor 2 — the true area is SA = 2·(dx·dy + dy·dz + dz·dx) — is dropped
+    /// deliberately, not by oversight. Every use of this quantity is either a *ratio* of
+    /// areas, namely the probability that a ray hitting one box also hits a box it
+    /// contains, or a comparison in which the factor stands on both sides. It cancels in
+    /// both cases. See `docs/heuristique_aire_surface.md` §1, equation `[1]`.
+    ///
+    /// An empty box reports **zero**, the area of the empty set. The explicit test is the
+    /// point of this method: without it the inverted bounds of `empty` would make
+    /// `bmax - bmin` overflow to `-inf` on every axis (`docs/arithmetique_flottante.md`
+    /// §0), and the sum of products would come back `+inf`. The surface-area heuristic
+    /// would then multiply that by a primitive count and obtain `+inf` — or `NaN`, when the
+    /// count is zero — and drop the candidate plane, which is the right outcome reached by
+    /// arithmetic overflow rather than by intent. See §5 of the same document.
     pub fn half_area(&self) -> f64 {
+        if self.is_empty() {
+            return 0.0;
+        }
+
         let d = self.bmax - self.bmin;
         d.x * d.y + d.y * d.z + d.z * d.x
     }
@@ -98,6 +136,22 @@ impl AABoundingBox {
     ///
     /// Intersecting the three parametric intervals leaves [tmin, tmax]; the ray meets the
     /// box if and only if that interval is non-empty.
+    ///
+    /// # Precondition: the box must not be empty
+    ///
+    /// Asking whether a ray hits nothing is a question with no useful answer, and no caller
+    /// has a reason to ask it — an accelerator fills every node's bounds before traversing
+    /// it. The precondition is therefore asserted in debug rather than handled, which also
+    /// keeps the release traversal branch-free.
+    ///
+    /// The deliberate asymmetry with `half_area`, which *does* answer for the empty box, is
+    /// that the area of the empty set is defined and the heuristic needs it; "does a ray
+    /// hit the empty set" is not a question worth defining.
+    ///
+    /// Note that the slab test happens to return `None` on an empty box today, the inverted
+    /// bounds sending `tmax` below `tmin` — but only because the arithmetic overflows in a
+    /// convenient direction. That is precisely the kind of accident the two sections below
+    /// are about removing, so it is not relied upon.
     ///
     /// # Why the rejection test is strict
     ///
@@ -242,6 +296,8 @@ impl AABoundingBox {
     /// already present in the inputs — notably the normalisation of `ray.direction` — is a
     /// separate matter and is not accounted for here.
     pub fn hit(&self, ray: &Ray, mut tmin: f64, mut tmax: f64) -> Option<f64> {
+        debug_assert!(!self.is_empty(), "AABoundingBox::hit called on an empty box: {:?}", self);
+
         for i in 0..3 {
             if ray.direction[i] == 0.0 {
                 // Parallel to this slab: inside it iff the origin is.
@@ -308,7 +364,7 @@ impl AABoundingBox {
     /// assert_eq!(c.bmax.z, 1.0);
     /// ```
     pub fn combine(a: &AABoundingBox, b: &AABoundingBox) -> AABoundingBox {
-        let mut res = AABoundingBox::new_invalid();
+        let mut res = AABoundingBox::empty();
         res.combine_with(a).combine_with(b);
         res
     }
@@ -446,6 +502,48 @@ mod tests {
 
         let point = AABoundingBox::new(&Vector3f::zero(), &Vector3f::zero());
         assert_eq!(point.half_area(), 0.0);
+    }
+
+    /// The area of the empty set is zero. Without the explicit test in `half_area` this
+    /// returns `+inf`: the inverted bounds make `bmax - bmin` overflow to `-inf` on each
+    /// axis, and the sum of the three products comes back `+inf`. The SAH would then get
+    /// `+inf` for any candidate whose bin is empty, or `NaN` (`inf × 0`) when the count is
+    /// zero too — dropping the plane either way, by overflow rather than by intent.
+    #[test]
+    fn test_empty_box_has_zero_area() {
+        assert_eq!(AABoundingBox::empty().half_area(), 0.0);
+    }
+
+    /// Flat is not empty, and the distinction is what the SAH rests on: a flat box still
+    /// contains points and generally still has an area, so it must keep contributing its
+    /// real cost, while an empty side of a split plane must be rejected outright.
+    #[test]
+    fn test_empty_and_flat_are_different_states() {
+        assert!(AABoundingBox::empty().is_empty());
+
+        // d = (2, 0, 3): no thickness along y, yet an area of 6.
+        let flat = AABoundingBox::new(&Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(2.0, 0.0, 3.0));
+        assert!(!flat.is_empty(), "a flat box bounds points and is not empty");
+        assert_eq!(flat.half_area(), 6.0);
+
+        // A single point is the smallest non-empty box.
+        let point = AABoundingBox::new(&Vector3f::zero(), &Vector3f::zero());
+        assert!(!point.is_empty());
+        assert_eq!(point.half_area(), 0.0);
+    }
+
+    /// The empty box is the identity element of the union, which is the whole reason it
+    /// exists: an accumulator can start from it and stay correct after one combine.
+    #[test]
+    fn test_empty_box_is_the_union_identity() {
+        let b = AABoundingBox::new(&Vector3f::new(-1.0, 2.0, -3.0), &Vector3f::new(4.0, 5.0, 6.0));
+
+        let mut acc = AABoundingBox::empty();
+        acc.combine_with(&b);
+
+        assert_eq!(acc.bmin, b.bmin);
+        assert_eq!(acc.bmax, b.bmax);
+        assert!(!acc.is_empty(), "one combine is enough to leave the empty state");
     }
 
     /// Guards the rounding constants derived in `hit`: γ(3) must stay a small multiple of

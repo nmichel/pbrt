@@ -103,6 +103,35 @@ and point everywhere and stress a tree differently; measuring those needs the se
 sampler (item 3 of the order of work). So this baseline tracks the right direction but
 understates the gain.
 
+#### Effect of making the empty box report an area of 0 — 2026-07-31
+
+`AABoundingBox::half_area()` now returns `0` on an empty box instead of `+inf`. This was
+meant as a correctness cleanup, not a tree improvement, but it moves the numbers — worth
+recording, because the direction is not the one intuition suggests.
+
+| mesh | nodes (leaves) | depth | max leaf | tri tests/ray |
+|---|---|---|---|---|
+| `cube.ply` | 1 (1) → **23 (12)** | 1 → 5 | 12 → **1** | 5.80 → **1.31** |
+| `bun_zipper_res4.ply` | 3 (2) → 3 (2) | 2 → 2 | 716 → 716 | 254.41 → 254.41 |
+| `bunny.ply` | 121 (61) → 217 (109) | 14 → 16 | 37 469 → 37 469 | 7464.08 → 7464.08 |
+| `dragon_vrip_res4.ply` | 351 (176) → 935 (468) | 19 → 22 | 3143 → 3143 | 517.28 → 517.13 |
+| `dragon_vrip_res3.ply` | 1021 (511) → 2423 (1212) | 22 → 26 | 15 949 → 15 949 | 3622.88 → 3623.01 |
+| `dragon_vrip.ply` | 2301 (1151) → 5755 (2878) | 27 → 32 | 316 949 → 316 949 | 66 649.36 → 66 658.07 |
+
+Hit counts unchanged on all six, so the partition is intact.
+
+**Reading.** The `+inf` was not a harmless accident: it *rejected outright* every candidate
+plane with an empty bin, which is why subdivision stopped so early. Removing it more than
+doubles the node count on the dragon. But it buys nothing per ray, because the areas are
+still read per bin: an empty bin now makes a plane look **free** — wrong in the opposite
+direction. So the extra nodes carve off crumbs while the dominant leaf, the one a real SAH
+would attack, is untouched on every organic mesh. `cube.ply` is the exception that proves the
+mechanism: 12 triangles over 8 bins leaves most bins empty, so the poisoning had blocked
+every plane there.
+
+Conclusion for the next step: the empty box had to be fixed, but the gain is entirely in the
+cost function itself.
+
 #### How to go about it
 
 **Prerequisite, satisfied.** `half_area` now reports the true area (commit `6211906`).
@@ -114,17 +143,17 @@ after every change to the build and put the before/after figures in the commit m
 
 **Four traps, all verified while reviewing:**
 
-- **`new_invalid().half_area()` is `+inf`.** `bmax - bmin` overflows to `-inf`, so the sum
-  of products comes back `+inf`. Two consequences, and the second is the one that bites:
-  an *accumulated* side that is still empty gives `inf * 0 = NaN`, and `NaN < best_cost` is
-  false, so the candidate is dropped — which is the outcome one wants, by accident. But with
-  the areas read per bin as they are today, **any** empty bin poisons its candidate with
-  `inf * N = +inf`, count non-zero or not. So it is not a rare NaN edge case: every plane
-  whose bin happens to be empty is discarded, which biases the choice systematically.
-  Fix both properly: reject empty sides explicitly,
-  `left_count[i] == 0 || right_count[i] == 0`, and make the empty box report an area of `0`
-  rather than `+inf` — the area of the empty set is zero, and `AABoundingBox` currently has
-  no way to say "empty" at all (see the empty-mesh and empty-scene defects above).
+- ~~**`new_invalid().half_area()` was `+inf`.**~~ *Half done.* `bmax - bmin` overflowed to
+  `-inf`, so the sum of products came back `+inf`, and **any** empty bin poisoned its
+  candidate with `inf * N = +inf` — not the rare `inf * 0 = NaN` edge case the review
+  described, but every plane with an empty bin, discarded systematically. `AABoundingBox` now
+  represents emptiness explicitly: `new_invalid()` is renamed `empty()` (the identity element
+  of the union, not an invalid state), `is_empty()` is the way to ask, `half_area()` reports
+  `0` — the area of the empty set — and `hit()` asserts the box is non-empty rather than
+  relying on the overflow landing the right way. Measured effect above: it unblocks
+  subdivision but buys nothing per ray. **Still to do in the binned path:** reject empty sides
+  explicitly, `left_count[i] == 0 || right_count[i] == 0`, because with `0` an empty side now
+  makes a plane look *free*.
 - **`inv_scale` is misnamed.** It holds the bin width `(bound_max - bound_min) / 8`,
   identical to the `scale` computed a few lines above, and is the inverse of nothing. The
   misnomer is very likely what made `bound_min + i * inv_scale` read as plausible. Rename
@@ -184,7 +213,7 @@ precisely what would have made the current bug visible on reading.
       instead of relying on `f64::max` silently dropping a NaN; the slab interval is
       widened by the rounding bound 2γ(3); `new` stores the
       bound faithfully with a `debug_assert`; `combine` and `Compound::get_bounding_box`
-      use `new_invalid()` instead of an inverted box fixed up by accident; `Rectangle`
+      use `empty()` instead of an inverted box fixed up by accident; `Rectangle`
       dropped its ±1.0 hand-padding for an exact flat bound. Four tests added for
       degenerate and grazing cases.
       The rounding bound has its own write-up in
