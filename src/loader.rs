@@ -1,7 +1,10 @@
 mod ast;
+mod mesh_loader;
 mod parser;
 mod ply;
 mod visitors;
+
+pub use mesh_loader::load_ply_mesh;
 
 use std::sync::Arc;
 

@@ -1,9 +1,7 @@
-use std::convert::TryFrom;
-use std::fmt::Debug;
 use std::sync::Arc;
 
 use super::super::ast::*;
-use super::super::ply::{read_ply_file, PlyElementDesc, PlyElementProps, PlyEventObserver, PlyPropertyValue};
+use super::super::mesh_loader::load_ply_mesh;
 use super::Visitor;
 use crate::cameras::{Camera, PinHoleCamera, ThinLensCamera};
 use crate::config::Config;
@@ -15,70 +13,6 @@ use crate::objects::*;
 use crate::scene::Scene;
 use crate::shapes::*;
 use crate::textures::*;
-
-struct PlyObserver {
-    vertices: Vec<f64>,
-    faces: Vec<usize>,
-    reverse: bool,
-}
-
-impl PlyEventObserver for PlyObserver {
-    fn on_header_complete(&mut self, _header: &Vec<PlyElementDesc>) {}
-
-    fn on_vertex_start(&mut self) {}
-
-    fn on_vertex_event(self: &mut Self, props: &PlyElementProps, value: PlyPropertyValue) {
-        match props {
-            PlyElementProps::VertexX | PlyElementProps::VertexY | PlyElementProps::VertexZ => {
-                self.vertices.push(f64::try_from(&value).unwrap());
-            }
-            _ => {}
-        }
-    }
-
-    fn on_vertex_end(&mut self) {}
-
-    fn on_face_start(&mut self) {}
-
-    fn on_face_event(self: &mut Self, props: &PlyElementProps, value: PlyPropertyValue) {
-        fn push_to_faces<T>(list: &[T], faces: &mut Vec<usize>, reverse: bool)
-        where
-            usize: TryFrom<T>,
-            T: Copy,
-            <usize as TryFrom<T>>::Error: Debug,
-        {
-            if reverse {
-                for index in list.iter().rev() {
-                    faces.push(usize::try_from(*index).unwrap());
-                }
-            }
-            else {
-                for index in list.iter() {
-                    faces.push(usize::try_from(*index).unwrap());
-                }
-            }
-        }
-
-        match props {
-            PlyElementProps::FaceVertexIndices => {
-                match value {
-                    PlyPropertyValue::ListUInt32(list) => {
-                        push_to_faces(&list[..], &mut self.faces, self.reverse);
-                    }
-                    PlyPropertyValue::ListInt32(list) => {
-                        push_to_faces(&list[..], &mut self.faces, self.reverse);
-                    }
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn on_face_end(&mut self) {}
-
-    fn on_data_complete(&mut self) {}
-}
 
 pub struct SceneBuilderVisitor<'a> {
     pub scene: Scene,
@@ -227,16 +161,7 @@ impl Visitor for SceneBuilderVisitor<'_> {
     }
 
     fn visit_shape_mesh(self: &mut Self, node: &MeshShapeNode) {
-        let mut observer = PlyObserver {
-            vertices: Vec::new(),
-            faces: Vec::new(),
-            reverse: node.reverse,
-        };
-
-        read_ply_file(&node.filename, &mut observer).unwrap();
-
-        self.shapes
-            .push(Arc::new(TriangleMesh::new(observer.vertices, observer.faces, None, None)));
+        self.shapes.push(Arc::new(load_ply_mesh(&node.filename, node.reverse)));
     }
 
     fn visit_material_dielectric(self: &mut Self, node: &DielectricMaterialNode) {
