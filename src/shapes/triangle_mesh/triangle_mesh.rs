@@ -122,6 +122,17 @@ impl Intersectable for TriangleMesh {
         }
     }
 
+    /// Straight to the any-hit traversal: none of the work above it is needed for a boolean.
+    ///
+    /// This is where the saving of an occlusion query actually lands. `intersect` above searches
+    /// for the *nearest* triangle, then interpolates texture coordinates, computes ∂p/∂u and
+    /// ∂p/∂v, derives a normal and packs it all into a freshly allocated `IntersectionResult`.
+    /// Every line of it is thrown away by a caller that only wanted to know whether the light was
+    /// blocked.
+    fn intersect_p(&self, ray: &Ray, near: f64, far: f64) -> bool {
+        self.bvh.intersect_p(ray, near, far)
+    }
+
     fn contain_point(&self, _point: &Vector3f) -> bool {
         false
     }

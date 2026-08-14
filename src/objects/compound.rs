@@ -46,6 +46,14 @@ impl Intersectable for Compound {
         })
     }
 
+    /// The first member that blocks the ray settles it, so `any` short-circuits over the rest.
+    ///
+    /// `intersect` above cannot do that: it has to visit every member and concatenate their
+    /// results, because the nearest hit may belong to the last one.
+    fn intersect_p(&self, ray: &Ray, near: f64, far: f64) -> bool {
+        self.objects.iter().any(|object| object.intersect_p(ray, near, far))
+    }
+
     fn contain_point(&self, point: &Vector3f) -> bool {
         for object in self.objects.iter() {
             if object.contain_point(&point) {

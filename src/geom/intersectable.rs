@@ -31,6 +31,24 @@ pub type IntersectionResult = Vec<Intersection>;
 
 pub trait Intersectable: Send + Sync {
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult;
+
+    /// Whether `ray` meets this geometry at all within `[near, far]`.
+    ///
+    /// A different question from `intersect`, and one that deserves different work: *any* hit
+    /// answers it, so there is no nearest to look for, no distance to rank, and none of the
+    /// shading frame — normal, texture coordinates, ∂p/∂u, ∂p/∂v — that a surface whose only role
+    /// is to be in the way will never be asked for. Shadow rays ask this and nothing else.
+    ///
+    /// The default implementation answers it by way of `intersect`, which is **correct for every
+    /// implementation and wasteful for most**: it computes all of the above and then looks only at
+    /// whether the list came back empty. It is a default so that adding this method breaks
+    /// nothing, not because it is a good way to answer. Override it wherever the waste is worth
+    /// removing — which means wherever `intersect` does real work, and not in a shape whose
+    /// intersection is a handful of arithmetic.
+    fn intersect_p(&self, ray: &Ray, near: f64, far: f64) -> bool {
+        !self.intersect(ray, near, far).is_empty()
+    }
+
     fn contain_point(&self, point: &Vector3f) -> bool;
 }
 

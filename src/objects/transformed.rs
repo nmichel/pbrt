@@ -50,6 +50,20 @@ impl Intersectable for Transformed {
         res
     }
 
+    /// Moves the ray into local space and asks the question there.
+    ///
+    /// A boolean needs no journey back: `intersect` above has to build a second
+    /// `IntersectionResult` to carry every hit into world space, and that whole round trip exists
+    /// only to place points and normals a shadow ray will never read.
+    ///
+    /// `near` and `far` cross unchanged, exactly as they do in `intersect` — which is only sound
+    /// while transforms preserve distances along the ray. A scaling transform would break both
+    /// equally; this method inherits that assumption rather than adding one.
+    fn intersect_p(&self, ray: &Ray, near: f64, far: f64) -> bool {
+        let local_ray: Ray = self.transform.transform_ray_to_local(&ray);
+        self.object.intersect_p(&local_ray, near, far)
+    }
+
     fn contain_point(&self, point: &Vector3f) -> bool {
         let local_point = self.transform.transform_point_to_local(&point);
         self.object.contain_point(&local_point)

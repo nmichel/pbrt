@@ -360,6 +360,65 @@ impl BVHTree {
         self.traverse(ray, near, far, stats)
     }
 
+    /// Whether `ray` meets any triangle of the mesh within `[near, far]`.
+    ///
+    /// The any-hit counterpart of [`BVHTree::query`], and deliberately a separate traversal rather
+    /// than a flag on that one, because almost everything it does is unnecessary here:
+    ///
+    /// - **no ordering.** Visiting the nearer child first exists to shrink `min_t` early; with no
+    ///   `min_t` to shrink there is nothing to gain, so the children are pushed as they come and
+    ///   the stack holds plain indices instead of entry distances.
+    /// - **no interval narrowing**, for the same reason. `[near, far]` is fixed throughout.
+    /// - **no bookkeeping.** The first triangle found ends the traversal, so there is no nearest
+    ///   to keep, no index to remember, and no comparison per hit.
+    ///
+    /// The shading quantities are not skipped here but one level up, in `TriangleMesh`: this
+    /// returns a boolean, so no caller can ask for the uv interpolation or the ∂p/∂u and ∂p/∂v
+    /// that `Intersectable::intersect` computes.
+    ///
+    /// Not instrumented. `TraversalStats` is threaded through `traverse` because something counts
+    /// it; nothing counts this path yet, and an unused parameter is noise rather than symmetry.
+    pub fn intersect_p(&self, ray: &Ray, near: f64, far: f64) -> bool {
+        let verts = self.vertices.as_ref();
+
+        // As in `traverse`: the root has no parent to test it, every other box is tested once, by
+        // the parent that pushes it.
+        if self.nodes[ROOT_NODE_IDX].bbox.hit(ray, near, far).is_none() {
+            return false;
+        }
+
+        let mut stack: Vec<usize> = Vec::with_capacity(64);
+        stack.push(ROOT_NODE_IDX);
+
+        while let Some(node_idx) = stack.pop() {
+            let node = &self.nodes[node_idx];
+
+            if node.is_leaf() {
+                for i in 0..node.tri_count {
+                    let tri: &Tri = &self.tris[self.tri_idx[node.left_first + i]];
+                    let p0 = BVHTree::build_vertex(verts, tri.vertex0_idx);
+                    let p1 = BVHTree::build_vertex(verts, tri.vertex1_idx);
+                    let p2 = BVHTree::build_vertex(verts, tri.vertex2_idx);
+
+                    if let Some(intersection) = intersect_ray(ray, &p0, &p1, &p2) {
+                        if intersection.t >= near && intersection.t <= far {
+                            return true;
+                        }
+                    }
+                }
+            }
+            else {
+                for child_idx in [node.left_first, node.left_first + 1] {
+                    if self.nodes[child_idx].bbox.hit(ray, near, far).is_some() {
+                        stack.push(child_idx);
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
     /// Tests `node`'s bounding box against `ray` and records the test.
     ///
     /// Every ray/box test in the traversal goes through here, so `box_tests` cannot drift
@@ -853,6 +912,55 @@ mod tests {
         }
 
         assert!(hits > 20, "only {} rays hit the mesh; the ray set proves little", hits);
+    }
+
+    /// `intersect_p` must say `true` exactly when `query` finds something.
+    ///
+    /// The two are separate traversals — different stack, no ordering, no `min_t`, an early return
+    /// — so nothing but a test keeps them answering the same question. And the failure they would
+    /// hide is quiet: an `intersect_p` that missed occluders would not crash or slow anything
+    /// down, it would simply let light through walls.
+    ///
+    /// Bounded intervals are checked as well as open ones, because that is the shadow-ray case:
+    /// `far` carries the distance to the light, and a hit beyond it must not count.
+    #[test]
+    fn test_intersect_p_agrees_with_query() {
+        let tree = grid_mesh(3);
+        let (near, far) = (0.0001, 1000.0);
+
+        let mut occluded = 0;
+        for ray in ray_set(&tree).iter() {
+            let nearest = tree.query(ray, near, far);
+            assert_eq!(
+                tree.intersect_p(ray, near, far),
+                nearest.is_some(),
+                "disagreement over the full interval for ray {:?}",
+                ray
+            );
+
+            // Then sweep `far` across the nearest hit. The factors either side of 1 matter most:
+            // a leaf's box is entered slightly before its triangle, so a bound falling between the
+            // two is the only case that exercises the interval check *inside* the leaf rather than
+            // the box test that usually shields it. Cutting at half the distance, which is the
+            // obvious thing to write, is rejected by the box test and proves nothing about it.
+            if let Some((hit, _)) = nearest {
+                occluded += 1;
+
+                for factor in [0.5, 0.99, 0.999999, 1.0, 1.000001] {
+                    let bound = hit.t * factor;
+                    assert_eq!(
+                        tree.intersect_p(ray, near, bound),
+                        tree.query(ray, near, bound).is_some(),
+                        "disagreement at {} of the nearest hit ({}) for ray {:?}",
+                        factor,
+                        hit.t,
+                        ray
+                    );
+                }
+            }
+        }
+
+        assert!(occluded > 20, "only {} rays hit the mesh; the agreement proves little", occluded);
     }
 
     /// Well separated triangles must end up in distinct leaves. This is the assertion that

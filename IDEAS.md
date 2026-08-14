@@ -295,13 +295,22 @@ precisely what would have made the current bug visible on reading.
       reach the *nearest* hit sooner, and here any hit is as good as any other — and tests
       candidates through `Intersectable::intersect` rather than `Object::intersect`, so no
       material is cloned to be dropped.
-- [ ] **`intersect_p` does not reach inside the shapes yet.** `Scene::intersect_p` stops at the
-      first *object*, but testing that object still runs `Intersectable::intersect`, which for a
-      mesh means the full nearest-hit search over its triangles *and* the shading derivatives —
-      `compute_texture_derivatives`, the uv interpolation, the `Vec<Intersection>` — all for a
-      boolean. Add `intersect_p` to `Intersectable` with a default implementation delegating to
-      `intersect`, then specialise it in `TriangleMesh`/`BVHTree` (any-hit traversal, no ordering,
-      no shading quantities) and in `Simple`/`Transformed`.
+- [x] **`intersect_p` did not reach inside the shapes.** `Scene::intersect_p` stopped at the first
+      *object*, but testing that object still ran `Intersectable::intersect` — for a mesh, the full
+      nearest-hit search over its triangles *and* the shading derivatives, for a boolean. *Done.*
+      `Intersectable::intersect_p` with a default implementation delegating to `intersect`, so
+      nothing breaks and the waste is removed where it is worth removing: `BVHTree::intersect_p`
+      (any-hit traversal — no ordering, no interval narrowing, no nearest to keep, return at the
+      first triangle), `TriangleMesh`, and the forwarding overrides in `Simple`, `Transformed`,
+      `Compound` and `Scene`'s `Wrapper` without which the default would shadow them.
+      **Measured: ~3 %** on the mesh scenes at 200×150×64 — `bunny_mesh` 1.36 s → 1.32 s,
+      `dragon_mesh` 2.65 s → 2.57 s — and nothing on `cornell_box`, which has no mesh, so its
+      shapes fall through to the default. Object-test counters do not move at all, as expected:
+      this changes the price of a test, not their number.
+      The return is small because no test scene combines the two things it needs — a mesh *and*
+      a high share of occluded shadow rays. `cornell_box` occludes 19.9 % of them but holds only
+      rectangles; `bunny_mesh` holds a 69 451-triangle mesh but occludes 2.7 %. A closed scene
+      containing a mesh would show far more, and that is the case this exists for.
 - [ ] **`Plane` reports an unbounded box**, `±f64::MAX` on x and z
       ([plane.rs:52-55](src/shapes/plane.rs#L52)), so its `half_area` is `inf` — which
       would poison any SAH cost the moment a `Plane` sits in the scene BVH. Not a bounding

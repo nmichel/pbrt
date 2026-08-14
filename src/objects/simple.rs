@@ -46,6 +46,15 @@ impl Intersectable for Simple {
         self.shape.intersect(ray, near, far)
     }
 
+    /// Forwards to the shape, so that whatever it overrides is what gets used.
+    ///
+    /// Without this the default implementation would call `Simple::intersect`, which calls the
+    /// shape's `intersect` — and the shape's own `intersect_p` would never be reached. A default
+    /// only helps the types that do not override; it must not shadow the ones that do.
+    fn intersect_p(&self, ray: &Ray, near: f64, far: f64) -> bool {
+        self.shape.intersect_p(ray, near, far)
+    }
+
     fn contain_point(&self, point: &Vector3f) -> bool {
         self.shape.contain_point(point)
     }

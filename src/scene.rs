@@ -22,6 +22,12 @@ where
         Intersectable::intersect(self.0.as_ref(), ray, near, far)
     }
 
+    /// Forwarded like `intersect`: a wrapper that let the default implementation through would
+    /// send every occlusion query back down the nearest-hit path it exists to avoid.
+    fn intersect_p(&self, ray: &Ray, near: f64, far: f64) -> bool {
+        Intersectable::intersect_p(self.0.as_ref(), ray, near, far)
+    }
+
     fn contain_point(&self, point: &Vector3f) -> bool {
         self.0.contain_point(point)
     }
@@ -135,11 +141,12 @@ impl Scene {
                 bvh_node.query_instrumented(ray, near, far, &mut accumulator, stats);
 
                 // `any` short-circuits, so candidates after the first occluder are never tested.
-                // `Intersectable::intersect` rather than `Object::intersect`: geometry is the
-                // whole question, and the material would only be cloned to be dropped.
+                // `Intersectable::intersect_p` rather than `Object::intersect`: geometry is the
+                // whole question, the material would only be cloned to be dropped, and the
+                // primitive is free to answer without searching for its nearest hit.
                 accumulator.acc.iter().any(|primitive| {
                     stats.object_tests += 1;
-                    !Intersectable::intersect(primitive, ray, near, far).is_empty()
+                    Intersectable::intersect_p(primitive, ray, near, far)
                 })
             }
         }
