@@ -56,6 +56,24 @@ impl AABoundingBox {
         }
     }
 
+    /// Whether the box encloses a finite region.
+    ///
+    /// False for a primitive that extends without limit — a `Plane`, which is infinite in x and
+    /// z. Such a thing has no place in a spatial acceleration structure: its box overlaps every
+    /// node, so it can never be excluded, and its area is infinite, so it poisons every
+    /// surface-area cost it enters (`docs/heuristique_aire_surface.md` §5). It belongs on a list
+    /// tested for every ray instead, which is what `Scene` does with it.
+    ///
+    /// The empty box is bounded: it encloses the empty region, which is as finite as regions get.
+    pub fn is_bounded(&self) -> bool {
+        if self.is_empty() {
+            return true;
+        }
+
+        let d = self.bmax - self.bmin;
+        d.x.is_finite() && d.y.is_finite() && d.z.is_finite()
+    }
+
     /// Whether the box bounds nothing at all.
     ///
     /// One inverted axis is enough: a box whose extent is negative along x contains no
@@ -530,6 +548,28 @@ mod tests {
         let point = AABoundingBox::new(&Vector3f::zero(), &Vector3f::zero());
         assert!(!point.is_empty());
         assert_eq!(point.half_area(), 0.0);
+    }
+
+    /// A primitive that extends without limit must be recognisable as such, because it has no
+    /// place in a spatial accelerator: its box overlaps every node and its area is infinite.
+    ///
+    /// The distinction the predicate has to make is between infinite and merely enormous. Writing
+    /// `±f64::MAX`, as `Plane` used to, gives a box that *reports* an infinite area — the
+    /// subtraction overflows — while looking finite in every coordinate, so nothing can tell it
+    /// from a legitimately huge one.
+    #[test]
+    fn test_unbounded_box_is_recognised() {
+        let infinite = AABoundingBox::new(
+            &Vector3f::new(f64::NEG_INFINITY, 0.0, f64::NEG_INFINITY),
+            &Vector3f::new(f64::INFINITY, 0.0, f64::INFINITY),
+        );
+        assert!(!infinite.is_bounded());
+
+        // Enormous, but finite in extent, and so a legitimate inhabitant of a tree.
+        let huge = AABoundingBox::new(&Vector3f::new(-1e100, -1e100, -1e100), &Vector3f::new(1e100, 1e100, 1e100));
+        assert!(huge.is_bounded());
+
+        assert!(AABoundingBox::empty().is_bounded(), "the empty region is a finite one");
     }
 
     /// The empty box is the identity element of the union, which is the whole reason it

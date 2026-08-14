@@ -1,7 +1,6 @@
 use super::{Light, LightLiSample, LightType, VisibilityTester};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
-use crate::geom::vector3::Vector3f;
 use crate::pdfs::sphere::SpherePdf;
 use crate::pdfs::Pdf;
 use crate::spectrum::Spectrum;

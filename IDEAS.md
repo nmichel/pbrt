@@ -278,8 +278,16 @@ precisely what would have made the current bug visible on reading.
       review; noticed while taking the scene baseline. This is the per-test cost that the counters
       cannot see, and the reason `intersect_p` is worth more than its effect on `object_tests`
       suggests.
-- [ ] **Split plane is a median split on a randomly chosen axis**
-      ([bvh.rs:77](src/bvh.rs#L77)). The mesh BVH's binned SAH is the design to port here.
+- [x] **The split axis was drawn at random**, which made the build non-reproducible and therefore
+      the accelerator unmeasurable: three consecutive runs of `cornell_box.stage` gave 9.63, 8.95
+      and 9.31 box tests per primary ray. *Done.* The split is now along the axis of greatest
+      **centroid** spread — deterministic, and the better guess besides, being the axis along which
+      a plane separates the primitives most. `cornell_box` now gives 9.12 on every run.
+- [ ] **Still a median split, not a surface-area one.** Porting the mesh's binned SAH is the
+      remaining half. Its measurable payoff at 4–10 primitives is near zero; what it buys is one
+      design in the project rather than two. The cost model, the oracle and the equivalence test
+      are all written in `shapes/triangle_mesh/bvh.rs` — the point is to **share** them rather than
+      copy them, since two copies will drift.
 - [x] **`BVHNode::new` on an empty vector** fell into the `_` arm and recursed forever;
       `Scene::commit` on an empty scene hit it. *Done.* Measured failure mode, by removing the
       guard: `fatal runtime error: stack overflow`, SIGABRT — not a hang. `Scene::build_bvh` now
@@ -315,9 +323,12 @@ precisely what would have made the current bug visible on reading.
       ([plane.rs:52-55](src/shapes/plane.rs#L52)), so its `half_area` is `inf` — which
       would poison any SAH cost the moment a `Plane` sits in the scene BVH. Not a bounding
       bug as such but a design question: an unbounded primitive has no business inside an
-      acceleration structure (pbrt keeps them out of the accelerator). **Blocks the port of
-      the binned SAH to the scene BVH** — decided: keep unbounded primitives in a separate list on
-      `Scene`, tested for every ray, and let the accelerator assert that what it holds is bounded.
+      acceleration structure (pbrt keeps them out of the accelerator). *Done.* `Plane` now returns
+      an honestly infinite box instead of `±f64::MAX` — a *finite* number standing in for infinity,
+      whose difference overflows to `+inf` anyway, but by accident and in a way no predicate could
+      tell from a merely enormous box. `AABoundingBox::is_bounded` can now tell, `Scene::commit`
+      sorts unbounded primitives onto a list tested for every ray, and `BVHNode::new` asserts that
+      what it holds is bounded.
 
 #### Baseline — 2026-07-31
 

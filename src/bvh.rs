@@ -3,7 +3,6 @@ use std::fmt;
 
 use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::ray::Ray;
-use crate::utils::random_double;
 
 pub struct BVHNode<T>
 where
@@ -68,9 +67,13 @@ impl<T: AABound + Clone> BVHNode<T> {
             !primitives.is_empty(),
             "BVHNode::new needs at least one primitive; an empty scene is a `None` tree, see Scene::build_bvh"
         );
+        debug_assert!(
+            primitives.iter().all(|primitive| primitive.get_bounding_box().is_bounded()),
+            "BVHNode::new was given an unbounded primitive; those belong outside the accelerator, see Scene::commit"
+        );
 
-        // Sort primitive with respect to a comparator randomly chosen
-        primitives.sort_by(Self::choose_comparator());
+        let axis = Self::widest_centroid_axis(primitives);
+        primitives.sort_by(|a, b| Self::compare_centroid(a, b, axis));
 
         // Depending on the count of elements in vector of primitive
         // Either create BVHNode childrne, or move the primitive
@@ -152,29 +155,49 @@ impl<T: AABound + Clone> BVHNode<T> {
         }
     }
 
-    fn choose_comparator() -> fn(&T, &T) -> Ordering {
-        let r = random_double() * 3.0;
-        if r < 1.0 {
-            Self::compare_x
+    /// The axis along which the primitives' centroids are most spread out.
+    ///
+    /// It replaces an axis drawn from an unseeded `random_double()`, and the gain is not one of
+    /// taste. A random axis meant the tree changed shape from one run to the next, so **no
+    /// traversal counter could be compared across two builds** — three consecutive runs of
+    /// `cornell_box.stage` gave 9.63, 8.95 and 9.31 box tests per ray. An accelerator whose cost
+    /// cannot be measured cannot be improved on purpose.
+    ///
+    /// The widest spread is also the better guess, not merely a reproducible one: it is the axis
+    /// along which a plane separates the primitives most, and the one a full surface-area
+    /// heuristic usually elects. Centroids rather than box corners, because a split assigns each
+    /// primitive whole to one side and the centroid is what decides which — see
+    /// `docs/heuristique_aire_surface.md` §4.
+    fn widest_centroid_axis(primitives: &[T]) -> usize {
+        let mut min = [f64::MAX; 3];
+        let mut max = [f64::MIN; 3];
+
+        for primitive in primitives.iter() {
+            let centroid = primitive.get_bounding_box().centroid();
+            for axis in 0..3 {
+                min[axis] = min[axis].min(centroid[axis]);
+                max[axis] = max[axis].max(centroid[axis]);
+            }
         }
-        else if r < 2.0 {
-            Self::compare_y
+
+        let mut widest = 0;
+        for axis in 1..3 {
+            if max[axis] - min[axis] > max[widest] - min[widest] {
+                widest = axis;
+            }
         }
-        else {
-            Self::compare_z
-        }
+
+        widest
     }
 
-    fn compare_x(a: &T, b: &T) -> Ordering {
-        a.get_bounding_box().bmin.x.partial_cmp(&b.get_bounding_box().bmin.x).unwrap()
-    }
+    fn compare_centroid(a: &T, b: &T, axis: usize) -> Ordering {
+        let a_pos = a.get_bounding_box().centroid()[axis];
+        let b_pos = b.get_bounding_box().centroid()[axis];
 
-    fn compare_y(a: &T, b: &T) -> Ordering {
-        a.get_bounding_box().bmin.y.partial_cmp(&b.get_bounding_box().bmin.y).unwrap()
-    }
-
-    fn compare_z(a: &T, b: &T) -> Ordering {
-        a.get_bounding_box().bmin.z.partial_cmp(&b.get_bounding_box().bmin.z).unwrap()
+        // `unwrap` is deliberate: `partial_cmp` only fails on `NaN`, which a bounded box cannot
+        // produce, and the `debug_assert` in `new` is what keeps unbounded ones out. A silent
+        // `Ordering::Equal` here would turn that into an arbitrary tree instead of a loud stop.
+        a_pos.partial_cmp(&b_pos).unwrap()
     }
 }
 
