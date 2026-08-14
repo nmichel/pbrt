@@ -289,8 +289,19 @@ precisely what would have made the current bug visible on reading.
       same reasoning as `AABoundingBox::hit`. Three tests, including one that builds over seven
       primitives and checks the root box encloses them all — the split axis being drawn at
       random, it exercises a different partition on every run.
-- [ ] **No `intersect_p`.** Shadow rays go through the full nearest-hit-plus-material
-      search when a boolean with an early-out would do — the main cost of NEE.
+- [x] **No `intersect_p` at the scene level.** Shadow rays went through the full
+      nearest-hit-plus-material search when a boolean with an early-out would do. *Done for
+      `Scene`*: `intersect_p` stops at the first occluder, stays unordered — ordering exists to
+      reach the *nearest* hit sooner, and here any hit is as good as any other — and tests
+      candidates through `Intersectable::intersect` rather than `Object::intersect`, so no
+      material is cloned to be dropped.
+- [ ] **`intersect_p` does not reach inside the shapes yet.** `Scene::intersect_p` stops at the
+      first *object*, but testing that object still runs `Intersectable::intersect`, which for a
+      mesh means the full nearest-hit search over its triangles *and* the shading derivatives —
+      `compute_texture_derivatives`, the uv interpolation, the `Vec<Intersection>` — all for a
+      boolean. Add `intersect_p` to `Intersectable` with a default implementation delegating to
+      `intersect`, then specialise it in `TriangleMesh`/`BVHTree` (any-hit traversal, no ordering,
+      no shading quantities) and in `Simple`/`Transformed`.
 - [ ] **`Plane` reports an unbounded box**, `±f64::MAX` on x and z
       ([plane.rs:52-55](src/shapes/plane.rs#L52)), so its `half_area` is `inf` — which
       would poison any SAH cost the moment a `Plane` sits in the scene BVH. Not a bounding
@@ -345,18 +356,70 @@ computed and thrown away — and no counter here can see that. Expect `object_te
 to fall by roughly half on `cornell_box` and barely move on the mesh scenes, while the wall clock
 falls further. Saying so now avoids reading a modest counter movement as a failure.
 
+#### After `intersect_p` and the visibility tester — 2026-08-15
+
+Object tests per shadow ray, the figure this targeted:
+
+| scene | before | after |
+|---|---|---|
+| `default.stage` | 0.84 | **0.00** |
+| `cornell_box.stage` | 2.16 | **0.91** |
+| `bunny_mesh.stage` | 0.28 | **0.20** |
+| `dragon_mesh.stage` | 0.30 | **0.21** |
+
+The prediction above was right, and beside the point. `cornell_box` halved as expected;
+`default.stage` fell to zero, because with `far` now carrying the light's distance the leaf boxes
+beyond the light are rejected and no candidate survives at all. And then:
+
+**`bunny_mesh.stage`, 120×90×4: 38.9 s → 0.13 s.** Three hundred times, which is not a figure any
+counter in the table predicts, so it needed attributing rather than announcing. Two experiments
+failed to reproduce the slowness — restoring the degenerate tester alone did not, whether with
+`far = 0` or `far = f64::MAX`, because `intersect_p` short-circuits on the first candidate that
+reports a hit and a `NaN` ray makes the first candidate report one. The decisive one was removing
+`BackgroundInfiniteLight` from the *old* build: 38.9 s → 0.16 s.
+
+So the whole of it was that one light. Its tester built a ray between a point and itself, whose
+normalised direction is `NaN`, and **`NaN` defeats every rejection test in both accelerators** —
+`f64::max(NaN, tmin)` returns `tmin`, `f64::min(NaN, tmax)` returns `tmax`, so no slab ever
+rejects and every box reports a hit. Sent through `intersect(.., f64::MAX)`, each such ray
+therefore walked the entire scene tree *and the entire 138 881-node bunny mesh, testing all 69 451
+triangles* — once per NEE sample of that light, per bounce, per pixel sample.
+
+Two lessons worth keeping:
+
+- **The instrumentation could not see this**, and said so only in hindsight. `bvh_stats` casts
+  well-formed shadow rays aimed at the point light; the degenerate ones never existed in its ray
+  set. A counter measures the rays you thought to cast.
+- **A quantity that cannot be rejected is worse than a large one.** The same `NaN`-defeats-`max`
+  mechanism was already documented in `AABoundingBox::hit`, where the parallel-ray case is handled
+  explicitly rather than left to propagation. It bit again one level up, in the ray itself.
+
+`cornell_box.stage` also changes, and dramatically: a closed room was being lit by the sky, because
+the background light was never occluded by its own walls. It now looks like a Cornell box — dark
+corners, boxes casting shadows — instead of a washed-out white interior. That is the change the
+"fix it properly" decision bought, and it is a correctness fix, not a contrast tweak.
+
+**A defect in the instrumentation itself, found here.** The scene measurement is **not**
+reproducible: `BVHNode::choose_comparator` draws its split axis from an unseeded `random_double()`,
+so the tree — and with it every node and box count — differs run to run. Measured on
+`cornell_box.stage`, three consecutive runs: 9.63, 8.95, 9.31 box tests per primary ray.
+`object_tests` is far steadier, varying in the second decimal, because it depends on which
+primitives lie along the ray rather than on how they were grouped. Until the build is made
+deterministic, compare `object_tests` across commits and read the box counts as an order of
+magnitude. This is a second, independent reason to do the deterministic SAH split.
+
 ### Correctness / robustness
 
 - [ ] **Needless `unsafe`** at [simple.rs:31-34](src/objects/simple.rs#L31) — a raw pointer
       is used to read `intersections[0]`, but `Intersection` is `Copy`. Also assumes the
       first element is the nearest; worth asserting that every `Intersectable` really does
       return a distance-sorted list.
-- [ ] **Infinite lights build a degenerate visibility tester** —
-      [uniform_infinite_light.rs:36](src/lights/uniform_infinite_light.rs#L36) and
-      [background_infinite_light.rs:40](src/lights/background_infinite_light.rs#L40) pass
-      `(0,0,0)` for both endpoints and ignore their `_intersection` argument, so the shadow
-      ray has a null direction. These lights cast no shadow. `UniformInfiniteLight` is
-      unusable as it stands.
+- [x] **Infinite lights built a degenerate visibility tester** — both passed `(0,0,0)` for both
+      endpoints and ignored their `_intersection` argument, so the shadow ray had a null
+      direction. *Done*, and it turned out to be the most expensive defect found on this branch,
+      by three orders of magnitude. See the write-up under *BVH — scene*: a light at infinity has
+      no position to aim at, only a direction, which is why the two-point form could not express
+      it; `VisibilityTester::towards_infinity` does.
 - [x] **`AABoundingBox::new` inflated every axis to a minimum extent of 0.01**, which
       biased every `half_area` and therefore every SAH cost. *Done.* The investigation
       showed the clamp was not the guard it looked like: `Plane` and `Rectangle` pad

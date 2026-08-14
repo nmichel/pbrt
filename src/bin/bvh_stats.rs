@@ -25,7 +25,15 @@
 //!
 //! Reproducibility is what makes this measurable today: the renderer's sampler is not seeded yet,
 //! so no lighting result can be compared between two runs — but a traversal draws no random
-//! numbers. Given the same rays, the counters are identical to the unit.
+//! numbers. Given the same rays *and the same tree*, the counters are identical to the unit.
+//!
+//! That second condition holds in mesh mode and **not in scene mode**. `BVHNode::choose_comparator`
+//! picks its split axis with an unseeded `random_double()`, so the scene tree differs from one run
+//! to the next and with it the node and box counts — measured spread on `cornell_box.stage`, three
+//! consecutive runs: 9.63, 8.95, 9.31 box tests per ray. `object_tests` is far steadier, varying in
+//! the second decimal, because it depends on which primitives lie along the ray rather than on how
+//! they were grouped. Until the scene build is made deterministic, compare `object_tests` across
+//! commits and read the box counts as an order of magnitude.
 //!
 //! In mesh mode the rays are the primary rays of `VIEW_COUNT` pinhole cameras placed on a circle
 //! around the mesh, one ray through the centre of each pixel. Several viewpoints rather than one,
@@ -191,12 +199,14 @@ fn cast_scene_ray_sets(scene: &Scene, camera: &dyn Camera) -> (SceneCast, SceneC
             };
             primary.hit_count += 1;
 
-            // Exactly what `VisibilityTester::unoccluded` builds today, including its interval: a
-            // segment from the shaded point to the light, walked as a full nearest-hit search.
+            // Exactly what `VisibilityTester::unoccluded` builds: a segment from the shaded point
+            // to the light, bounded by the light's own distance — an occluder beyond the light is
+            // not an occluder — and answered by `intersect_p`.
             let shadow_ray = Ray::spawn_from_through(&hit.intersection.p, &target);
+            let light_distance = (&target - &hit.intersection.p).length();
 
             shadow.ray_count += 1;
-            if scene.intersect_instrumented(&shadow_ray, SHADOW_NEAR, FAR, &mut shadow.stats).is_some() {
+            if scene.intersect_p_instrumented(&shadow_ray, SHADOW_NEAR, light_distance, &mut shadow.stats) {
                 shadow.hit_count += 1;
             }
         }

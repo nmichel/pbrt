@@ -30,7 +30,7 @@ impl Light for PointLight {
             wi: wi.normalized(),
             pdf: 1.0,
         };
-        let tester = VisibilityTester::new(&intersection.p, &world_light_pos);
+        let tester = VisibilityTester::between(&intersection.p, &world_light_pos);
         Some((sample, tester))
     }
 }

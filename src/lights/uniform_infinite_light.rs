@@ -25,7 +25,7 @@ impl Light for UniformInfiniteLight {
         self.i.clone()
     }
 
-    fn sample_li(&self, _intersection: &Intersection) -> Option<(LightLiSample, VisibilityTester)> {
+    fn sample_li(&self, intersection: &Intersection) -> Option<(LightLiSample, VisibilityTester)> {
         let sphere_pdf = SpherePdf {};
 
         let wi = sphere_pdf.generate();
@@ -33,7 +33,7 @@ impl Light for UniformInfiniteLight {
         let spectrum = self.i;
 
         let sample = LightLiSample { spectrum, wi, pdf };
-        let tester = VisibilityTester::new(&Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(0.0, 0.0, 0.0));
+        let tester = VisibilityTester::towards_infinity(&intersection.p, &wi);
         Some((sample, tester))
     }
 }

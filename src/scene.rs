@@ -99,9 +99,50 @@ impl Scene {
         self.find_nearest(ray, near, far, stats)
     }
 
+    /// Whether anything at all stands along `ray` within `[near, far]`.
+    ///
+    /// Not `intersect(..).is_some()`. The question is different, and so is the work it deserves:
+    /// *any* hit settles it, so the search stops at the first one instead of ranking every
+    /// candidate by distance, and no `Interaction` is built — no material, and none of the
+    /// shading frame a surface whose only role is to be in the way will never need.
+    ///
+    /// Deliberately unordered. Ordering exists to reach the *nearest* hit sooner; here any hit is
+    /// as good as any other, and sorting children would be work spent on a distinction that does
+    /// not matter.
+    ///
+    /// This is the query shadow rays want, and `far` is what carries the light's distance: an
+    /// occluder beyond the light is not an occluder.
+    pub fn intersect_p(&self, ray: &Ray, near: f64, far: f64) -> bool {
+        self.any_hit(ray, near, far, &mut TraversalStats::default())
+    }
+
+    /// Same as [`Scene::intersect_p`], but adds the work done to `stats`.
+    pub fn intersect_p_instrumented(&self, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> bool {
+        self.any_hit(ray, near, far, stats)
+    }
+
     /// Number of primitives the accelerator was built over, or zero for an empty scene.
     pub fn primitive_count(&self) -> usize {
         self.bvh.as_ref().map_or(0, |bvh_node| bvh_node.primitive_count())
+    }
+
+    fn any_hit(&self, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> bool {
+        let mut accumulator = ObjectAccumulator { acc: Vec::new() };
+
+        match &self.bvh {
+            None => false,
+            Some(bvh_node) => {
+                bvh_node.query_instrumented(ray, near, far, &mut accumulator, stats);
+
+                // `any` short-circuits, so candidates after the first occluder are never tested.
+                // `Intersectable::intersect` rather than `Object::intersect`: geometry is the
+                // whole question, and the material would only be cloned to be dropped.
+                accumulator.acc.iter().any(|primitive| {
+                    stats.object_tests += 1;
+                    !Intersectable::intersect(primitive, ray, near, far).is_empty()
+                })
+            }
+        }
     }
 
     fn find_nearest(&self, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> Option<Interaction> {
