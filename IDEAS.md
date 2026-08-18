@@ -21,9 +21,10 @@ Nothing here has been fixed yet.
 Rationale: (1) makes every later iteration faster to test, (2) is the largest
 departure from a physical model, (3) is a prerequisite to *validating* (2) and (4).
 
-1. Finish the BVH revamp. The mesh SAH is fixed and `intersect_p` is in place; what remains is
-   porting the flat/ordered traversal to the scene BVH. Its binned SAH is explicitly *not* part
-   of this — see the low-priority note under *BVH — scene*.
+1. Finish the BVH revamp. The mesh SAH is fixed, `intersect_p` is in place, and the scene tree is
+   flat; what remains is making its traversal ordered — closure instead of accumulator, nearer
+   child first, interval narrowing. Its binned SAH is explicitly *not* part of this — see the
+   low-priority note under *BVH — scene*.
 2. `AreaLight` — emissive primitives registered as sampleable lights.
 3. Seedable RNG + stratified samplers (needed to compare two renders at all).
 4. MIS, then re-enable Russian roulette.
@@ -265,13 +266,33 @@ precisely what would have made the current bug visible on reading.
 ### BVH — scene
 
 - [ ] **`query` clones the primitives it finds** into an accumulator `Vec` — one allocation plus
-      one atomic refcount bump per candidate. Measured below: **under one candidate per primary
-      ray**, so the cost is real but small. The review's "N atomic refcount bumps per ray" read as
-      if N were large; it is not.
+      one atomic refcount bump per candidate. Measured: **under one candidate per primary ray**, so
+      the cost is real but small. The review's "N atomic refcount bumps per ray" read as if N were
+      large; it is not.
+      *Half done*: the flat tree owns its primitives and each leaf is a **range** of them, so
+      `Accumulator::accumulate` receives a borrowed slice and the per-leaf vector is gone. The
+      refcount bumps remain, in the `extend_from_slice` that copies the slice into the accumulator.
+      Removing those means removing the accumulator itself — see the entry below.
+- [x] **The tree was a tree of pointers** — `Option<Box<BVHNode<T>>>` with a `Vec<T>` inside every
+      leaf, so one heap allocation per node plus one per leaf, scattered wherever the allocator put
+      them, and a traversal that had to be recursive. *Done.* `BVH<T>` is now a `Vec<Node>` addressed
+      by index, with the primitives in a second vector permuted so each leaf owns a contiguous
+      range — the same layout as `BVHTree` in `shapes::triangle_mesh`. Two allocations, contiguous
+      nodes, an explicit stack, and `T: Clone` is no longer required since no primitive is ever
+      copied. Deliberately **behaviour-preserving**: same split, same order, so every counter is
+      identical to the digit on all four scenes. That was the point of doing it on its own.
 - [ ] **No ordered traversal, no `far` narrowing, no early-out.** `Scene::intersect` collects every
-      candidate, then tests them all. The BVH filters but does not order. Measured below: box tests
-      per ray equal the tree's whole node count on the mesh scenes — **every node, every ray** —
-      so the pruning that is missing is at the interior level, not among the candidates.
+      candidate, then tests them all. The BVH filters but does not order. Measured: box tests per
+      ray equal the tree's whole node count on the mesh scenes — **every node, every ray** — so the
+      pruning that is missing is at the interior level, not among the candidates.
+      The layout is no longer the obstacle: the flat tree above is what lets a stack entry carry
+      state per pending node. What remains is to replace `Accumulator` with a closure
+      `FnMut(&T, f64, f64) -> Option<f64>` — the tree prunes, the closure intersects and returns
+      the hit distance so the traversal can narrow its interval — and to visit the nearer child
+      first. Note the honest ceiling, established while planning: restructuring alone moves no
+      counter, since a fully visited 7-node tree costs 7 box tests either way. The gain comes only
+      from interval narrowing, and with a 3×3 floor and wall overlapping the whole view the estimate
+      is 7.00 → about 6.
 - [ ] **Every shape's `intersect` returns a freshly built `Vec<Intersection>`**
       (`IntersectionResult`), and `Transformed::intersect` builds a second one to hold the
       transformed copies. So a hit costs one or two heap allocations that are read once and

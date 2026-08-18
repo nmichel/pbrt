@@ -1,7 +1,7 @@
 use crate::lights::LightType;
 use crate::objects::Object;
 
-use super::bvh::{Accumulator, BVHNode, TraversalStats};
+use super::bvh::{Accumulator, TraversalStats, BVH};
 use super::geom::aabound::{AABound, AABoundingBox};
 use super::geom::intersectable::{Intersectable, IntersectionResult};
 use super::geom::ray::Ray;
@@ -67,13 +67,13 @@ pub struct Scene {
     ///
     /// They are kept out of the accelerator and tested for every ray instead. A spatial structure
     /// works by excluding what a ray cannot reach, and a primitive that fills space can never be
-    /// excluded: its box overlaps every node, so it would be visited by every ray anyway, while
-    /// its infinite area poisoned every split cost it entered. Being outside costs one test per
-    /// ray and buys back a tree that means something. pbrt does the same.
+    /// excluded: its box overlaps every node, so every ray would visit it anyway, and its infinite
+    /// area would poison every split cost it entered. Being outside costs one test per ray and buys
+    /// back a tree that means something. pbrt does the same.
     unbounded: Vec<Wrapper<dyn Object>>,
 
     lights: Vec<Arc<dyn Light>>,
-    bvh: Option<BVHNode<Wrapper<dyn Object>>>,
+    bvh: Option<BVH<Wrapper<dyn Object>>>,
 }
 
 impl Scene {
@@ -110,7 +110,7 @@ impl Scene {
             }
         }
 
-        self.bvh = Self::build_bvh(&mut bounded);
+        self.bvh = Self::build_bvh(bounded);
         self
     }
 
@@ -253,14 +253,14 @@ impl Scene {
     /// accelerate.
     ///
     /// An empty scene has no tree, and that is how emptiness is represented here: `Option`
-    /// already carries it, so `BVHNode` never has to. `intersect` reads `None` as "nothing to
-    /// hit" and returns without a single box test.
-    fn build_bvh(prim: &mut Vec<Wrapper<dyn Object>>) -> Option<BVHNode<Wrapper<dyn Object>>> {
-        if prim.is_empty() {
+    /// already carries it, so `BVH` never has to. `intersect` reads `None` as "nothing to hit" and
+    /// returns without a single box test.
+    fn build_bvh(primitives: Vec<Wrapper<dyn Object>>) -> Option<BVH<Wrapper<dyn Object>>> {
+        if primitives.is_empty() {
             return None;
         }
 
-        Some(BVHNode::new(prim))
+        Some(BVH::new(primitives))
     }
 }
 
@@ -269,9 +269,12 @@ struct ObjectAccumulator {
 }
 
 impl Accumulator<Wrapper<dyn Object>> for ObjectAccumulator {
-    fn accumulate(&mut self, items: &mut Vec<Wrapper<dyn Object>>) -> () {
-        self.acc.append(items);
-        ()
+    /// Copies the leaf's slice into the accumulator, one `Arc` refcount bump per primitive.
+    ///
+    /// The bumps are the price of collecting candidates before testing them: a list outlives the
+    /// traversal that filled it, so it cannot hold borrows of the tree.
+    fn accumulate(&mut self, items: &[Wrapper<dyn Object>]) {
+        self.acc.extend_from_slice(items);
     }
 }
 
@@ -285,9 +288,10 @@ mod tests {
 
     /// A scene with no object has no tree, and `intersect` must say so.
     ///
-    /// This did not use to fail, it aborted: `commit` handed an empty vector to `BVHNode::new`,
-    /// whose median split left the left half empty and recursed on it until the stack overflowed.
-    /// Verified by removing the guard — `fatal runtime error: stack overflow`, SIGABRT.
+    /// Note what this test does *not* do when it fails: removing the guard in `build_bvh` hands an
+    /// empty vector to `BVH::new`, whose median split leaves the left half empty and recurses on it
+    /// until the stack overflows — `fatal runtime error: stack overflow`, SIGABRT. There is no
+    /// assertion to read, only an abort.
     #[test]
     fn test_empty_scene_intersects_nothing() {
         let mut scene = Scene::new();
@@ -330,10 +334,10 @@ mod tests {
 
     /// The nearest hit is found across both groups, whichever one it belongs to.
     ///
-    /// The sphere is pushed *below* the plane on purpose. With it above, the tree would hold the
-    /// nearer candidate and the test would pass even if the unbounded list were ignored
-    /// altogether — which is exactly what the first version of this test did, and it proved
-    /// nothing that its name claimed.
+    /// The sphere is pushed *below* the plane on purpose, so that the nearer candidate is the
+    /// unbounded one. With the sphere above, the tree would hold the nearer candidate and the test
+    /// would pass even with the unbounded list ignored altogether — proving nothing its name
+    /// claims.
     #[test]
     fn test_nearest_is_found_across_both_groups() {
         let below = Box::new(Transform::translation(Vector3f::new(0.0, -5.0, 0.0)));
