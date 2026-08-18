@@ -23,17 +23,11 @@
 //!
 //! # The ray sets, and why they are reproducible
 //!
-//! Reproducibility is what makes this measurable today: the renderer's sampler is not seeded yet,
-//! so no lighting result can be compared between two runs — but a traversal draws no random
-//! numbers. Given the same rays *and the same tree*, the counters are identical to the unit.
-//!
-//! That second condition holds in mesh mode and **not in scene mode**. `BVHNode::choose_comparator`
-//! picks its split axis with an unseeded `random_double()`, so the scene tree differs from one run
-//! to the next and with it the node and box counts — measured spread on `cornell_box.stage`, three
-//! consecutive runs: 9.63, 8.95, 9.31 box tests per ray. `object_tests` is far steadier, varying in
-//! the second decimal, because it depends on which primitives lie along the ray rather than on how
-//! they were grouped. Until the scene build is made deterministic, compare `object_tests` across
-//! commits and read the box counts as an order of magnitude.
+//! Reproducibility is what makes this measurable while the renderer's sampler is unseeded, so that
+//! no lighting result can be compared between two runs. Neither accelerator draws a random number,
+//! in its build or in its traversal, so the same rays over the same geometry give **counts identical
+//! to the unit** — in both modes. Every figure printed here can therefore be compared across
+//! commits, and a movement of one is a change in the code and not noise.
 //!
 //! In mesh mode the rays are the primary rays of `VIEW_COUNT` pinhole cameras placed on a circle
 //! around the mesh, one ray through the centre of each pixel. Several viewpoints rather than one,
@@ -46,10 +40,11 @@
 //!
 //! # What it does *not* measure
 //!
-//! Only primary rays, which are coherent: they all start from one point and diverge slowly.
-//! Secondary rays — the bulk of the work in a path tracer, and *all* of the work of the shadow
-//! rays that `intersect_p` is meant to serve — start anywhere and point everywhere, and stress a
-//! tree differently. Measuring those needs a seeded sampler, so it has to wait.
+//! Only primary rays, which are coherent: they all start from one point and diverge slowly, plus
+//! one shadow ray per hit, which is a segment towards a fixed point. Secondary rays — the bulk of
+//! the work in a path tracer — start anywhere and point everywhere, and stress a tree differently.
+//! Reaching them requires a seeded sampler, without which their ray set is not reproducible and the
+//! counters mean nothing.
 
 use std::f64::consts::PI;
 use std::{env, fs};

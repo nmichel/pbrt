@@ -466,7 +466,7 @@ mod tests {
     /// A bounding box may be flat — an axis-aligned triangle, a `Rectangle`, a `Plane`.
     /// Since the box is a conservative bound, a tangential hit must be reported or the
     /// primitive it contains is dropped. This is what the strict comparison in `hit` buys:
-    /// with the previous `tmax <= tmin`, every crossing case below was rejected.
+    /// rejecting on `tmax <= tmin` instead turns every crossing case below into a miss.
     #[test]
     fn test_collide_flat_box() {
         // Zero extent along y, two units along x and z.
@@ -510,8 +510,8 @@ mod tests {
     }
 
     /// `half_area` feeds the SAH split cost, so it must report the true area. Inflating a
-    /// degenerate box — as the constructor used to do, with a 0.01 floor per axis — makes
-    /// every cost comparison wrong.
+    /// degenerate box — a floor of 0.01 per axis, say, to keep it from being flat — makes every
+    /// cost comparison wrong: the box then declares an area it does not have.
     #[test]
     fn test_degenerate_box_area_is_faithful() {
         // d = (2, 0, 3), so half_area = dx·dy + dy·dz + dz·dx = 0 + 0 + 6.
@@ -554,9 +554,9 @@ mod tests {
     /// place in a spatial accelerator: its box overlaps every node and its area is infinite.
     ///
     /// The distinction the predicate has to make is between infinite and merely enormous. Writing
-    /// `±f64::MAX`, as `Plane` used to, gives a box that *reports* an infinite area — the
-    /// subtraction overflows — while looking finite in every coordinate, so nothing can tell it
-    /// from a legitimately huge one.
+    /// `±f64::MAX` gives a box that *reports* an infinite area — the subtraction overflows — while
+    /// looking finite in every coordinate, so nothing could tell it from a legitimately huge one;
+    /// hence the infinities in `Plane::get_bounding_box`.
     #[test]
     fn test_unbounded_box_is_recognised() {
         let infinite = AABoundingBox::new(

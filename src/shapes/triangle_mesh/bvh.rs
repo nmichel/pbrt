@@ -312,8 +312,8 @@ impl BVHTree {
     ///
     /// The reference implementation of `[3]`: no bins, the two child boxes accumulated
     /// directly. It is not used by the build — it is the oracle the binned prefix/suffix scan
-    /// is checked against, and that check is what would have caught the per-bin area defect
-    /// this replaces (`docs/heuristique_aire_surface.md` §3).
+    /// is checked against — and that check is what catches an `A_L` read from a single bin instead
+    /// of the union of every bin on that side (`docs/heuristique_aire_surface.md` §3).
     ///
     /// It classifies with `bin_index`, exactly as the binned path does, so the two compare the
     /// same partition; the test then bears on the accumulation alone, which is what it claims
@@ -376,8 +376,8 @@ impl BVHTree {
     /// returns a boolean, so no caller can ask for the uv interpolation or the ∂p/∂u and ∂p/∂v
     /// that `Intersectable::intersect` computes.
     ///
-    /// Not instrumented. `TraversalStats` is threaded through `traverse` because something counts
-    /// it; nothing counts this path yet, and an unused parameter is noise rather than symmetry.
+    /// Not instrumented, where `traverse` is: nothing measures this path, and a `TraversalStats`
+    /// no caller reads would be noise rather than symmetry.
     pub fn intersect_p(&self, ray: &Ray, near: f64, far: f64) -> bool {
         let verts = self.vertices.as_ref();
 
@@ -433,8 +433,8 @@ impl BVHTree {
     /// **Each node's box is tested exactly once.** The distance at which the ray enters a box
     /// is what decides the visiting order, so it has to be known before a child is pushed;
     /// carrying it on the stack means the pop does not have to test the box again to recover
-    /// it. Re-testing was the previous shape of this loop, and it cost one redundant test per
-    /// node — about 60 % of all box tests.
+    /// it. Recovering it by a second test instead would cost one redundant box test per node, some
+    /// 60 % of the total.
     ///
     /// The distance is still worth re-examining at pop, but only against `min_t`: a hit found
     /// since the push may have brought the nearest intersection closer than this whole node,
@@ -635,8 +635,8 @@ impl BVHTree {
             }
 
             // A union can only grow, so the prefix areas cannot decrease and the suffix areas
-            // cannot increase. Reading a single bin's area instead of the union breaks this —
-            // the invariant is the cheap guard against reintroducing that defect.
+            // cannot increase. Reading a single bin's area instead of the union breaks the
+            // invariant, which is what makes it worth asserting.
             for i in 1..SPLIT_COUNT {
                 debug_assert!(left_areas[i] >= left_areas[i - 1], "prefix areas must not decrease");
                 debug_assert!(right_areas[i] <= right_areas[i - 1], "suffix areas must not increase");
@@ -805,10 +805,9 @@ mod tests {
     /// A deterministic ray set that actually reaches the geometry.
     ///
     /// Rays aimed at triangle centroids from three distant origins, so the comparison below is
-    /// not vacuous — a lattice of parallel rays mostly misses a mesh of small, well separated
-    /// slivers, which is how the first version of this test managed to hit six times out of
-    /// two hundred. Aiming at a centroid also lands rays exactly on bin boundaries, the case
-    /// that matters most here.
+    /// not vacuous. A lattice of parallel rays would be: against a mesh of small, well separated
+    /// slivers it mostly misses — six hits out of two hundred, measured. Aiming at a centroid also
+    /// lands rays exactly on bin boundaries, the case that matters most here.
     ///
     /// Axis-aligned pencils are added on purpose rather than out of laziness: they graze the
     /// flat faces of the bins' boxes, which is where a conservative box test and a partition
@@ -841,10 +840,9 @@ mod tests {
         rays
     }
 
-    /// The binned prefix/suffix scan must give exactly the cost a full scan of the triangles
-    /// gives for the same plane. This is the test that would have caught reading a single
-    /// bin's area instead of the union of every bin on that side — see
-    /// `docs/heuristique_aire_surface.md` §3.
+    /// The binned prefix/suffix scan must give exactly the cost a full scan of the triangles gives
+    /// for the same plane. This is the test that catches an `A_L` read from a single bin instead of
+    /// the union of every bin on that side — see `docs/heuristique_aire_surface.md` §3.
     ///
     /// Equality is exact, not approximate, and that is a claim about the arithmetic: both
     /// paths union the same boxes with `min`/`max`, which are exact and order-independent, then
@@ -963,9 +961,9 @@ mod tests {
         assert!(occluded > 20, "only {} rays hit the mesh; the agreement proves little", occluded);
     }
 
-    /// Well separated triangles must end up in distinct leaves. This is the assertion that
-    /// fails on the defect this replaces: with the cost read per bin, one leaf kept a third of
-    /// the mesh.
+    /// Well separated triangles must end up in distinct leaves. This is the assertion that fails
+    /// when the cost is read per bin rather than per union: the split then stops early enough for
+    /// one leaf to hold a third of the mesh.
     #[test]
     fn test_separated_triangles_land_in_distinct_leaves() {
         let tree = grid_mesh(4);

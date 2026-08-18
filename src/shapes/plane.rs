@@ -48,14 +48,14 @@ impl Intersectable for Plane {
 }
 
 impl AABound for Plane {
-    /// The plane is infinite in x and z, and says so.
+    /// The plane is infinite in x and z, and says so — `±f64::INFINITY` and not `±f64::MAX`.
     ///
-    /// It used to say `±f64::MAX`, which is a *finite* number standing in for infinity, and the
-    /// difference is not cosmetic: `bmax - bmin` then overflows to `+inf` and the box reports an
-    /// infinite area anyway, but by accident, in a way no predicate can distinguish from a merely
-    /// enormous box. Written honestly, `AABoundingBox::is_bounded` can tell — and `Scene` uses it
-    /// to keep this primitive out of the accelerator entirely, which is where an unbounded
-    /// primitive belongs (see `docs/heuristique_aire_surface.md` §5).
+    /// The difference is not cosmetic. `f64::MAX` is a *finite* number standing in for infinity: the
+    /// box it describes reports an infinite area anyway, since `bmax - bmin` overflows, but it does
+    /// so by accident and in a way no predicate can distinguish from a merely enormous box. Stated
+    /// as an infinity, `AABoundingBox::is_bounded` can tell — and `Scene` uses it to keep this
+    /// primitive out of the accelerator, which is where an unbounded primitive belongs (see
+    /// `docs/heuristique_aire_surface.md` §5).
     ///
     /// Zero thickness in y is exact and correct: the plane really is flat. `hit` handles a
     /// zero-extent slab, and `half_area` reports the bound faithfully rather than inflating it.
