@@ -21,8 +21,9 @@ Nothing here has been fixed yet.
 Rationale: (1) makes every later iteration faster to test, (2) is the largest
 departure from a physical model, (3) is a prerequisite to *validating* (2) and (4).
 
-1. Finish the BVH revamp — fix the SAH cost, then port the flat/ordered design to the
-   scene BVH and add `intersect_p`.
+1. Finish the BVH revamp. The mesh SAH is fixed and `intersect_p` is in place; what remains is
+   porting the flat/ordered traversal to the scene BVH. Its binned SAH is explicitly *not* part
+   of this — see the low-priority note under *BVH — scene*.
 2. `AreaLight` — emissive primitives registered as sampleable lights.
 3. Seedable RNG + stratified samplers (needed to compare two renders at all).
 4. MIS, then re-enable Russian roulette.
@@ -283,11 +284,67 @@ precisely what would have made the current bug visible on reading.
       and 9.31 box tests per primary ray. *Done.* The split is now along the axis of greatest
       **centroid** spread — deterministic, and the better guess besides, being the axis along which
       a plane separates the primitives most. `cornell_box` now gives 9.12 on every run.
-- [ ] **Still a median split, not a surface-area one.** Porting the mesh's binned SAH is the
-      remaining half. Its measurable payoff at 4–10 primitives is near zero; what it buys is one
-      design in the project rather than two. The cost model, the oracle and the equivalence test
-      are all written in `shapes/triangle_mesh/bvh.rs` — the point is to **share** them rather than
-      copy them, since two copies will drift.
+- [ ] **`AABound::get_bounding_box` is a computation, not an accessor** — and nothing caches it.
+      [`TriangleMesh`](src/shapes/triangle_mesh/triangle_mesh.rs) recomputes it by scanning **every
+      vertex**, O(V): 104 000 floats for the bunny, 2.6 million for the dragon. `Transformed`
+      transforms eight corners and then calls the object inside it; `Compound` folds over all its
+      children. So the call is recursive, uncached, and arbitrarily expensive.
+      The scene build leans on it hard: `compare_centroid` calls it **twice per comparison**, inside
+      a `sort_by`, at every level of the recursion — O(n log² n) calls, each O(V) when a mesh is
+      involved. Invisible at 4 primitives, ruinous at a hundred meshes.
+      The fix is the one the mesh BVH already applies to itself: compute each primitive's box and
+      centroid **once**, at `Scene::commit`, and build from those. ~20 lines, and it is the
+      prerequisite for anything that wants to look at bounds more than once — the binned SAH below
+      first of all. Found while studying that port, not by measurement: at current scene sizes it
+      costs milliseconds at startup.
+
+#### Low priority — port the binned SAH to the scene BVH
+
+Studied on 2026-08-18, not done, and deliberately parked. The split is still a median one; the
+mesh's binned SAH could replace it and be shared rather than copied. What the study found:
+
+**Shareable**: `BIN_COUNT`/`SPLIT_COUNT`, `Bin`, `SplitCandidate`, `bin_index`,
+`find_best_split_plane`, `centroid_extent`, `fill_bins`, and `exhaustive_split_cost` for the
+tests — about 190 lines, of which ~110 is the live cost model.
+**Not shareable**: the partition (the mesh does a Lomuto pass in place over `tri_idx`, the scene
+has to split an owned `Vec<T>` in two), the node layout, the traversal, and the two
+`TraversalStats`. So "one design in the project" would be an overstatement: ~110 lines out of some
+600.
+
+The two sides reach an item's centroid and box differently, so a shared entry point needs an
+accessor. Monomorphised, hence no indirection:
+
+```rust
+// src/accel.rs — a new module
+pub fn find_best_split(
+    count: usize,
+    centroid_of: impl Fn(usize) -> Vector3f,
+    bounds_of: impl Fn(usize) -> AABoundingBox,
+) -> Option<SplitCandidate>
+```
+
+**Three reasons it is parked:**
+
+- **No measurable gain.** Under 1.3 object tests per ray on every scene (see the baseline above):
+  the accelerator is not where a ray spends its time at 4–10 primitives, and at that size the SAH
+  and the median elect barely different planes.
+- **The drift argument is void today.** It is the usual reason to share rather than copy — but
+  there is only **one** copy of the SAH. Sharing would prevent a drift that does not exist yet;
+  *not* giving the scene BVH a SAH prevents it just as well, for zero lines.
+- **It costs readability on the side that matters.** In the mesh, `find_best_split_plane` currently
+  walks `node.left_first .. + tri_count` in plain sight. Behind an accessor that range becomes an
+  offset the closures have to carry, and the algorithm body no longer shows what it iterates over.
+  That is a loss on the one piece of this branch with a measured payoff (66 649 → 0.58 triangle
+  tests per ray) and three tests guarding it.
+
+**If it is ever done**: fix the `get_bounding_box` caching first, above. A SAH port multiplies those
+calls — one pass for the centroid extent, one for the binning, per axis, per node — so porting it
+onto the uncached accessor would pile O(V) calls on top of each other.
+
+**What would earn the design unity instead**: the flat/ordered traversal (item 1 of the order of
+work). The two accelerators differ there in a way that *is* measured — the scene tree does 7.00 box
+tests per ray on a 7-node tree, i.e. every node, every ray, with no ordering and no interval
+narrowing, while the mesh has both.
 - [x] **`BVHNode::new` on an empty vector** fell into the `_` arm and recursed forever;
       `Scene::commit` on an empty scene hit it. *Done.* Measured failure mode, by removing the
       guard: `fatal runtime error: stack overflow`, SIGABRT — not a hang. `Scene::build_bvh` now
