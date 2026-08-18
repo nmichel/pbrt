@@ -365,6 +365,34 @@ impl AABoundingBox {
         self
     }
 
+    /// Restrict self to the region it shares with other.
+    ///
+    /// The set intersection of two boxes, and the counterpart of `combine_with`: where that one
+    /// takes the smallest box containing both, this takes the largest contained in both. Not to be
+    /// confused with `Intersectable::intersect`, which is a ray against geometry — this is two boxes
+    /// against each other.
+    ///
+    /// Disjoint boxes yield an **empty** box, and by construction rather than by special case:
+    /// raising `bmin` and lowering `bmax` past each other inverts the bounds on the axis where they
+    /// do not overlap, which is exactly how emptiness is represented. `is_empty` then reports it and
+    /// `half_area` gives zero.
+    ///
+    /// # Example
+    /// ```
+    /// use pbrt::geom::aabound::AABoundingBox;
+    /// use pbrt::geom::vector3::Vector3f;
+    /// let mut a = AABoundingBox::new(&Vector3f::new(0.0, 0.0, 0.0), &Vector3f::new(2.0, 2.0, 2.0));
+    /// let b = AABoundingBox::new(&Vector3f::new(1.0, 1.0, 1.0), &Vector3f::new(3.0, 3.0, 3.0));
+    /// a.intersect_with(&b);
+    /// assert_eq!(a.bmin.x, 1.0);
+    /// assert_eq!(a.bmax.x, 2.0);
+    /// ```
+    pub fn intersect_with(&mut self, other: &AABoundingBox) -> &mut Self {
+        self.bmin.maximize_by(&other.bmin);
+        self.bmax.minimize_by(&other.bmax);
+        self
+    }
+
     /// Return the AABoundingBox emcompassing a and b.
     ///
     /// # Example
@@ -389,7 +417,24 @@ impl AABoundingBox {
 }
 
 impl Transformable<AABoundingBox> for AABoundingBox {
+    /// Smallest axis-aligned box containing the eight transformed corners.
+    ///
+    /// An unbounded box has no corners to transform: a coordinate of `±inf` meets a zero in the
+    /// matrix product and comes out `NaN`, `minimize_by` and `maximize_by` then discard every `NaN`
+    /// operand, and the accumulators are left inverted — an empty box where an infinite one belongs,
+    /// which `new` refuses outright. Such a box is therefore reported as infinite on every axis.
+    ///
+    /// That is conservative and loose: a half-space y ≤ 0 keeps its shape under a translation, and
+    /// answering "infinite everywhere" throws that away. Recovering it would mean tracking which
+    /// axes a transform mixes, and a bound may be loose but must never be too small.
     fn transform(&self, transform: &Transform) -> Self {
+        if !self.is_bounded() {
+            return Self {
+                bmin: Vector3f::new(f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY),
+                bmax: Vector3f::new(f64::INFINITY, f64::INFINITY, f64::INFINITY),
+            };
+        }
+
         let min = &self.bmin;
         let max = &self.bmax;
         let vertices = vec![
@@ -584,6 +629,39 @@ mod tests {
         assert_eq!(acc.bmin, b.bmin);
         assert_eq!(acc.bmax, b.bmax);
         assert!(!acc.is_empty(), "one combine is enough to leave the empty state");
+    }
+
+    /// Two boxes that share nothing intersect to an empty box, and by construction: raising `bmin`
+    /// and lowering `bmax` past each other inverts the bounds on the axis where they miss, which is
+    /// how emptiness is represented. No special case, and the result answers `is_empty`.
+    #[test]
+    fn test_intersecting_disjoint_boxes_gives_an_empty_box() {
+        let mut left = AABoundingBox::new(&Vector3f::zero(), &Vector3f::new(1.0, 1.0, 1.0));
+        let right = AABoundingBox::new(&Vector3f::new(5.0, 0.0, 0.0), &Vector3f::new(6.0, 1.0, 1.0));
+
+        left.intersect_with(&right);
+
+        assert!(left.is_empty());
+        assert_eq!(left.half_area(), 0.0);
+    }
+
+    /// Transforming an unbounded box must not fall apart.
+    ///
+    /// Its corners hold `±inf`, which meets a zero in the matrix product and comes out `NaN`;
+    /// `minimize_by` and `maximize_by` then drop every `NaN` operand, leaving the accumulators
+    /// inverted, and `AABoundingBox::new` rejects that outright. The answer is an infinite box:
+    /// loose, since a translated half-space keeps its shape, and never too small.
+    #[test]
+    fn test_transforming_an_unbounded_box_stays_unbounded() {
+        let half_space = AABoundingBox::new(
+            &Vector3f::new(f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY),
+            &Vector3f::new(f64::INFINITY, 0.0, f64::INFINITY),
+        );
+
+        let moved = half_space.transform(&Transform::translation(Vector3f::new(0.0, 3.0, 0.0)));
+
+        assert!(!moved.is_bounded());
+        assert!(!moved.is_empty(), "an infinite box bounds everything, not nothing");
     }
 
     /// Guards the rounding constants derived in `hit`: γ(3) must stay a small multiple of
