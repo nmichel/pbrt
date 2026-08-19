@@ -52,39 +52,47 @@ where
     primitives: Vec<T>,
 }
 
-/// What a traversal does with the primitives of a leaf it could not exclude.
-pub trait Accumulator<T> {
-    /// Receives a **borrowed slice**, never an owned vector: the primitives belong to the tree and
-    /// a leaf is a range of it, so there is nothing to hand over but a view. What the accumulator
-    /// then does with it is its own business.
-    fn accumulate(&mut self, items: &[T]);
+/// One pending node of an ordered traversal, and the distance at which the ray enters its box.
+///
+/// Carrying the distance is what allows **one box test per node**: the test that decided the
+/// visiting order already computed it, so the pop does not have to test the box again to recover
+/// it. It is still worth re-examining at pop, against the narrowed interval — a hit found since the
+/// push may sit closer than this whole node.
+struct StackEntry {
+    node_idx: usize,
+    entry_distance: f64,
 }
 
 /// Work counters for traversals of the scene accelerator.
 ///
 /// Same purpose as [`crate::shapes::triangle_mesh::TraversalStats`], and a separate type because
-/// the work units differ — objects tested here, triangles there — and the two traversals are
-/// different algorithms: the mesh's orders its children and narrows its interval, this one does
-/// neither. A single type would abstract over that difference rather than describe it.
+/// the work units differ — objects tested here, triangles there. A single type would abstract over
+/// that difference rather than describe it.
 ///
 /// Reproducible to the unit for a given ray set: neither the build nor the traversal draws a random
 /// number, so the same rays over the same scene give the same counts.
 #[derive(Default, Clone, Copy)]
 pub struct TraversalStats {
-    /// Nodes whose contents were examined. A node whose box the ray misses is not counted — what
-    /// it cost is a box test, which `box_tests` counts.
+    /// Nodes whose contents were examined.
+    ///
+    /// Two kinds of node are deliberately absent. One whose box the ray misses never reaches the
+    /// stack, and one popped after the interval has shrunk past its entry distance is dropped
+    /// without a single test — no work was done on either. What the first cost is a box test, which
+    /// `box_tests` counts; the second cost nothing at all.
     pub nodes_visited: usize,
 
-    /// Ray/box tests. Every node taken off the stack performs exactly one, on its own box, so this
-    /// figure also counts the nodes the traversal reached at all.
+    /// Ray/box tests, every one of them routed through `BVH::hit_box` so this cannot drift.
+    ///
+    /// In the ordered traversal a node's box is tested once, by the parent that decides whether and
+    /// in what order to push it, plus one test for the root, which has no parent. The unordered
+    /// traversal of `query_p` tests instead at pop, one per node it takes off the stack.
     pub box_tests: usize,
 
-    /// Objects handed to `Object::intersect`.
+    /// Primitives handed to the visitor, which is to say offered for a real geometric test.
     ///
-    /// Today this is also the number of primitives the accelerator hands out: it returns every
-    /// candidate it cannot exclude, and the scene then tests all of them in whatever order they
-    /// arrived. The two figures coincide only because nothing prunes between them — which is the
-    /// defect, not a property.
+    /// Fewer than the primitives the ray's path crosses, and that gap is the point: the interval
+    /// shrinks to each hit as it is reported, so a subtree beginning beyond the nearest hit so far
+    /// is never opened and its primitives are never offered.
     pub object_tests: usize,
 }
 
@@ -123,18 +131,147 @@ impl<T: AABound> BVH<T> {
         tree
     }
 
-    /// Hands every primitive the ray might meet to `accumulator`.
-    pub fn query(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>) -> () {
-        self.traverse(ray, near, far, accumulator, &mut TraversalStats::default())
+    /// Offers `visit` the primitives the ray might meet, nearest node first, narrowing the search as
+    /// `visit` reports hits. Adds the work done to `stats`.
+    ///
+    /// # The contract with `visit`
+    ///
+    /// Called as `visit(primitive, near, far)`, it must answer with the distance of the hit it
+    /// **adopted as its new nearest**, or `None` when it kept nothing. The interval it receives is
+    /// the one still worth searching: `far` shrinks to the last adopted distance, so whatever the
+    /// visitor is offered next lies closer than everything it has already kept.
+    ///
+    /// That contract is the whole reason this takes a closure rather than filling a list. A list is
+    /// complete before the first primitive is tested, so nothing in it can be excluded by what a
+    /// test found: every candidate is tested over the caller's full `[near, far]`, and the ranking
+    /// happens afterwards, once the work is already spent. Reporting each hit as it is found lets
+    /// the traversal skip subtrees that begin beyond it, and lets each primitive reject over a
+    /// shorter interval than the one before.
+    ///
+    /// The visitor is free to decline a hit it was offered — returning `None` leaves the interval
+    /// untouched — which is what lets the caller keep its own tie-breaking rule.
+    pub fn query<F>(&self, ray: &Ray, near: f64, far: f64, mut visit: F, stats: &mut TraversalStats)
+    where
+        F: FnMut(&T, f64, f64) -> Option<f64>,
+    {
+        // The caller's `far`, narrowed by every hit reported so far. It bounds the box tests as well
+        // as the primitive tests: a node the ray enters beyond the nearest hit cannot hold a nearer
+        // one, so it is not worth opening.
+        let mut min_t = far;
+
+        // The root has no parent to have tested it, so it is tested here. That is the one box test
+        // outside the loop, and the reason a ray missing the scene entirely costs exactly one.
+        let root_distance = match Self::hit_box(&self.nodes[ROOT_NODE_IDX], ray, near, min_t, stats) {
+            Some(distance) => distance,
+            None => return,
+        };
+
+        let mut stack: Vec<StackEntry> = Vec::with_capacity(64);
+        stack.push(StackEntry {
+            node_idx: ROOT_NODE_IDX,
+            entry_distance: root_distance,
+        });
+
+        while let Some(entry) = stack.pop() {
+            // A hit adopted since this node was pushed may sit closer than the point where the ray
+            // enters it, in which case nothing below it can contribute and it is dropped without a
+            // single test. This is what visiting the nearer child first buys: it gives `min_t` its
+            // best chance to shrink before the farther child is ever popped.
+            if entry.entry_distance >= min_t {
+                continue;
+            }
+
+            stats.nodes_visited += 1;
+            let node = &self.nodes[entry.node_idx];
+
+            if node.is_leaf() {
+                for primitive in self.primitives[node.primitive_range()].iter() {
+                    stats.object_tests += 1;
+                    if let Some(distance) = visit(primitive, near, min_t) {
+                        debug_assert!(
+                            distance >= near && distance <= min_t,
+                            "the visitor adopted a hit at {} but was offered [{}, {}]; a hit outside the interval would let the traversal prune \
+                             geometry that is actually nearer",
+                            distance,
+                            near,
+                            min_t
+                        );
+                        min_t = distance;
+                    }
+                }
+            }
+            else {
+                let left_idx = node.left_first;
+                let right_idx = left_idx + 1;
+                let left = (left_idx, Self::hit_box(&self.nodes[left_idx], ray, near, min_t, stats));
+                let right = (right_idx, Self::hit_box(&self.nodes[right_idx], ray, near, min_t, stats));
+
+                // Order the two children so the nearer is examined first. Only their entry distances
+                // are compared: a child the ray misses is never pushed (see code below), so where it would have sat
+                // is not relevant.
+                let (nearer, farther) = match (left.1, right.1) {
+                    (Some(left_distance), Some(right_distance)) if right_distance < left_distance => (right, left),
+                    _ => (left, right),
+                };
+
+                // The stack is LIFO, so pushing the farther child first pops the nearer first.
+                // Children that the ray misses (None) are not pushed,
+                // so the visitor is never offered a primitive it cannot meet.
+                for (child_idx, child_hit) in [farther, nearer] {
+                    if let Some(entry_distance) = child_hit {
+                        stack.push(StackEntry {
+                            node_idx: child_idx,
+                            entry_distance,
+                        });
+                    }
+                }
+            }
+        }
     }
 
-    /// Same as [`BVH::query`], but adds the work done to `stats`.
+    /// Whether any primitive the ray might meet satisfies `blocks`. Adds the work done to `stats`.
     ///
-    /// Both entry points run the very same `traverse`, so the measured traversal is the one the
-    /// renderer performs — a separate instrumented copy would be free to drift away from it and
-    /// would measure nothing trustworthy.
-    pub fn query_instrumented(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>, stats: &mut TraversalStats) -> () {
-        self.traverse(ray, near, far, accumulator, stats)
+    /// Deliberately **not** the ordered traversal. Ordering and narrowing both exist to reach the
+    /// *nearest* hit sooner, and here any hit settles the question: there is no interval to shrink,
+    /// nothing for an early hit to prune, so the children are pushed as they come and the stack
+    /// holds plain indices instead of entry distances. What this traversal does that the other
+    /// cannot is stop — it returns on the first `blocks`.
+    pub fn query_p<F>(&self, ray: &Ray, near: f64, far: f64, mut blocks: F, stats: &mut TraversalStats) -> bool
+    where
+        F: FnMut(&T) -> bool,
+    {
+        let mut stack: Vec<usize> = Vec::with_capacity(64);
+        stack.push(ROOT_NODE_IDX);
+
+        while let Some(node_idx) = stack.pop() {
+            let node = &self.nodes[node_idx];
+
+            if Self::hit_box(node, ray, near, far, stats).is_none() {
+                continue;
+            }
+            stats.nodes_visited += 1;
+
+            if node.is_leaf() {
+                for primitive in self.primitives[node.primitive_range()].iter() {
+                    stats.object_tests += 1;
+                    if blocks(primitive) {
+                        return true;
+                    }
+                }
+            }
+            else {
+                // Right pushed first, so the left child pops first. No hit is preferred over
+                // another here, but the order still decides *how soon* the first occluder is met,
+                // and the primitives of a leaf sit in build order: walking them left to right is
+                // what makes the search stop early on the near side of the scene rather than the
+                // far one. Reversing these two lines takes `cornell_box.stage`'s shadow rays from
+                // 0.89 object tests per ray to 0.92.
+                stack.push(node.left_first + 1);
+                stack.push(node.left_first);
+            }
+        }
+
+        false
     }
 
     /// Number of primitives the tree was built over.
@@ -197,32 +334,13 @@ impl<T: AABound> BVH<T> {
         aabbox
     }
 
-    fn traverse(&self, ray: &Ray, near: f64, far: f64, accumulator: &mut dyn Accumulator<T>, stats: &mut TraversalStats) -> () {
-        let mut stack: Vec<usize> = Vec::with_capacity(64);
-        stack.push(ROOT_NODE_IDX);
-
-        while let Some(node_idx) = stack.pop() {
-            let node = &self.nodes[node_idx];
-
-            stats.box_tests += 1;
-            if node.aabbox.hit(ray, near, far).is_none() {
-                continue;
-            }
-            stats.nodes_visited += 1;
-
-            if node.is_leaf() {
-                accumulator.accumulate(&self.primitives[node.primitive_range()]);
-            }
-            else {
-                // Right first, so the left child pops first. Nothing in this traversal depends on
-                // the order — the accumulator collects every candidate and the scene ranks them
-                // afterwards — but the order does decide which of two equidistant hits the scene
-                // keeps, since it prefers the first it sees. Left to right is therefore a choice,
-                // not an accident, however invisible.
-                stack.push(node.left_first + 1);
-                stack.push(node.left_first);
-            }
-        }
+    /// Tests `node`'s box against `ray` and records the test.
+    ///
+    /// Every ray/box test of both traversals goes through here, so `box_tests` cannot drift out of
+    /// step with the tests actually performed.
+    fn hit_box(node: &BVHNode, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> Option<f64> {
+        stats.box_tests += 1;
+        node.aabbox.hit(ray, near, far)
     }
 
     /// The axis along which the primitives' centroids are most spread out.
@@ -298,6 +416,179 @@ mod tests {
 
     fn spread_out(count: usize) -> Vec<Boxed> {
         (0..count).map(|i| unit_box_at(i as f64 * 3.0)).collect()
+    }
+
+    /// Unit boxes at `x = 0, 0.5, 1.0, …`, so that they overlap and a ray along +x meets them all.
+    ///
+    /// The overlap is the point: with `spread_out` the first hit prunes everything behind it, so a
+    /// traversal never gets to offer a second primitive. Overlapping boxes are what let a test watch
+    /// the interval shrink across several calls.
+    fn stacked_up(count: usize) -> Vec<Boxed> {
+        (0..count).map(|i| unit_box_at(i as f64 * 0.5)).collect()
+    }
+
+    /// A ray along +x, starting one unit before the first box of either helper.
+    fn along_x() -> Ray {
+        Ray::new(&Vector3f::new(-1.0, 0.5, 0.5), &Vector3f::new(1.0, 0.0, 0.0))
+    }
+
+    const NEAR: f64 = 0.0001;
+    const FAR: f64 = 1000.0;
+
+    /// A visitor that adopts nothing must still be offered every primitive the ray meets.
+    ///
+    /// This is the invariant the whole change rests on, and the one whose failure is silent: an
+    /// over-eager prune drops geometry without any error, and the image simply loses an object.
+    /// Adopting nothing keeps the interval at the caller's `far`, so nothing may be excluded.
+    #[test]
+    fn test_a_visitor_that_adopts_nothing_is_offered_every_primitive() {
+        let tree = BVH::new(stacked_up(4));
+
+        let mut offered = 0;
+        tree.query(
+            &along_x(),
+            NEAR,
+            FAR,
+            |_primitive, _near, _far| {
+                offered += 1;
+                None
+            },
+            &mut TraversalStats::default(),
+        );
+
+        assert_eq!(offered, 4, "all four boxes lie along the ray and none was excluded by a hit");
+    }
+
+    /// The interval handed to the visitor shrinks to the last hit it adopted.
+    ///
+    /// The visitor adopts once, at a distance chosen beyond every box's entry point so that nothing
+    /// is pruned and the later calls can be observed. What they must show is the narrowed `far`:
+    /// without it every primitive is tested over the caller's whole interval, which is precisely
+    /// what filling a list of candidates forced.
+    #[test]
+    fn test_the_interval_shrinks_to_the_adopted_hit() {
+        let tree = BVH::new(stacked_up(4));
+        let adopted_at = 5.0;
+
+        let mut intervals: Vec<f64> = Vec::new();
+        tree.query(
+            &along_x(),
+            NEAR,
+            FAR,
+            |_primitive, _near, far| {
+                intervals.push(far);
+                if intervals.len() == 1 {
+                    Some(adopted_at)
+                }
+                else {
+                    None
+                }
+            },
+            &mut TraversalStats::default(),
+        );
+
+        assert_eq!(intervals[0], FAR, "the first call has nothing to narrow it");
+        assert!(intervals.len() > 1, "the remaining boxes are entered before {}", adopted_at);
+        assert!(
+            intervals[1..].iter().all(|far| *far == adopted_at),
+            "every later call must be bounded by the adopted hit, got {:?}",
+            intervals
+        );
+    }
+
+    /// One hit near the ray's origin is enough to prune the whole rest of the tree.
+    ///
+    /// Ordering and narrowing only pay together: narrowing needs a hit to narrow *with*, and the
+    /// nearest hit comes first only if the nearer child is opened first. Separated boxes and a
+    /// visitor that adopts whatever box it is handed make both visible — the count must be 1, not 8.
+    ///
+    /// **Both directions along the axis, and that is what makes this about ordering.** The build
+    /// sorts each range by centroid, so for a ray towards +x the left child is always the nearer
+    /// one and pushing the children in build order happens to be right. Only the ray running back
+    /// down the axis tells the two apart: there the far half comes first in build order, gets opened
+    /// first, and its hit is adopted before the near half is ever reached.
+    #[test]
+    fn test_the_nearest_hit_prunes_the_rest_of_the_tree() {
+        // 8 disjoint unit boxes, 3 units apart, so a ray along +x meets them all in order.
+        let tree = BVH::new(spread_out(8));
+
+        // The boxes span x ∈ [0, 22], so both origins sit outside and look across the whole layout.
+        for (origin_x, direction_x) in [(-1.0, 1.0), (25.0, -1.0)] {
+            let ray = Ray::new(&Vector3f::new(origin_x, 0.5, 0.5), &Vector3f::new(direction_x, 0.0, 0.0));
+            let mut stats = TraversalStats::default();
+
+            let mut offered = 0;
+            tree.query(
+                &ray,
+                NEAR,
+                FAR,
+                |primitive, near, far| {
+                    offered += 1;
+                    primitive.0.hit(&ray, near, far)
+                },
+                &mut stats,
+            );
+
+            assert_eq!(
+                offered, 1,
+                "towards x{:+}, the nearest box is met first and no other can then be nearer",
+                direction_x
+            );
+            assert_eq!(stats.object_tests, 1, "the counter must agree with the calls actually made");
+        }
+    }
+
+    /// `query_p` finds a blocker exactly when `query` is offered a primitive the ray meets.
+    ///
+    /// The two are separate traversals — one ordered and narrowing, the other unordered with an
+    /// early return — so nothing but a test keeps them answering the same question. The failure they
+    /// would hide is quiet: a `query_p` that missed occluders would neither crash nor slow anything
+    /// down, it would only delete shadows.
+    #[test]
+    fn test_query_p_agrees_with_query() {
+        // 8 disjoint unit boxes, 3 units apart
+        let tree = BVH::new(spread_out(8));
+
+        // Rays across the whole layout: some through the boxes, some between them, some past the
+        // end, and one pointing away.
+        let origins = [-1.0, 4.0, 10.0, 25.0];
+        let heights = [0.5, 1.5];
+        let directions = [1.0, -1.0];
+
+        for x in origins {
+            for y in heights {
+                for direction in directions {
+                    let ray = Ray::new(&Vector3f::new(x, y, 0.5), &Vector3f::new(direction, 0.0, 0.0));
+
+                    let mut met_any = false;
+                    tree.query(
+                        &ray,
+                        NEAR,
+                        FAR,
+                        |primitive, near, far| {
+                            let hit = primitive.0.hit(&ray, near, far);
+                            met_any |= hit.is_some();
+                            hit
+                        },
+                        &mut TraversalStats::default(),
+                    );
+
+                    let blocked = tree.query_p(
+                        &ray,
+                        NEAR,
+                        FAR,
+                        |primitive| primitive.0.hit(&ray, NEAR, FAR).is_some(),
+                        &mut TraversalStats::default(),
+                    );
+
+                    assert_eq!(
+                        blocked, met_any,
+                        "the two traversals disagree for a ray from ({}, {}) towards x{:+}",
+                        x, y, direction
+                    );
+                }
+            }
+        }
     }
 
     /// One primitive is a leaf, and the tree is that single node.

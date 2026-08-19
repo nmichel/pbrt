@@ -13,6 +13,28 @@ physiquement », choisir la clarté et la justesse, et signaler le coût en perf
 références précises dans le code. **Le consulter avant de proposer un chantier**, et y cocher
 ou amender les entrées au fur et à mesure — c'est la mémoire longue du projet.
 
+Un sujet reste une ligne dans `IDEAS.md` tant qu'une ligne suffit ; dès qu'il porte une analyse,
+il prend son propre fichier dans [ideas/](ideas/) et `IDEAS.md` n'en garde que l'entrée d'index.
+Ce répertoire n'est pas `docs/` : `docs/` décrit le code tel qu'il est, `ideas/` ce qui n'est pas
+fait. Le fichier d'un sujet disparaît quand le sujet atterrit.
+
+**Chantier en cours** — aucun. Le sujet de la branche `chore/revamp_bvh_for_trimesh` est clos :
+SAH de maillage corrigé, `intersect_p` descendu dans les formes, arbre de scène à plat, traversée
+ordonnée avec resserrement de l'intervalle. L'ordre de travail d'`IDEAS.md` désigne `AreaLight`
+comme suite — les surfaces émissives ne contribuent aujourd'hui à aucun éclairage indirect.
+
+Trois chantiers restent *voisins* du BVH et n'en font délibérément pas partie, chacun documenté
+dans `IDEAS.md` : `get_bounding_box` recalculé à chaque comparaison (à traiter avant qu'une scène
+grossisse), les feuilles de maillage à un seul triangle, et le SAH binné de la scène, mis de côté
+avec ses raisons.
+
+**Lancer les tests** — `cargo test` échoue en bloc : les `examples/` ne compilent plus (20 erreurs,
+dette antérieure sans rapport avec la bibliothèque, voir `IDEAS.md`). Utiliser `cargo test --lib`
+et `cargo test --doc`, qui sont verts, plus `cargo fmt --check`. Pour tout changement de
+construction ou de traversée d'un accélérateur, `cargo run --release --bin bvh_stats -- <scène>`
+donne les compteurs à comparer ; ils ne voient que les rayons primaires et d'ombre, donc le
+chronomètre d'un rendu complet reste une mesure distincte et parfois divergente.
+
 ## 1. Structure
 
 Un module = un concept. L'idiome en vigueur dans tout le projet, à respecter pour tout

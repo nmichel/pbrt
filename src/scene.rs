@@ -1,7 +1,7 @@
 use crate::lights::LightType;
 use crate::objects::Object;
 
-use super::bvh::{Accumulator, TraversalStats, BVH};
+use super::bvh::{TraversalStats, BVH};
 use super::geom::aabound::{AABound, AABoundingBox};
 use super::geom::intersectable::{Intersectable, IntersectionResult};
 use super::geom::ray::Ray;
@@ -163,15 +163,14 @@ impl Scene {
 
         match &self.bvh {
             None => false,
-            Some(bvh_node) => {
-                let mut accumulator = ObjectAccumulator { acc: Vec::new() };
-                bvh_node.query_instrumented(ray, near, far, &mut accumulator, stats);
-                Self::any_blocks(accumulator.acc.iter(), ray, near, far, stats)
-            }
+            Some(bvh) => bvh.query_p(ray, near, far, |primitive| Intersectable::intersect_p(primitive, ray, near, far), stats),
         }
     }
 
     /// Whether any of `primitives` stands in the way.
+    ///
+    /// Serves the unbounded group only; the tree answers the same question through
+    /// [`BVH::query_p`], which can stop mid-traversal rather than after a whole list.
     ///
     /// `any` short-circuits, so nothing after the first occluder is tested.
     /// `Intersectable::intersect_p` rather than `Object::intersect`: geometry is the whole
@@ -188,12 +187,33 @@ impl Scene {
         // The unbounded primitives are not in the tree, so they are asked directly, every time.
         let mut nearest = Self::nearest_among(self.unbounded.iter(), ray, near, far, stats);
 
-        if let Some(bvh_node) = &self.bvh {
-            let mut accumulator = ObjectAccumulator { acc: Vec::new() };
-            bvh_node.query_instrumented(ray, near, far, &mut accumulator, stats);
+        if let Some(bvh) = &self.bvh {
+            // A hit found outside the tree already bounds the search inside it: nothing beyond it
+            // can win, so the traversal is given the shorter interval from the start rather than
+            // discovering it one primitive at a time.
+            let far = nearest.as_ref().map_or(far, |interaction| interaction.intersection.d);
 
-            let from_tree = Self::nearest_among(accumulator.acc.iter(), ray, near, far, stats);
-            nearest = Self::closer(nearest, from_tree);
+            bvh.query(
+                ray,
+                near,
+                far,
+                |primitive, near, far| {
+                    let candidate = Object::intersect(primitive, ray, near, far)?;
+
+                    // Strictly nearer, so two equidistant candidates leave the current in place —
+                    // the same rule `closer` applies to the unbounded group. Declining also keeps
+                    // the traversal's interval where it is, which is correct: nothing was learnt.
+                    let distance = candidate.intersection.d;
+                    let is_nearer = nearest.as_ref().map_or(true, |current| distance < current.intersection.d);
+                    if !is_nearer {
+                        return None;
+                    }
+
+                    nearest = Some(candidate);
+                    Some(distance)
+                },
+                stats,
+            );
         }
 
         nearest
@@ -264,20 +284,6 @@ impl Scene {
     }
 }
 
-struct ObjectAccumulator {
-    pub acc: Vec<Wrapper<dyn Object>>,
-}
-
-impl Accumulator<Wrapper<dyn Object>> for ObjectAccumulator {
-    /// Copies the leaf's slice into the accumulator, one `Arc` refcount bump per primitive.
-    ///
-    /// The bumps are the price of collecting candidates before testing them: a list outlives the
-    /// traversal that filled it, so it cannot hold borrows of the tree.
-    fn accumulate(&mut self, items: &[Wrapper<dyn Object>]) {
-        self.acc.extend_from_slice(items);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -330,6 +336,80 @@ mod tests {
 
         // And it occludes, which is the same question asked of the other traversal.
         assert!(scene.intersect_p(&at_the_plane, 0.0001, 1000.0));
+    }
+
+    /// The accelerated search agrees with testing every primitive, over a spread of rays.
+    ///
+    /// This is the property the tree exists to preserve, and brute force is the only reference
+    /// available for it: a render cannot be compared, the sampler being unseeded. The rays include
+    /// ones that start *between* the spheres, ones that graze past them all, and ones pointing away,
+    /// so a subtree wrongly excluded or a leaf's primitives wrongly skipped shows up as a hit found
+    /// where brute force finds none, or the reverse.
+    ///
+    /// What it does **not** catch, and no test here does: a prune a fraction too eager. Narrowing
+    /// only ever excludes what lies beyond a hit already adopted, and ordering delivers the nearest
+    /// hit first, so shaving a per-mille off the interval afterwards removes nothing that could have
+    /// won. Seeing such a bug would need two candidates whose *hit* distances are within that
+    /// fraction while their *box entry* distances rank them the other way round — the safety of the
+    /// prune rests on the argument, not on this test.
+    #[test]
+    fn test_the_tree_finds_what_brute_force_finds() {
+        let centres = [-6.0, -2.0, 3.0, 8.0, 9.5];
+        let objects: Vec<Arc<dyn Object>> = centres
+            .iter()
+            .map(|z| {
+                let sphere = Arc::new(Simple::new(Arc::new(Sphere::new(1.0)), lambertian()));
+                let at = Box::new(Transform::translation(Vector3f::new(0.0, 0.0, *z)));
+                Arc::new(Transformed::new(sphere, at)) as Arc<dyn Object>
+            })
+            .collect();
+
+        let mut scene = Scene::new();
+        for object in objects.iter() {
+            scene.add_object(Arc::clone(object));
+        }
+        scene.commit();
+        assert_eq!(scene.primitive_count(), centres.len());
+
+        for origin_z in [-10.0, -4.0, 0.0, 8.75, 12.0] {
+            for direction_z in [1.0, -1.0] {
+                // A ray along the row of spheres, and one offset so it grazes past them all.
+                for offset_x in [0.0, 1.5] {
+                    let ray = Ray::new(&Vector3f::new(offset_x, 0.0, origin_z), &Vector3f::new(0.0, 0.0, direction_z));
+
+                    let expected = objects.iter().fold(None, |nearest, object| {
+                        Scene::closer(nearest, Object::intersect(object.as_ref(), &ray, 0.0001, 1000.0))
+                    });
+
+                    let found = scene.intersect(&ray, 0.0001, 1000.0);
+
+                    match (expected, found) {
+                        (None, None) => (),
+                        (Some(expected), Some(found)) => {
+                            assert!(
+                                (expected.intersection.d - found.intersection.d).abs() < 1e-12,
+                                "from ({}, {}) towards z{:+}: brute force says {}, the tree says {}",
+                                offset_x,
+                                origin_z,
+                                direction_z,
+                                expected.intersection.d,
+                                found.intersection.d
+                            )
+                        }
+                        (expected, found) => {
+                            panic!(
+                                "from ({}, {}) towards z{:+}: brute force {} but the tree {}",
+                                offset_x,
+                                origin_z,
+                                direction_z,
+                                if expected.is_some() { "hits" } else { "misses" },
+                                if found.is_some() { "hits" } else { "misses" }
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// The nearest hit is found across both groups, whichever one it belongs to.

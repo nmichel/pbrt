@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["nicolas michel <nicolas.michel.lava@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/nmichel/pbrt"
+# `src/bin/bvh_stats.rs` is a second binary target; without this, `cargo run`
+# refuses to pick one. The renderer is the default.
+default-run = "pbrt"
 
 [dependencies]
 crossbeam = "0.7"

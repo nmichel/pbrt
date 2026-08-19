@@ -9,6 +9,7 @@ use pbrt::geom::transform::Transform;
 use pbrt::geom::vector2::Vector2u;
 use pbrt::geom::vector3::Vector3f;
 use pbrt::integrators::{self, *};
+use pbrt::lights::BackgroundInfiniteLight;
 use pbrt::materials::{Dielectric, Lambertian, Material, Metal, RefractionIndices};
 use pbrt::objects::{Simple, Transformed};
 use pbrt::scene::Scene;
@@ -79,6 +80,13 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
             )),
             Box::new(Transform::translation(Vector3f::new(4.0, 1.0, 0.0))),
         )));
+
+    // Not one object of this scene emits: in "Ray Tracing in One Weekend" all the light comes
+    // from the sky. `BackgroundInfiniteLight` interpolates on the vertical component of the
+    // direction, `f` at the nadir and `t` at the zenith, which reproduces the book's gradient —
+    // white near the horizon, pale blue overhead. Without it every path ends on a black
+    // background and the image is uniformly black.
+    scene.add_light(Arc::new(BackgroundInfiniteLight::new(colors::WHITE, Spectrum::new(0.5, 0.7, 1.0))));
 
     for a in -11..10 {
         for b in -11..10 {
