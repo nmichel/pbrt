@@ -144,7 +144,7 @@ impl Intersectable for Sphere {
     }
 
     fn contain_point(&self, point: &Vector3f) -> bool {
-        vector3::dot(&point, &point) < self.r * self.r
+        vector3::dot(&point, &point) <= self.r * self.r
     }
 }
 

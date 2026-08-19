@@ -42,15 +42,17 @@ impl Intersectable for Plane {
         res
     }
 
+    /// The solid is the closed half-space at or below y = 0, per the convention on
+    /// `Intersectable::contain_point`.
     fn contain_point(&self, point: &Vector3f) -> bool {
-        point.y < 0.0
+        point.y <= 0.0
     }
 }
 
 impl AABound for Plane {
     /// Bounds the **solid**, which is the half-space below the surface, not the surface itself.
     ///
-    /// `contain_point` answers `point.y < 0.0`: this shape *is* the half-space y ≤ 0, and
+    /// `contain_point` answers `point.y <= 0.0`: this shape *is* the half-space y ≤ 0, and
     /// `intersect` returns where a ray crosses its boundary — the usual convention, where a shape is
     /// a volume and its intersection routine reports its skin. A bound must contain the object it
     /// bounds, so it has to reach down to −∞ in y. A slab of zero thickness at y = 0 would bound the
@@ -101,5 +103,11 @@ mod tests {
         assert!(!plane.contain_point(&Vector3f::new(0.0, 1.0, 0.0)));
 
         assert!(!bbox.is_bounded(), "infinite in x and z, so it stays out of the accelerator");
+    }
+
+    /// The solid is closed, so its own surface belongs to it.
+    #[test]
+    fn test_the_surface_belongs_to_the_solid() {
+        assert!(Plane::new().contain_point(&Vector3f::new(3.0, 0.0, -2.0)));
     }
 }

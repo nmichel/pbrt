@@ -57,8 +57,15 @@ impl Intersectable for Rectangle {
         }
     }
 
-    fn contain_point(&self, point: &Vector3f) -> bool {
-        point.y < 0.0 && point.x.abs() <= self.half_width && point.z.abs() <= self.half_height
+    /// A rectangle is an open surface and encloses nothing, so it contains no point.
+    ///
+    /// Answering `y <= 0` within the footprint would describe a solid reaching down for ever, and
+    /// `get_bounding_box` below — flat at y = 0, correctly, since that is where the surface is —
+    /// would then fail to contain it. Making the bound match instead would render every rectangle
+    /// unbounded, and the floors, walls and light panels of every scene would leave the accelerator
+    /// for a volume they do not have.
+    fn contain_point(&self, _point: &Vector3f) -> bool {
+        false
     }
 }
 
@@ -73,5 +80,25 @@ impl AABound for Rectangle {
         let bmin = Vector3f::new(-self.half_width, 0.0, -self.half_height);
         let bmax = Vector3f::new(self.half_width, 0.0, self.half_height);
         AABoundingBox::new(&bmin, &bmax)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An open surface encloses nothing, so no point is inside it — and its flat bound is then a
+    /// truthful description rather than one that omits a volume.
+    #[test]
+    fn test_an_open_surface_encloses_nothing() {
+        let rectangle = Rectangle::new(2.0, 3.0);
+
+        assert!(!rectangle.contain_point(&Vector3f::new(0.0, -1.0, 0.0)));
+        assert!(!rectangle.contain_point(&Vector3f::new(0.0, 0.0, 0.0)));
+
+        let bbox = rectangle.get_bounding_box();
+        assert_eq!(bbox.bmin.y, 0.0);
+        assert_eq!(bbox.bmax.y, 0.0);
+        assert!(bbox.is_bounded());
     }
 }

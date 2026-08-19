@@ -109,8 +109,18 @@ impl Intersectable for Cylinder {
         res
     }
 
+    /// Inside the radius **and** between the caps: the cylinder is a finite solid, and `intersect`
+    /// bounds it that way — it discards a wall hit outside ±`half_height` and adds the two end
+    /// discs.
+    ///
+    /// Testing the radius alone describes an infinitely long cylinder, and the disagreement is not
+    /// academic: a `Substraction(box, cylinder)` reading it bores the hole clean through the box,
+    /// past both ends of the cylinder that was supposed to cut it.
     fn contain_point(&self, point: &crate::geom::vector3::Vector3f) -> bool {
-        point.x * point.x + point.z * point.z < self.radius * self.radius // && point.y > -self.half_height && point.y < self.half_height
+        let inside_radius = point.x * point.x + point.z * point.z <= self.radius * self.radius;
+        let between_caps = point.y >= -self.half_height && point.y <= self.half_height;
+
+        inside_radius && between_caps
     }
 }
 
@@ -143,5 +153,35 @@ impl AABound for Cylinder {
         let bmin = Vector3f::new(-self.radius, -self.half_height, -self.radius);
         let bmax = Vector3f::new(self.radius, self.half_height, self.radius);
         AABoundingBox::new(&bmin, &bmax)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geom::vector3::Vector3f;
+
+    /// The solid stops at the caps, as `intersect` does.
+    ///
+    /// Testing the radius alone leaves the interior infinitely long while the boundary is finite, and
+    /// the two halves of a shape's description then contradict each other. What that costs is
+    /// concrete: `Substraction(box, cylinder)` bores its hole clean through, past both ends of the
+    /// cylinder meant to cut it.
+    #[test]
+    fn test_the_solid_stops_at_the_caps() {
+        let cylinder = Cylinder::new(1.0, 4.0);
+
+        assert!(cylinder.contain_point(&Vector3f::new(0.0, 0.0, 0.0)), "the middle is inside");
+
+        // Beyond either cap, on the axis: outside, however small the radius.
+        assert!(!cylinder.contain_point(&Vector3f::new(0.0, 5.0, 0.0)));
+        assert!(!cylinder.contain_point(&Vector3f::new(0.0, -5.0, 0.0)));
+
+        // Outside the radius, at mid-height.
+        assert!(!cylinder.contain_point(&Vector3f::new(2.0, 0.0, 0.0)));
+
+        // The solid is closed, so the caps and the wall belong to it.
+        assert!(cylinder.contain_point(&Vector3f::new(0.0, 2.0, 0.0)), "the cap is on the boundary");
+        assert!(cylinder.contain_point(&Vector3f::new(1.0, 0.0, 0.0)), "the wall is on the boundary");
     }
 }
