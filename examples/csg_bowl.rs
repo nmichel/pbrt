@@ -4,7 +4,8 @@ use pbrt::geom::matrix4::Matrix4;
 use pbrt::geom::transform::Transform;
 use pbrt::geom::vector2::Vector2u;
 use pbrt::geom::vector3::Vector3f;
-use pbrt::integrators::{self, Integrator, NormalIntegrator, PathIntegrator};
+use pbrt::integrators::{self, Integrator, NaiveIntegrator, NormalIntegrator, PathIntegrator};
+use pbrt::lights::BackgroundInfiniteLight;
 use pbrt::materials::*;
 use pbrt::objects::{Simple, Transformed};
 use pbrt::scene::Scene;
@@ -70,6 +71,28 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
     )));
 
+    // Nothing in this scene emits, and until this line no `Light` is registered either — which
+    // under the default `PATH` integrator is enough to make the image uniformly black. The chain
+    // is worth spelling out, because every link fails silently:
+    //
+    //   [1] `sample_light` returns `None` as soon as `Scene::lights` is empty, so next-event
+    //       estimation contributes nothing.
+    //   [2] `background_radiance` sums `le` over the *infinite* lights. Over an empty set that
+    //       sum is BLACK, so a ray that escapes the scene carries nothing back.
+    //   [3] A material's own emission is only accumulated while `is_last_bounce_specular`, so
+    //       even an emissive surface would go dark after the first diffuse bounce.
+    //
+    // A `BackgroundInfiniteLight` answers all three. It is the sky of "Ray Tracing in One
+    // Weekend", interpolating on the vertical component of the direction — `f` at the nadir, `t`
+    // at the zenith. The gradient below is the one `NaiveIntegrator` hard-codes, which is what
+    // makes `--integrator path` and `--integrator naive` comparable on the same scene.
+    //
+    // It feeds [1] as well as [2]: `sample_li` genuinely samples, drawing `wi` from a `SpherePdf`.
+    // Departure from the ideal, worth naming — that pdf is uniform over the *whole* sphere,
+    // including the half below the horizon no surface can see, so about half the samples land on
+    // an invisible hemisphere. The estimator stays unbiased; only the variance pays.
+    scene.add_light(Arc::new(BackgroundInfiniteLight::new(colors::WHITE, Spectrum::new(0.5, 0.7, 1.0))));
+
     (scene, Box::new(camera))
 }
 
@@ -83,6 +106,7 @@ fn main() {
     println!("Redering with configuration settings: {:#?}", &config);
 
     let integrator: Box<dyn Integrator> = match config.integrator {
+        integrators::Type::NAIVE => Box::new(NaiveIntegrator::new(config.max_depth)),
         integrators::Type::NORMAL => Box::new(NormalIntegrator::new()),
         integrators::Type::PATH => Box::new(PathIntegrator::new(config.max_depth)),
     };

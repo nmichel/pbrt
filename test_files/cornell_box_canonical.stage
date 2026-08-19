@@ -1,0 +1,105 @@
+# Canonical Cornell box
+#
+# The reference scene of the field: a white box open towards the camera, one red wall and one
+# green wall, two white blocks, and an emissive panel set into the ceiling. Both blocks are
+# plain white lambertian — that is what makes the scene a test of light transport rather than of
+# materials. `cornell_box.stage` keeps the same geometry but swaps them for metal and dielectric,
+# which measures something else.
+#
+# The camera stands at z = 800 with a 60° field of view. Neither is expressed here: the loader
+# takes the field of view and the clipping planes from the command line, so the scene needs
+#
+#   --fov 60 --far 2000
+#
+# `--far` must clear the distance from the camera to the back wall, 800 + 277 ≈ 1077, which the
+# default of 1000 does not.
+#
+# A `transform` block composes its steps as `translation · rotation`, so the rotation is listed
+# first and applies in the object's own frame, before the translation carries it into place.
+
+camera pin_hole
+  pos 0.0 0.0 800.0
+  look 0.0 0.0 0.0
+  up 0.0 1.0 0.0
+
+scene
+  # Ceiling. Flipped by a half turn about x so its normal faces down, into the room.
+  object transformed
+    object simple
+      rectangle 555.0 555.0
+      lambertian color 1.0 1.0 1.0
+    transform {
+      rotate_x -3.14159
+      translate 0.0 277.0 0.0
+    }
+
+  # Floor. The reference orientation of `rectangle` already faces up, so it needs no rotation.
+  object transformed
+    object simple
+      rectangle 555.0 555.0
+      lambertian color 1.0 1.0 1.0
+    transform {
+      translate 0.0 -277.0 0.0
+    }
+
+  # Right wall, red. A quarter turn about z stands the rectangle on edge.
+  object transformed
+    object simple
+      rectangle 555.0 555.0
+      lambertian color 1.0 0.0 0.0
+    transform {
+      rotate_z -1.5708
+      translate -277.0 0.0 0.0
+    }
+
+  # Left wall, green. Note this is the darker `GREEN` of the palette, (0, 0.502, 0), not a
+  # saturated (0, 1, 0) — the asymmetry with the fully saturated red wall is deliberate.
+  object transformed
+    object simple
+      rectangle 555.0 555.0
+      lambertian color 0.0 0.5019607843137255 0.0
+    transform {
+      rotate_z 1.5708
+      translate 277.0 0.0 0.0
+    }
+
+  # Back wall.
+  object transformed
+    object simple
+      rectangle 555.0 555.0
+      lambertian color 1.0 1.0 1.0
+    transform {
+      rotate_x 1.5708
+      translate 0.0 0.0 -277.0
+    }
+
+  # Tall block, twice as high as it is wide, turned -15° = -0.2618 rad.
+  object transformed
+    object simple
+      aabox 165.0 330.0 165.0
+      lambertian color 1.0 1.0 1.0
+    transform {
+      rotate_y -0.2618
+      translate 80.0 -150.0 -100.0
+    }
+
+  # Short block, a cube, turned 18° = 0.3142 rad the other way.
+  object transformed
+    object simple
+      aabox 165.0 165.0 165.0
+      lambertian color 1.0 1.0 1.0
+    transform {
+      rotate_y 0.3142
+      translate -100.0 -195.0 100.0
+    }
+
+  # The light: a panel just under the ceiling, radiance 15 so that one bounce off the white
+  # walls still carries the room. Turned a half turn about z to aim it down.
+  object transformed
+    object simple
+      rectangle 130.0 105.0
+      diffuse_light color 15.0 15.0 15.0
+    transform {
+      rotate_z 3.14159
+      translate 0.0 276.0 0.0
+    }

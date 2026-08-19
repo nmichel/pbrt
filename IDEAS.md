@@ -598,11 +598,38 @@ magnitude. This is a second, independent reason to do the deterministic SAH spli
 - [ ] **Renders are not reproducible.** `rand 0.3` via `thread_rng` is not seeded here, so
       two runs cannot be compared — which makes every change to the integrator unverifiable.
       Upgrading to `rand 0.8` also buys stratified/Sobol samplers.
-- [ ] **The `examples/` directory no longer compiles** — 22 errors, all the same cause: the
-      `match config.integrator` in each example predates the `NAIVE` and `NORMAL` variants
-      and is now non-exhaustive. `cargo test` therefore fails as a whole; only
-      `cargo test --lib` and `cargo test --doc` are green. Either fix the matches or drop
-      the examples now that `.stage` files cover the same ground.
+- [x] **The `examples/` directory no longer compiles** — 16 errors, all the same cause: the
+      `match config.integrator` in each example predates the `NAIVE` variant and is now
+      non-exhaustive. *Done.* Pruned, then fixed. Only two examples had a `.stage` twin, and
+      only one was a real duplicate: `csg_union_spheres.rs` matched its `.stage` value for
+      value and is gone. `cornell_box.stage` had drifted into a materials showcase — metal
+      and dielectric blocks, camera at z = 550, emission 7.0, a saturated green — so the
+      canonical box was ported to `test_files/cornell_box_canonical.stage` (two white
+      lambertian blocks, camera at z = 800, emission 15.0; needs `--fov 60 --far 2000`)
+      before `cornell_box.rs` was dropped. The 14 survivors got the missing arm, and with it
+      the only integrators under which most of them are visible at all — see the next entry.
+- [x] **Fifteen examples registered no light and rendered pure black.** *Done.* Under `PATH`
+      an empty `Scene::lights` makes `sample_light` return `None`, `background_radiance` sum
+      `le` over an empty set, and `is_last_bounce_specular` gate away any material emission:
+      three independent paths to zero. Each now adds the `BackgroundInfiniteLight` of "Ray
+      Tracing in One Weekend", the gradient `NaiveIntegrator` hard-codes, so `path` and
+      `naive` renders of one scene are comparable. [csg_bowl.rs](examples/csg_bowl.rs)
+      carries the derivation in full — including the departure it costs: `sample_li` draws
+      from a `SpherePdf` uniform over the whole sphere, so about half the samples land below
+      the horizon where no surface can see them. Unbiased, but the variance pays. The other
+      thirteen refer to it. Verified by removing the light and watching the image go black.
+- [ ] **`match config.integrator` is duplicated 16 times** — the 15 examples plus
+      [main.rs](src/main.rs) — and `match config.renderer` as many. §2 of CLAUDE.md asks that
+      a new variant of a concept arrive as a trait implementation, "pas par un `match` ou un
+      `enum` dans le code appelant"; this is that `match`, and it is why adding `NAIVE` broke
+      sixteen files at once. The fix is a factory beside each enum: `Type::build(max_depth)`
+      in [integrators.rs](src/integrators.rs), `Type::render_fn()` in
+      [renderers.rs](src/renderers.rs). Take `max_depth` rather than `&Config` — `config.rs`
+      already depends on `integrators::Type`, and passing `&Config` would close the cycle.
+- [ ] **No example carries an emissive surface any more**, `cornell_box.rs` having been
+      dropped. The visual witness of the missing `AreaLight` is now
+      `test_files/cornell_box.stage`, whose render goes through the lights
+      [loader.rs](src/loader.rs) hard-codes rather than anything the scene file declares.
 - [ ] Dead weight: `src/_keep.rs` and `src/shapes/triangle.cpp` are not compiled;
       `integrators/whitted.rs` no longer compiles and is commented out of the module;
       `crossbeam` is still declared in `Cargo.toml` but unused (`thread::scope` replaced

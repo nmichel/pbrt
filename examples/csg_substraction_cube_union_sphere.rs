@@ -4,7 +4,8 @@ use pbrt::geom::matrix4::Matrix4;
 use pbrt::geom::transform::Transform;
 use pbrt::geom::vector2::Vector2u;
 use pbrt::geom::vector3::Vector3f;
-use pbrt::integrators::{self, Integrator, NormalIntegrator, PathIntegrator};
+use pbrt::integrators::{self, Integrator, NaiveIntegrator, NormalIntegrator, PathIntegrator};
+use pbrt::lights::BackgroundInfiniteLight;
 use pbrt::materials::*;
 use pbrt::objects::{Simple, Transformed};
 use pbrt::scene::Scene;
@@ -148,6 +149,11 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
         Box::new(Transform::translation(Vector3f::new(0.0, -0.6, 0.0))),
     )));
 
+    // Nothing in this scene emits, so without a light the `PATH` integrator returns a uniformly
+    // black image. The sky of "Ray Tracing in One Weekend" stands in; `examples/csg_bowl.rs`
+    // derives why it is needed and what its uniform-sphere sampling costs.
+    scene.add_light(Arc::new(BackgroundInfiniteLight::new(colors::WHITE, Spectrum::new(0.5, 0.7, 1.0))));
+
     (scene, Box::new(camera))
 }
 
@@ -161,6 +167,7 @@ fn main() {
     println!("Redering with configuration settings: {:#?}", &config);
 
     let integrator: Box<dyn Integrator> = match config.integrator {
+        integrators::Type::NAIVE => Box::new(NaiveIntegrator::new(config.max_depth)),
         integrators::Type::NORMAL => Box::new(NormalIntegrator::new()),
         integrators::Type::PATH => Box::new(PathIntegrator::new(config.max_depth)),
     };
