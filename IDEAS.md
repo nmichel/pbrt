@@ -81,12 +81,22 @@ departure from a physical model, (3) is a prerequisite to *validating* (2) and (
       traversal counted free, splitting always wins. Giving it pbrt's weight of ~1/8 of an
       intersection would shorten the tree and cut the memory, at some cost in triangle tests.
       Worth measuring both ways now that measuring is cheap.
-- [ ] **An empty mesh makes `build_stats` recurse into a node that does not exist.** `build`
+- [x] **An empty mesh makes `build_stats` recurse into a node that does not exist.** `build`
       leaves a root with `tri_count == 0`, which `is_leaf` reports as an interior node, so a
       walk follows `left_first` into an empty `nodes`. `subdivide` is no longer affected — the
       explicit rejection of empty sides makes it return at once — but the representation
       problem stands. Same family as the `BVHNode::new`-on-empty-vector defect listed under
-      *BVH — scene*: emptiness is not represented in `BVHTree` at all.
+      *BVH — scene*: emptiness is not represented in `BVHTree` at all. *Done.* Worse than
+      described: `left_first == 0` on that root, so `collect_build_stats` recurses into the
+      root itself and overflows the stack before reaching the missing sibling; the traversal
+      trips the `hit`-on-empty-box precondition instead. Closed by forbidding the state rather
+      than representing it — `TriangleMesh::new` asserts a non-empty index list, which is the
+      one door leading there, and `build_stats` restates the invariant with a `debug_assert`
+      where it relies on it. That is the treatment the scene tree had already received — see
+      the `BVHNode::new` entry under *BVH — scene*, same precondition, same `Option` one level
+      up — applied to the second of the two accelerators. What stands is the encoding: `is_leaf`
+      still reads `tri_count == 0` as "interior", so the state is unreachable rather than
+      unspeakable.
 
 #### Baseline — 2026-07-30
 

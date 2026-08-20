@@ -525,7 +525,14 @@ impl BVHTree {
     }
 
     /// Walks the finished tree and reports its shape.
+    ///
+    /// The walk descends on `is_leaf`, which reads `tri_count == 0` as "interior", so a tree
+    /// with no node at all would send it to a root that does not exist. `TriangleMesh::new`
+    /// rejects the empty mesh that would produce one; the invariant is restated here, where it
+    /// is relied upon.
     pub fn build_stats(&self) -> BuildStats {
+        debug_assert!(!self.nodes.is_empty(), "build_stats on a tree that was never built");
+
         let mut stats = BuildStats::default();
         let root_depth = 1;
         self.collect_build_stats(0, root_depth, &mut stats);

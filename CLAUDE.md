@@ -28,7 +28,7 @@ dans `IDEAS.md` : `get_bounding_box` recalculé à chaque comparaison (à traite
 grossisse), les feuilles de maillage à un seul triangle, et le SAH binné de la scène, mis de côté
 avec ses raisons.
 
-**Lancer les tests** — `cargo test` est vert en entier : 74 tests de bibliothèque, 8 doc-tests, et
+**Lancer les tests** — `cargo test` est vert en entier : 75 tests de bibliothèque, 8 doc-tests, et
 les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour tout changement de
 construction ou de traversée d'un accélérateur, `cargo run --release --bin bvh_stats -- <scène>`
 donne les compteurs à comparer ; ils ne voient que les rayons primaires et d'ombre, donc le

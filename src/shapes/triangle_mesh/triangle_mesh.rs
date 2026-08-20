@@ -17,7 +17,16 @@ pub struct TriangleMesh {
 }
 
 impl TriangleMesh {
+    /// Builds a mesh over `indices`, which must describe **at least one** triangle.
+    ///
+    /// Emptiness is refused here rather than represented downstream. `BVHTree` encodes
+    /// "interior node" as `tri_count == 0`, so a tree built over no triangle would have a root
+    /// that claims two children which do not exist, and an empty bounding box that
+    /// `AABoundingBox::hit` states as a precondition it will not accept. Both are states the
+    /// tree has no way to spell, and the one door leading to them is this constructor.
     pub fn new(vertices: Vec<f64>, indices: Vec<usize>, normals: Option<Vec<f64>>, uvs: Option<Vec<f64>>) -> Self {
+        assert!(!indices.is_empty(), "a TriangleMesh needs at least one triangle");
+
         let vertices = Arc::new(vertices);
         let mut bvh = BVHTree::new(Arc::clone(&vertices), &indices);
         bvh.build();
@@ -260,5 +269,13 @@ mod test {
         let uvs = Some(vec![0.0, 0.0, 1.0, 0.0, 1.0, 1.0]);
 
         let mesh = TriangleMesh::new(vertices, indices, normals, uvs);
+    }
+
+    /// A mesh with no triangle is rejected at construction, so no later stage has to answer
+    /// for a tree whose root is neither a leaf nor an interior node.
+    #[test]
+    #[should_panic(expected = "at least one triangle")]
+    fn test_empty_mesh_is_rejected() {
+        TriangleMesh::new(Vec::new(), Vec::new(), None, None);
     }
 }
