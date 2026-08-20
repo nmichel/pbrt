@@ -47,6 +47,13 @@ chronomètre d'un rendu complet reste une mesure distincte et parfois divergente
 dont le chargement n'est pas dominé par le parse d'un `.ply`
 ([docs/mesures_bvh.md](docs/mesures_bvh.md) §0).
 
+**Messages de commit** — le corps ne dépasse pas **20 lignes**. Ce n'est pas une invitation à en
+dire moins : ce qui débordait était surtout des tables de mesure et des arbitrages, et ceux-là ont
+désormais leur place — `docs/` pour ce qui décrit le code tel qu'il est, `ideas/` pour ce qui reste
+à faire. Le corps dit donc ce que le commit change, pourquoi, et où lire le raisonnement complet.
+Les commits antérieurs à cette règle ne la respectent pas ; ne pas les prendre pour modèle sur ce
+point.
+
 ## 1. Structure
 
 Un module = un concept. L'idiome en vigueur dans tout le projet, à respecter pour tout
