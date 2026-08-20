@@ -1,818 +1,219 @@
 # IDEAS
 
-A subject stays a line here as long as a line says it. It gets its own file in
-[ideas/](ideas/) once it carries a derivation — an analysis worth more than a checkbox — and this
-file then keeps only the index entry. `ideas/` is not `docs/`: `docs/` describes the code as it
-is and has to stay trustworthy, `ideas/` describes what is not done. A subject's file goes away
-when the subject lands.
+Un sujet reste une ligne ici tant qu'une ligne suffit. Il prend son propre fichier dans
+[ideas/](ideas/) dès qu'il porte une analyse — quelque chose qui vaut plus qu'une case à cocher — et
+ce fichier-ci n'en garde alors que l'entrée d'index. `ideas/` n'est pas `docs/` : `docs/` décrit le
+code tel qu'il est et doit rester digne de confiance, `ideas/` décrit ce qui n'est pas fait. Le
+fichier d'un sujet disparaît quand le sujet atterrit — et ce qu'il a appris, s'il s'agit d'une mesure
+ou d'un arbitrage sur le code tel qu'il est, passe dans `docs/`.
 
-- [x] Add cylinder volume
-- [ ] **Nested dielectrics** — a transmitter inside another transmitter, and two shapes sharing a
-      face with different materials, are both rendered wrong today:
+**Ce fichier est un index.** Une entrée cochée garde une ligne, pas son corps ; le raisonnement qui a
+survécu au correctif est dans le fichier `docs/` indiqué.
+
+**La liste qui suit est ordonnée, et cet ordre est celui du traitement envisagé.** Une dépendance s'y
+dit en une incise ; quand elle contraint l'ordre, c'est l'ordre qui s'adapte. Les sections thématiques
+plus bas portent le détail de chaque entrée — elles servent à retrouver un sujet, pas à savoir quoi
+faire ensuite.
+
+- [ ] **RNG graine + samplers stratifiés** — indépendant. Deux choses en dépendent : la validation
+      d'`AreaLight` et le balayage de `t_trav`, aucune des deux n'étant démontrable sans un rendu
+      reproductible. Détail sous *Renderer & infrastructure*.
+- [ ] **`AreaLight`** — surfaces émissives enregistrées comme sources échantillonnables. Le plus grand
+      écart au modèle physique du projet ; plan détaillé dans
+      [ideas/area_light.md](ideas/area_light.md).
+- [ ] **Production `light` dans la grammaire `.stage`** — dépend d'`AreaLight`, qui décide de ce que la
+      production doit *ne pas* couvrir, et atterrit dans le même visiteur. Retire les lumières câblées
+      du loader. Détail sous *Renderer & infrastructure*.
+- [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
+      `is_last_bounce_specular` de l'intégrateur.
+- [ ] **Roulette russe** — dépend de MIS, et corrige au passage la coupe prématurée de `path.rs:65`.
+- [ ] **Abstraction `Film` + ordonnancement par tuiles** — indépendant, et déduplique les deux
+      renderers. Détail sous *Renderer & infrastructure*.
+- [ ] **Balayage de `t_trav`, et feuilles de maillage plus grosses** — dépend du sampler graine, pour
+      la raison qui compte : élire la constante sur les seuls rayons primaires figerait un arbitrage
+      mesuré sur un cinquième du problème ([ideas/cout_traversee_bvh.md](ideas/cout_traversee_bvh.md)).
+- [ ] **Nested dielectrics** — un transmetteur dans un autre, et deux formes partageant une face avec
+      des matériaux différents, sont tous deux rendus faux aujourd'hui. Dépend d'un prérequis interne :
+      déplacer le décalage anti-acné de la position vers l'intervalle du rayon.
       [ideas/nested_dielectrics.md](ideas/nested_dielectrics.md)
-- [ ] don't use Arc, but Rc with unsafe wrapping to pass to threads. See this [stackoverflow article](https://stackoverflow.com/questions/63433718/how-to-freeze-an-rc-data-structure-and-send-it-across-threads)
+- [ ] **Add cone volume** — indépendant, et petit.
+- [ ] **`Rc` avec enveloppe `unsafe` au lieu d'`Arc`** pour passer aux threads
+      ([article stackoverflow](https://stackoverflow.com/questions/63433718/how-to-freeze-an-rc-data-structure-and-send-it-across-threads)).
+      Dépend d'une mesure : CLAUDE.md §3 demande que tout `unsafe` soit argumenté par un chiffre, donc
+      le coût des compteurs atomiques doit être établi avant d'écrire la moindre ligne.
+- [x] Add cylinder volume
 - [x] Make BVH more generic
-- [ ] Add cone volume
-- [ ] Add a scene from text file loader
-- [ ] Add support for triangle based geometry
+- [x] Add a scene from text file loader — `src/loader/`, et la grammaire `.stage` dit tout ce que le
+      projet possède *sauf* les lumières, entrée ouverte ci-dessus.
+- [x] Add support for triangle based geometry — `src/shapes/triangle_mesh/`. Reste les normales de
+      shading, suivies sous *Justesse / robustesse*.
+- [x] **Chantier BVH** — SAH de maillage corrigé, `intersect_p` descendu dans les formes, arbre de
+      scène à plat, traversée ordonnée avec resserrement de l'intervalle, test de boîte inliné.
+      Mesures et arbitrages dans [docs/mesures_bvh.md](docs/mesures_bvh.md).
+- [x] **Bornes cachées à la construction — mesuré, chiffré, et écarté.** Le correctif marche et ne
+      vaut pas son diff : un millième d'un aperçu. Le sujet sort de cette liste et garde son entrée
+      sous *Accélérateurs* avec sa condition de réouverture ; le corpus de mesure y a gagné deux
+      scènes. [docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3.
 
 ---
 
-# Code review — 2026-07-28
-
-Findings from a full read of the tree at commit `1859a9e`, on branch
-`chore/revamp_bvh_for_trimesh`. Line numbers are from that state and drift as the code moves; the
-checkbox is what says whether an entry still stands, and a ticked one keeps its body so the reasoning
-survives the fix.
-
-## Suggested order of work
-
-Rationale: (1) makes every later iteration faster to test, (2) is the largest
-departure from a physical model, (3) is a prerequisite to *validating* (2) and (4).
-
-1. ~~Finish the BVH revamp.~~ Done: the mesh SAH is fixed, `intersect_p` is in place, and the scene
-   tree is flat with an ordered, narrowing traversal. Its binned SAH is explicitly *not* part of
-   this — see the low-priority note under *BVH — scene*. What is left there is not traversal but
-   build: `get_bounding_box` is recomputed at every comparison, which is the entry below and the
-   thing to do before any scene grows.
-2. `AreaLight` — emissive primitives registered as sampleable lights.
-3. Seedable RNG + stratified samplers (needed to compare two renders at all).
-4. MIS, then re-enable Russian roulette.
-5. `Film` abstraction + tile-based scheduling.
-
-## Defects
-
-### BVH — mesh (the branch's current subject)
-
-- [x] **SAH cost was computed from the wrong box.** `left_bin.bounds.half_area()` — the area
-      of a *single* bin — where the SAH needs the area of the union of all bins on that side
-      of the plane. `left_box`/`right_box` were accumulated correctly and then never read.
-      *Done.* The prefix/suffix scan now reads the accumulated unions. The derivation is in
-      [docs/heuristique_aire_surface.md](docs/heuristique_aire_surface.md), whose §3 carries
-      the counter-example that settles it: for eight equally populated bins of growing spread,
-      the per-bin cost is not merely imprecise, it is **constant** — it distinguishes nothing,
-      ties on all seven planes, and the strict comparison then elects the first, i.e. the
-      degenerate one. A `debug_assert!` now guards the invariant the per-bin form lacks: a
-      union can only grow, so prefix areas cannot decrease and suffix areas cannot increase.
-- [x] **First candidate plane was degenerate.** `bound_min + i * inv_scale` with `i` from 0 put
-      the first plane exactly on `bound_min`, left side empty, the `left_count == 0` guard
-      returning and subdivision stopping. *Done.* Boundary `i` is at
-      `centroid_min + (i + 1) · bin_width`, and `inv_scale` — the misnamed duplicate of
-      `scale` that made the wrong formula read as plausible — is gone.
-- [x] `evaluate_sah` was dead code, and buggy: `f64::MAX` for a zero cost under a comment about
-      a division it does not perform. *Done.* Fixed, renamed `exhaustive_split_cost`, marked
-      `#[cfg(test)]`, and used as the oracle of `test_binned_cost_matches_exhaustive_scan` —
-      which fails on the per-bin defect, verified by reintroducing it.
-- [x] **The partition compared a reconstructed float position** while the cost was derived from
-      bin counts, so the two could disagree for a centroid on a boundary and the winning plane
-      could be scored on a partition that never happened. *Done.* `SplitCandidate` carries the
-      boundary index and the binning parameters rather than a position, and both paths call the
-      same `bin_index`. Not in the original review — found while planning the fix.
-- [x] **Each node's box was tested twice**, once before its parent pushed it and once again
-      after it was popped. *Done.* The stack now carries `StackEntry { node_idx,
-      entry_distance }`: the distance is measured when the parent orders its children — which
-      it has to do anyway — and travels with the index instead of being recomputed. The pop
-      still re-examines that distance against `min_t`, which is the useful half of the old
-      re-test and costs no box test at all. The root is tested once outside the loop, so a ray
-      missing the mesh entirely costs exactly one box test. Figures below.
-- [ ] **Leaves hold a single triangle**, so the tree has ~2 nodes per triangle: 1 724 381 nodes
-      for `dragon_vrip.ply`. That is the `t_trav = 0` of `[5]`
-      ([docs/heuristique_aire_surface.md](docs/heuristique_aire_surface.md) §6) — with
-      traversal counted free, splitting always wins. Giving it pbrt's weight of ~1/8 of an
-      intersection would shorten the tree and cut the memory, at some cost in triangle tests.
-      Worth measuring both ways now that measuring is cheap.
-      **Amended by the duration baseline below**, which corrects the premise twice. The
-      `t_trav·A` term only bites where the two children nearly fill the parent, so at 1/8 it
-      shortens almost nothing — for two separated triangles the split cost collapses while the
-      leaf cost is `A·N`, and the margin is enormous. ~2 nodes per triangle is also the normal
-      shape of a top-down SAH build, pbrt included: its `maxPrimsInNode` is an upper bound that
-      *forces* splits, and below three primitives it splits at the midpoint without consulting
-      the cost model at all. What does argue for a shorter tree is the memory term measured
-      below, which `[3]` cannot express. Sequenced after the box-test entry: that one changes
-      `t_trav`'s denominator, so calibrating the constant first would date it immediately.
-- [x] **`AABoundingBox::hit` recomputes three reciprocals per box test.** `1.0 / ray.direction[i]`
-      per axis, per call ([aabound.rs](src/geom/aabound.rs)) — 16.31 box tests per ray on
-      `dragon_vrip` is **49 f64 divisions per ray, all recomputing the same three values**. They
-      are loop-invariant, but the call boundary hides them from LICM: `objdump` shows `hit` as a
-      110-instruction function reached by `bl`, never inlined, with three `fdiv` inside. A box
-      test measures ~18 ns, i.e. ~64 cycles at 3.5 GHz, and an f64 division is poorly pipelined
-      on this chip, so this is a serious share of the traversal — which the baseline below shows
-      *is* the traversal. pbrt passes a precomputed `invDir` into `Bounds3::IntersectP`; the
-      choice here is between that and a reciprocal cached on `Ray`, which would leave every
-      signature alone at the price of derived state to keep in step with `direction`. Hoisting
-      `1.0 / d` gives a bit-identical value, so images and counters must not move by one unit —
-      that invariant is the test. Concerns both accelerators, `hit` being shared.
-      *Done, and by neither of those two routes.* `#[inline(always)]` on `hit` **and** on
-      `BVHTree::hit_box` is the whole fix: the divisions were never the cost, the call boundary
-      was. Once it is gone, LICM hoists the three reciprocals into the traversal's prologue —
-      visible in the disassembly, three `fdiv` at +0xb4 with their results spilled and reloaded
-      per box test. Both attributes are needed: marking `hit` alone only moves the boundary out
-      to the counter wrapper, which measures as nothing at all. Figures below; counters and hit
-      counts identical to the unit on all six meshes and both scenes, which is what "bit-identical"
-      buys as a test.
-      **Two things measured and rejected, so they are not tried again.** A reciprocal cached on
-      `Ray` costs 3 to 7 % on `dragon_vrip` — nine alternating passes per variant, non-overlapping
-      round by round — and is neutral on the cache-resident meshes. The divisions being already
-      hoisted, all it adds is three `f64` to read out of a 50 % larger `Ray` on every box test, on
-      the one mesh where memory traffic is already the bottleneck. And the same attribute on the
-      *scene* `hit_box` is neutral: those trees hold 4 to 8 primitives over 3 to 4 levels, so a
-      traversal loop that short has nothing to hoist out of.
-- [x] **An empty mesh makes `build_stats` recurse into a node that does not exist.** `build`
-      leaves a root with `tri_count == 0`, which `is_leaf` reports as an interior node, so a
-      walk follows `left_first` into an empty `nodes`. `subdivide` is no longer affected — the
-      explicit rejection of empty sides makes it return at once — but the representation
-      problem stands. Same family as the `BVHNode::new`-on-empty-vector defect listed under
-      *BVH — scene*: emptiness is not represented in `BVHTree` at all. *Done.* Worse than
-      described: `left_first == 0` on that root, so `collect_build_stats` recurses into the
-      root itself and overflows the stack before reaching the missing sibling; the traversal
-      trips the `hit`-on-empty-box precondition instead. Closed by forbidding the state rather
-      than representing it — `TriangleMesh::new` asserts a non-empty index list, which is the
-      one door leading there, and `build_stats` restates the invariant with a `debug_assert`
-      where it relies on it. That is the treatment the scene tree had already received — see
-      the `BVHNode::new` entry under *BVH — scene*, same precondition, same `Option` one level
-      up — applied to the second of the two accelerators. What stands is the encoding: `is_leaf`
-      still reads `tri_count == 0` as "interior", so the state is unreachable rather than
-      unspeakable.
-
-#### Baseline — 2026-07-30
-
-Instrumentation is in place: `TraversalStats` and `BuildStats` in
-[bvh.rs](src/shapes/triangle_mesh/bvh.rs), exposed through
-`TriangleMesh::intersect_instrumented` / `build_stats`, driven by
-[src/bin/bvh_stats.rs](src/bin/bvh_stats.rs). The ray set is the primary rays of 6 pinhole
-cameras on a deterministic orbit, 200×200 each — 240 000 rays, no RNG, reproducible to the
-unit.
-
-```
-cargo run --release --bin bvh_stats -- test_files/<mesh>.ply
-```
-
-| mesh | tris | nodes (leaves) | depth | leaf tris mean / max | nodes/ray | box tests/ray | **tri tests/ray** |
-|---|---|---|---|---|---|---|---|
-| `cube.ply` | 12 | 1 (1) | 1 | 12.0 / 12 | 1.00 | 1.00 | 5.80 |
-| `bun_zipper_res4.ply` | 948 | 3 (2) | 2 | 474.0 / 716 | 1.51 | 2.45 | 254.41 |
-| `bunny.ply` | 69 451 | 121 (61) | 14 | 1138.5 / 37 469 | 2.63 | 5.80 | 7464.08 |
-| `dragon_vrip_res4.ply` | 11 102 | 351 (176) | 19 | 63.1 / 3143 | 3.20 | 7.36 | 517.28 |
-| `dragon_vrip_res3.ply` | 47 794 | 1021 (511) | 22 | 93.5 / 15 949 | 2.98 | 6.68 | 3622.88 |
-| `dragon_vrip.ply` | 871 414 | 2301 (1151) | 27 | 757.1 / 316 949 | 2.89 | 6.45 | 66 649.36 |
-
-Hit rate is 18–20 % on the organic meshes, 48 % on the cubes, so the averages are over ray
-sets that really do reach the geometry.
-
-**What the numbers say.** The tree barely filters anything: on the full dragon a ray is
-charged 66 649 triangle tests, i.e. **7.6 % of the whole mesh**, and a single leaf holds
-316 949 of the 871 414 triangles — 36 % of the model. `cube.ply` is not subdivided at all
-(1 node). Subdivision stops almost immediately, which is the signature of the degenerate
-first candidate plane: `best_pos = bound_min` leaves the left side empty, the
-`left_count == 0` guard returns, and the node stays a leaf. The two defects compound — the
-cost being minimised is not the SAH, and the winning plane is unusable.
-
-For scale: 240 000 primary rays against `dragon_vrip.ply` take **2 min 17 s**. A correct
-binned SAH should bring triangle tests per ray down to the tens.
-
-**Ray set caveat.** Primary rays only, and they are coherent. Secondary rays start anywhere
-and point everywhere and stress a tree differently; measuring those needs the seeded
-sampler (item 3 of the order of work). So this baseline tracks the right direction but
-understates the gain.
-
-#### Effect of making the empty box report an area of 0 — 2026-07-31
-
-`AABoundingBox::half_area()` now returns `0` on an empty box instead of `+inf`. This was
-meant as a correctness cleanup, not a tree improvement, but it moves the numbers — worth
-recording, because the direction is not the one intuition suggests.
-
-| mesh | nodes (leaves) | depth | max leaf | tri tests/ray |
-|---|---|---|---|---|
-| `cube.ply` | 1 (1) → **23 (12)** | 1 → 5 | 12 → **1** | 5.80 → **1.31** |
-| `bun_zipper_res4.ply` | 3 (2) → 3 (2) | 2 → 2 | 716 → 716 | 254.41 → 254.41 |
-| `bunny.ply` | 121 (61) → 217 (109) | 14 → 16 | 37 469 → 37 469 | 7464.08 → 7464.08 |
-| `dragon_vrip_res4.ply` | 351 (176) → 935 (468) | 19 → 22 | 3143 → 3143 | 517.28 → 517.13 |
-| `dragon_vrip_res3.ply` | 1021 (511) → 2423 (1212) | 22 → 26 | 15 949 → 15 949 | 3622.88 → 3623.01 |
-| `dragon_vrip.ply` | 2301 (1151) → 5755 (2878) | 27 → 32 | 316 949 → 316 949 | 66 649.36 → 66 658.07 |
-
-Hit counts unchanged on all six, so the partition is intact.
-
-**Reading.** The `+inf` was not a harmless accident: it *rejected outright* every candidate
-plane with an empty bin, which is why subdivision stopped so early. Removing it more than
-doubles the node count on the dragon. But it buys nothing per ray, because the areas are
-still read per bin: an empty bin now makes a plane look **free** — wrong in the opposite
-direction. So the extra nodes carve off crumbs while the dominant leaf, the one a real SAH
-would attack, is untouched on every organic mesh. `cube.ply` is the exception that proves the
-mechanism: 12 triangles over 8 bins leaves most bins empty, so the poisoning had blocked
-every plane there.
-
-Conclusion for the next step: the empty box had to be fixed, but the gain is entirely in the
-cost function itself.
-
-#### After the SAH fix — 2026-07-31
-
-The cost now reads the areas of the accumulated **unions** either side of the plane, candidate
-planes sit on the right bin boundaries, empty sides are rejected explicitly, and the partition
-classifies with the same `bin_index` the cost model binned with.
-
-| mesh | nodes (leaves) | depth | max leaf | **tri tests/ray** | box tests/ray |
-|---|---|---|---|---|---|
-| `cube.ply` | 11 (6) | 6 | 2 | 5.80 → **1.18** | 1.00 → 8.62 |
-| `bun_zipper_res4.ply` | 1811 (906) | 14 | 4 | 254.41 → **0.77** | 2.45 → 15.27 |
-| `bunny.ply` | 138 881 (69 441) | 21 | 2 | 7464.08 → **0.58** | 5.80 → 21.48 |
-| `dragon_vrip_res4.ply` | 21 137 (10 569) | 19 | 5 | 517.28 → **0.63** | 7.36 → 18.22 |
-| `dragon_vrip_res3.ply` | 92 929 (46 465) | 21 | 5 | 3622.88 → **0.60** | 6.68 → 20.87 |
-| `dragon_vrip.ply` | 1 724 381 (862 191) | 29 | 6 | 66 649.36 → **0.58** | 6.45 → 24.76 |
-
-Four to five orders of magnitude on the large meshes. The dominant leaf of `dragon_vrip.ply`
-goes from 316 949 triangles — 36 % of the model — to 6. Measuring the six meshes took 2 min 17 s
-for the dragon alone before; the whole set now runs in seconds.
-
-**The partition is intact, checked two ways.** Raw hit counts are identical *to the unit* on all
-six meshes (`cube` 116 004, `bun_zipper_res4` 47 693, `bunny` 46 904, `dragon_res4` 42 797,
-`dragon_res3` 43 451, `dragon_vrip` 43 269) — `bvh_stats` now prints the raw count, not only the
-rounded percentage, precisely so this comparison is possible. And a unit test compares
-`BVHTree::query` against brute-force intersection of every triangle, requiring exact equality of
-distance *and* triangle index; the hit count alone would not notice a ray that found a farther
-triangle.
-
-**Two costs, both expected.** Box tests per ray rise by a factor of 3 to 4: a deeper tree means
-more nodes to reject, which is the trade the SAH makes and wins by a wide margin. And the node
-count is now ~2× the triangle count, so leaves hold a single triangle on average — that is the
-`t_trav = 0` departure showing (`docs/heuristique_aire_surface.md` §6): with traversal counted
-free, splitting always looks worth it. Giving `t_trav` its real weight would shorten the tree
-and cut the memory; deliberately left for later so this before/after measures one thing.
-
-**A render is unchanged**, verified by rendering `cube_mesh.stage` from the previous commit and
-from this one. A pixel-exact comparison is impossible while the sampler is unseeded, so the
-brute-force test above is the real guarantee.
-
-**Where the time goes now.** `bunny_mesh.stage` at 120×90×4 takes 53 s, which is no longer the
-mesh's fault — the scene BVH clones its primitives into a `Vec` per ray and tests them all,
-unordered. That is the next bottleneck, and it is the *BVH — scene* section below.
-
-#### After removing the double box test — 2026-07-31
-
-| mesh | box tests/ray | tri tests/ray | nodes visited/ray |
-|---|---|---|---|
-| `cube.ply` | 8.62 → **5.83** (−32 %) | 1.18 → 1.19 | 3.79 → 3.01 |
-| `bun_zipper_res4.ply` | 15.27 → **10.04** (−34 %) | 0.77 → 0.77 | 6.23 → 5.25 |
-| `bunny.ply` | 21.48 → **14.19** (−34 %) | 0.58 → 0.58 | 8.29 → 7.17 |
-| `dragon_vrip_res4.ply` | 18.22 → **12.01** (−34 %) | 0.63 → 0.63 | 7.22 → 6.11 |
-| `dragon_vrip_res3.ply` | 20.87 → **13.75** (−34 %) | 0.60 → 0.60 | 8.12 → 6.96 |
-| `dragon_vrip.ply` | 24.76 → **16.31** (−34 %) | 0.58 → 0.58 | 9.45 → 8.23 |
-
-A flat −34 % across every organic mesh, which is what one expects: the removed test was one of
-roughly three per node. Triangle tests are untouched, as they must be — this changes how a node
-is reached, never which triangles a leaf holds. Hit counts identical to the unit again.
-
-**Two caveats on reading this table.**
-
-`nodes_visited` **changed definition** in the same commit, so its column mixes two effects and
-is not a measure of anything gained. It used to count every pop; it now counts nodes whose
-contents were actually examined, excluding those a shrunken `min_t` discards at pop and the root
-of a ray that misses the mesh. Only `box_tests` and `triangle_tests` are comparable across this
-commit — and `box_tests` is the one the commit is about. The pairing is now exact and
-verifiable: `box_tests = 2 · (interior nodes examined) + 1`.
-
-`cube.ply` moves from 1.18 to 1.19 triangle tests because **the tie-break order flipped**. When
-two children are entered at exactly the same distance the old code visited the right one first,
-the new code the left. Neither is better founded, both find the same nearest hit — the
-brute-force test guarantees that — and only axis-aligned geometry produces enough exact ties for
-it to show at all.
-
-Indicatively, `bunny_mesh.stage` at 120×90×4 goes from 53 s to 40 s. Not a controlled
-measurement, since an unseeded sampler means the two runs traced different paths; the box-test
-count is the controlled figure.
-
-#### How to go about it
-
-**Prerequisite, satisfied.** `half_area` now reports the true area (commit `6211906`).
-Before that every box was inflated to a 0.01 minimum extent per axis, so repairing the
-accumulation alone would have left the cost wrong anyway.
-
-**Measure first — done.** See the baseline above. Re-run `bvh_stats` over the same meshes
-after every change to the build and put the before/after figures in the commit message.
-
-**Four traps, all verified while reviewing:**
-
-- ~~**`new_invalid().half_area()` was `+inf`.**~~ *Half done.* `bmax - bmin` overflowed to
-  `-inf`, so the sum of products came back `+inf`, and **any** empty bin poisoned its
-  candidate with `inf * N = +inf` — not the rare `inf * 0 = NaN` edge case the review
-  described, but every plane with an empty bin, discarded systematically. `AABoundingBox` now
-  represents emptiness explicitly: `new_invalid()` is renamed `empty()` (the identity element
-  of the union, not an invalid state), `is_empty()` is the way to ask, `half_area()` reports
-  `0` — the area of the empty set — and `hit()` asserts the box is non-empty rather than
-  relying on the overflow landing the right way. Measured effect above: it unblocks
-  subdivision but buys nothing per ray. **Still to do in the binned path:** reject empty sides
-  explicitly, `left_count[i] == 0 || right_count[i] == 0`, because with `0` an empty side now
-  makes a plane look *free*.
-- **`inv_scale` is misnamed.** It holds the bin width `(bound_max - bound_min) / 8`,
-  identical to the `scale` computed a few lines above, and is the inverse of nothing. The
-  misnomer is very likely what made `bound_min + i * inv_scale` read as plausible. Rename
-  it and drop the duplicate.
-- **Keep the cost convention.** `find_best_split_plane` returns `A_L·N_L + A_R·N_R` and
-  `subdivide` compares it against `calculate_node_cost` = `A_node·N`. Neither is normalised
-  by `A_node`, so the comparison is consistent as it stands — changing one side alone
-  silently redefines the "is splitting worth it" test.
-- **`next_node_idx` duplicates `nodes.len()`.** They stay in step only because every
-  `push` happens to be paired with an increment. Worth collapsing while in the area.
-
-**Documentation expected**, per `CLAUDE.md` §4: the SAH is a concept, so the surface-area
-heuristic itself should be derived in the doc comment — why cost goes as area × primitive
-count, what the probability argument behind it is, and why the areas must be those of the
-*unions* either side of the plane rather than of the individual bins. That derivation is
-precisely what would have made the current bug visible on reading.
-
-#### Duration baseline — 2026-08-20
-
-`bvh_stats` now times what it counts. The reason is written in its header: the counters rank two
-trees only when one wins on both, and a deeper tree trades box tests for triangle tests. Reading
-that trade needs `t_trav`, and weighing the counters with `t_trav` to elect `t_trav` is circular —
-so the arbiter is the wall clock over the same fixed ray set. Three passes, the fastest being the
-figure to compare.
-
-Apple M2 Pro, 16 GB, macOS 26.5.2, `--release`. Counters unchanged from the tables above, to the
-unit, on all six meshes and both scenes.
-
-| mesh | load (parse + build) | traversal, fastest of 3 | passes |
-|---|---|---|---|
-| `cube.ply` | 258 µs | **25.59 ms** | 30.27, 27.57, 25.59 |
-| `bun_zipper_res4.ply` | 995 µs | **42.41 ms** | 42.79, 42.81, 42.41 |
-| `bunny.ply` | 76.3 ms | **62.64 ms** | 67.85, 65.04, 62.64 |
-| `dragon_vrip_res4.ply` | 9.90 ms | **50.96 ms** | 51.48, 50.96, 51.50 |
-| `dragon_vrip_res3.ply` | 45.1 ms | **60.95 ms** | 63.12, 62.52, 60.95 |
-| `dragon_vrip.ply` | 929 ms | **100.11 ms** | 100.11, 103.13, 101.97 |
-
-| scene | load | both ray sets, fastest of 3 |
-|---|---|---|
-| `cornell_box_canonical.stage` | 99 µs | **3.09 ms** |
-| `bunny_mesh.stage` | 71.3 ms | **11.24 ms** |
-
-**The duration is the box-test count.** Dividing one by the other, over 240 000 rays per mesh:
-
-| mesh | nodes | node MB | box/ray | ns/ray | **ns per box test** |
-|---|---|---|---|---|---|
-| `cube.ply` | 11 | 0.0 | 5.83 | 106.6 | **18.3** |
-| `bun_zipper_res4.ply` | 1 811 | 0.1 | 10.04 | 176.7 | **17.6** |
-| `dragon_vrip_res4.ply` | 21 137 | 1.4 | 12.01 | 212.3 | **17.7** |
-| `dragon_vrip_res3.ply` | 92 929 | 5.9 | 13.75 | 254.0 | **18.5** |
-| `bunny.ply` | 138 881 | 8.9 | 14.19 | 261.0 | **18.4** |
-| `dragon_vrip.ply` | 1 724 381 | 110.4 | 16.31 | 417.1 | **25.6** |
-
-Five meshes in a 17.6–18.5 ns band, across four orders of magnitude of triangle count, with an
-intercept of nearly zero — so ray generation, which the header warns dilutes the figure, is in
-fact below the noise. Counters and clock agree, which is what validates the instrument.
-
-**The dragon breaks the line by 40 %, and it is memory.** It is the only mesh whose nodes — 110 MB
-at 64 bytes each — exceed every level of cache on this machine; `bunny` at 8.9 MB does not. `[3]`
-counts tests, not cache misses, so on a large mesh two fifths of the traversal time sits in a term
-the cost model has no place for, and shortening the tree attacks it independently of the
-box/triangle trade. That is an argument for the open leaf-size entry that the SAH cannot make.
-
-**What the table says about `t_trav`, which is more than nothing and less than a calibration.**
-Solving mesh pairs is useless: box and triangle counts are anti-correlated across these meshes — the
-tree deepens as the leaves thin — so the two regressors are collinear. Of the ten pairs, those not
-involving `cube` have determinants between 0.5 and 3 and return costs like −90 ns per triangle test.
-
-The constraint that makes it speak is physical rather than statistical: `c_box` must be *the same*
-on all five cache-resident meshes. Scanning a shared (`c_box`, `c_tri`) and minimising the spread of
-the former then bounds the latter — 4.8 % spread at `c_tri = 0`, 5.5 % at 3 ns, 6.5 % at 6 ns,
-10.4 % at 10 ns. So `c_box ≈ 17.6–18.5 ns` and **`c_tri ≲ 6 ns`**: a triangle test costs at most a
-third of a box test. A three-parameter scan adding a fixed per-ray cost keeps that cost at zero, so
-ray generation really is below the noise. And the disassembly agrees independently — `intersect_ray`
-is inlined, one division, three early exits, 15–20 cycles.
-
-`[2]` charges `t_trav` **per interior node visited**, and this traversal tests both children to
-order them, whence `box_tests = 2·(interior nodes) + 1` recorded above. So
-`TRAVERSAL_COST = 2·c_box/c_tri`, which lands between **6 and 12** — a factor of 50 to 100 above
-pbrt's 1/8, for reasons that belong to this code and not to the algorithm: our box test is a
-non-inlined call doing three divisions, our triangle test is inlined and exits early.
-
-Consequence for the build, from `Σ + t_trav·A < A·N`: as soon as `N ≤ t_trav` the right-hand side
-`(N − t_trav)·A` is negative while `Σ ≥ 0`, so **no node under ~7 triangles would ever be split**,
-and at `N = 16` with children at 0.55·A it splits only just. Equilibrium around 8–16 triangles per
-leaf, 8 to 16 times fewer nodes, and `dragon_vrip` back from 110 MB to 7–14 MB — inside cache, so
-the 40 % penalty above lifts at the same time. Both effects push the same way.
-
-Two corrections to the plan follow. The sweep range was centred far too low: `{0, 1, 2, 4, 8, 16}`,
-not `{0, 1/8, 1/2, 1}`. And the box-test entry above comes first, since it moves the numerator.
-
-**And a third, which blocks the sweep outright.** These rays are the coherent ones: they leave one
-point, travel together and re-enter nodes still warm, which is the population that *most* favours a
-deep tree, since it amortises node memory across neighbouring rays. Secondary rays start anywhere,
-pay full price per node, and would push the optimum shallower still. Electing `t_trav` on primaries
-alone would freeze an arbitration measured on a fifth of the problem into every build the renderer
-ever does — so the sweep waits on a seeded sampler, item 3 of the order of work, which this gives a
-second customer. The box-test entry was not blocked that way, which is why it went first: a cheaper
-box test is a gain for every ray there is, under no assumption about how the rays are distributed.
-
-#### After inlining the box test — 2026-08-20
-
-`#[inline(always)]` on `AABoundingBox::hit` and on `BVHTree::hit_box`, nothing else. Same machine
-and same protocol as the baseline above, fastest of three passes.
-
-| mesh | traversal | | box tests/ray | tri tests/ray |
-|---|---|---|---|---|
-| `cube.ply` | 24.76 → **23.04 ms** | −7 % | 5.83 | 1.19 |
-| `bun_zipper_res4.ply` | 41.18 → **34.79 ms** | −16 % | 10.04 | 0.77 |
-| `dragon_vrip_res4.ply` | 51.00 → **44.86 ms** | −12 % | 12.01 | 0.63 |
-| `dragon_vrip_res3.ply` | 60.29 → **53.13 ms** | −12 % | 13.75 | 0.60 |
-| `bunny.ply` | 62.63 → **55.22 ms** | −12 % | 14.19 | 0.58 |
-| `dragon_vrip.ply` | 100.88 → **84.18 ms** | −17 % | 16.31 | 0.58 |
-| `cornell_box_canonical.stage` | 3.09 → **2.64 ms** | −15 % | | |
-| `bunny_mesh.stage` | 11.24 → **9.73 ms** | −13 % | | |
-
-Not one counter moves, and neither does a hit count — 116 004, 47 693, 42 797, 43 451, 46 904,
-43 269, the same figures as every table above. That is the point of a bit-identical change: the
-counters are a complete regression test for it, and a single unit of movement would have meant a
-bug rather than a gain.
-
-The scene figures gain as much as the mesh ones although the scene wrapper was left alone, `hit`
-being shared: a scene traversal tests its own nodes' boxes through the same inlined function.
-
-**The dependency on the optimiser is accepted, and here is what it consists of.** Passing the
-reciprocals as an argument to `hit` — pbrt's shape, and the structural way to write the same
-hoisting — was weighed and turned down: the signature `hit(ray, tmin, tmax)` asks a question of
-geometry, and a fourth parameter carrying a cache would be the only thing in it that does not speak
-of the domain, in a function whose doc-comment is a derivation of floating-point error bounds. That
-is the trade `CLAUDE.md` settles against performance. What the gain rests on, precisely:
-`alwaysinline`, which the inliner must honour rather than weigh; `noalias` on `&mut TraversalStats`,
-so LLVM knows the counter cannot alias the ray; and LICM over a loop-invariant division. The
-nominal path, not a corner of the optimiser. And the failure mode is a lost 15 % of mesh traversal,
-never a wrong image — detectable by re-running `bvh_stats` against the figures above, which is what
-the instrument is for.
-
-Reopen it if a scene ever holds many meshes: the reciprocals are hoisted per *traversal*, so a ray
-recomputes them once per candidate mesh. At the 1 to 4 objects of today's scenes that is noise; at
-fifty the argument changes side.
-
-**Which revises `t_trav` downward.** A box test falls from ~18.4 to ~15.5 ns on the cache-resident
-meshes and from 25.6 to 21.5 ns on `dragon_vrip`, while the triangle test is untouched — so
-`TRAVERSAL_COST = 2·c_box/c_tri` lands between 5 and 10 rather than 6 and 12. Still forty-odd times
-pbrt's 1/8, so nothing about the leaf-size entry changes; only the sweep's centre moves.
-
-### BVH — scene
-
-- [x] **`query` cloned the primitives it found** into an accumulator `Vec` — one allocation plus
-      one atomic refcount bump per candidate. Measured: **under one candidate per primary ray**, so
-      the cost was real but small. The review's "N atomic refcount bumps per ray" read as if N were
-      large; it is not. *Done*, in two steps: the flat tree made each leaf a **range** of primitives
-      it owns, which removed the per-leaf vector, and the closure removed the accumulator with the
-      last of the bumps. Note that the "real but small" reading is the one the clock contradicted —
-      see the ordered-traversal entry above.
-- [x] **The tree was a tree of pointers** — `Option<Box<BVHNode<T>>>` with a `Vec<T>` inside every
-      leaf, so one heap allocation per node plus one per leaf, scattered wherever the allocator put
-      them, and a traversal that had to be recursive. *Done.* `BVH<T>` is now a `Vec<Node>` addressed
-      by index, with the primitives in a second vector permuted so each leaf owns a contiguous
-      range — the same layout as `BVHTree` in `shapes::triangle_mesh`. Two allocations, contiguous
-      nodes, an explicit stack, and `T: Clone` is no longer required since no primitive is ever
-      copied. Deliberately **behaviour-preserving**: same split, same order, so every counter is
-      identical to the digit on all four scenes. That was the point of doing it on its own.
-- [x] **No ordered traversal, no `far` narrowing, no early-out.** `Scene::intersect` collected every
-      candidate, then tested them all. The BVH filtered but did not order. *Done.* `Accumulator` is
-      replaced by a closure `FnMut(&T, f64, f64) -> Option<f64>`: the tree prunes, the closure
-      intersects and reports the distance it adopted, and the traversal narrows its interval to it —
-      bounding its box tests as well as its primitive tests. The nearer child is opened first, so
-      the narrowing has the best chance of biting early. `intersect_p` gets its own unordered
-      traversal, `BVH::query_p`, whose one advantage is that it can **stop**.
-      Two lessons worth keeping:
-      - **The ceiling predicted while planning was right about the counters and wrong about the
-        clock.** Predicted 7.00 → about 6 box tests per primary ray; measured 7.00 → 7.00 on the
-        mesh scenes and 9.12 → 9.07 on `cornell_box`. The trees hold 4 to 8 primitives over 3 to 4
-        levels, and the floor and walls overlap the whole view, so there is next to nothing to
-        prune — every node is reached whatever the order. Object tests do fall, ~8 %: 0.85 → 0.77,
-        1.23 → 1.15, 0.87 → 0.80. Shadow rays gain from the early-out alone, `cornell_box` 15.00 →
-        13.22 box tests per ray.
-      - **The wall clock moved far more than that: `cornell_box.stage` at 32 spp went from
-        19.27/17.24/17.19 s to 15.61/15.03/14.71 s, about −14 %, three runs each and no overlap.**
-        The primary and shadow counters cannot account for it, so the rest comes from what
-        `bvh_stats` does not measure — secondary rays, which are incoherent and where narrowing pays
-        much better, and the per-ray `Vec` the accumulator allocated on every single query, now
-        gone. That split is *not* measured; it is the remaining hypothesis.
-- [ ] **Every shape's `intersect` returns a freshly built `Vec<Intersection>`**
-      (`IntersectionResult`), and `Transformed::intersect` builds a second one to hold the
-      transformed copies. So a hit costs one or two heap allocations that are read once and
-      dropped. Misses are free — `Vec::new()` does not allocate until pushed. Not in the original
-      review; noticed while taking the scene baseline. This is the per-test cost that the counters
-      cannot see, and the reason `intersect_p` is worth more than its effect on `object_tests`
-      suggests.
-- [x] **The split axis was drawn at random**, which made the build non-reproducible and therefore
-      the accelerator unmeasurable: three consecutive runs of `cornell_box.stage` gave 9.63, 8.95
-      and 9.31 box tests per primary ray. *Done.* The split is now along the axis of greatest
-      **centroid** spread — deterministic, and the better guess besides, being the axis along which
-      a plane separates the primitives most. `cornell_box` now gives 9.12 on every run.
-- [ ] **`AABound::get_bounding_box` is a computation, not an accessor** — and nothing caches it.
-      [`TriangleMesh`](src/shapes/triangle_mesh/triangle_mesh.rs) recomputes it by scanning **every
-      vertex**, O(V): 104 000 floats for the bunny, 2.6 million for the dragon. `Transformed`
-      transforms eight corners and then calls the object inside it; `Compound` folds over all its
-      children. So the call is recursive, uncached, and arbitrarily expensive.
-      The scene build leans on it hard: `compare_centroid` calls it **twice per comparison**, inside
-      a `sort_by`, at every level of the recursion — O(n log² n) calls, each O(V) when a mesh is
-      involved. Invisible at 4 primitives, ruinous at a hundred meshes.
-      The fix is the one the mesh BVH already applies to itself: compute each primitive's box and
-      centroid **once**, at `Scene::commit`, and build from those. ~20 lines, and it is the
-      prerequisite for anything that wants to look at bounds more than once — the binned SAH below
-      first of all. Found while studying that port, not by measurement: at current scene sizes it
-      costs milliseconds at startup.
-
-#### Low priority — port the binned SAH to the scene BVH
-
-Studied on 2026-08-18, not done, and deliberately parked. The split is still a median one; the
-mesh's binned SAH could replace it and be shared rather than copied. What the study found:
-
-**Shareable**: `BIN_COUNT`/`SPLIT_COUNT`, `Bin`, `SplitCandidate`, `bin_index`,
-`find_best_split_plane`, `centroid_extent`, `fill_bins`, and `exhaustive_split_cost` for the
-tests — about 190 lines, of which ~110 is the live cost model.
-**Not shareable**: the partition (the mesh does a Lomuto pass in place over `tri_idx`, the scene
-has to split an owned `Vec<T>` in two), the node layout, the traversal, and the two
-`TraversalStats`. So "one design in the project" would be an overstatement: ~110 lines out of some
-600.
-
-The two sides reach an item's centroid and box differently, so a shared entry point needs an
-accessor. Monomorphised, hence no indirection:
-
-```rust
-// src/accel.rs — a new module
-pub fn find_best_split(
-    count: usize,
-    centroid_of: impl Fn(usize) -> Vector3f,
-    bounds_of: impl Fn(usize) -> AABoundingBox,
-) -> Option<SplitCandidate>
-```
-
-**Three reasons it is parked:**
-
-- **No measurable gain.** Under 1.3 object tests per ray on every scene (see the baseline above):
-  the accelerator is not where a ray spends its time at 4–10 primitives, and at that size the SAH
-  and the median elect barely different planes.
-- **The drift argument is void today.** It is the usual reason to share rather than copy — but
-  there is only **one** copy of the SAH. Sharing would prevent a drift that does not exist yet;
-  *not* giving the scene BVH a SAH prevents it just as well, for zero lines.
-- **It costs readability on the side that matters.** In the mesh, `find_best_split_plane` currently
-  walks `node.left_first .. + tri_count` in plain sight. Behind an accessor that range becomes an
-  offset the closures have to carry, and the algorithm body no longer shows what it iterates over.
-  That is a loss on the one piece of this branch with a measured payoff (66 649 → 0.58 triangle
-  tests per ray) and three tests guarding it.
-
-**If it is ever done**: fix the `get_bounding_box` caching first, above. A SAH port multiplies those
-calls — one pass for the centroid extent, one for the binning, per axis, per node — so porting it
-onto the uncached accessor would pile O(V) calls on top of each other.
-
-**What would earn the design unity instead**: the flat/ordered traversal (item 1 of the order of
-work). The two accelerators differ there in a way that *is* measured — the scene tree does 7.00 box
-tests per ray on a 7-node tree, i.e. every node, every ray, with no ordering and no interval
-narrowing, while the mesh has both.
-- [x] **`BVHNode::new` on an empty vector** fell into the `_` arm and recursed forever;
-      `Scene::commit` on an empty scene hit it. *Done.* Measured failure mode, by removing the
-      guard: `fatal runtime error: stack overflow`, SIGABRT — not a hang. `Scene::build_bvh` now
-      returns `None` for an empty primitive list, which is where emptiness belongs: the `Option`
-      already carries it, so `BVHNode` never has to, and `intersect` reads `None` as "nothing to
-      hit" without a single box test. `BVHNode::new` states the precondition and asserts it,
-      same reasoning as `AABoundingBox::hit`. Three tests, including one that builds over seven
-      primitives and checks the root box encloses them all — the split axis being drawn at
-      random, it exercises a different partition on every run.
-- [x] **No `intersect_p` at the scene level.** Shadow rays went through the full
-      nearest-hit-plus-material search when a boolean with an early-out would do. *Done for
-      `Scene`*: `intersect_p` stops at the first occluder, stays unordered — ordering exists to
-      reach the *nearest* hit sooner, and here any hit is as good as any other — and tests
-      candidates through `Intersectable::intersect` rather than `Object::intersect`, so no
-      material is cloned to be dropped.
-- [x] **`intersect_p` did not reach inside the shapes.** `Scene::intersect_p` stopped at the first
-      *object*, but testing that object still ran `Intersectable::intersect` — for a mesh, the full
-      nearest-hit search over its triangles *and* the shading derivatives, for a boolean. *Done.*
-      `Intersectable::intersect_p` with a default implementation delegating to `intersect`, so
-      nothing breaks and the waste is removed where it is worth removing: `BVHTree::intersect_p`
-      (any-hit traversal — no ordering, no interval narrowing, no nearest to keep, return at the
-      first triangle), `TriangleMesh`, and the forwarding overrides in `Simple`, `Transformed`,
-      `Compound` and `Scene`'s `Wrapper` without which the default would shadow them.
-      **Measured: ~3 %** on the mesh scenes at 200×150×64 — `bunny_mesh` 1.36 s → 1.32 s,
-      `dragon_mesh` 2.65 s → 2.57 s — and nothing on `cornell_box`, which has no mesh, so its
-      shapes fall through to the default. Object-test counters do not move at all, as expected:
-      this changes the price of a test, not their number.
-      The return is small because no test scene combines the two things it needs — a mesh *and*
-      a high share of occluded shadow rays. `cornell_box` occludes 19.9 % of them but holds only
-      rectangles; `bunny_mesh` holds a 69 451-triangle mesh but occludes 2.7 %. A closed scene
-      containing a mesh would show far more, and that is the case this exists for.
-- [x] **`Plane` reports an unbounded box**, `±f64::MAX` on x and z
-      ([plane.rs:52-55](src/shapes/plane.rs#L52)), so its `half_area` is `inf` — which
-      would poison any SAH cost the moment a `Plane` sits in the scene BVH. Not a bounding
-      bug as such but a design question: an unbounded primitive has no business inside an
-      acceleration structure (pbrt keeps them out of the accelerator). *Done.* `Plane` now returns
-      an honestly infinite box instead of `±f64::MAX` — a *finite* number standing in for infinity,
-      whose difference overflows to `+inf` anyway, but by accident and in a way no predicate could
-      tell from a merely enormous box. `AABoundingBox::is_bounded` can now tell, `Scene::commit`
-      sorts unbounded primitives onto a list tested for every ray, and `BVHNode::new` asserts that
-      what it holds is bounded.
-
-#### Baseline — 2026-07-31
-
-`bvh_stats` now has a scene mode, told apart by the file extension: a `.ply` has no camera and the
-tool has to invent a ray set, a `.stage` carries its own and the ray set is simply the render's.
-`Loader::load_scene` hands back that camera, so the rays are one per pixel centre of a 200×150
-render at the renderer's default settings. Two sets are counted **apart**: the camera's primary
-rays, and one shadow ray from each point they hit, aimed at the `PointLight` that
-`Loader::load_scene` hard-codes at (0, 2, 1) — the segment NEE actually casts.
-
-```
-cargo run --release --bin bvh_stats -- test_files/<scene>.stage
-```
-
-| scene | prims | ray set | nodes/ray | box tests/ray | object tests/ray | hit |
-|---|---|---|---|---|---|---|
-| `default.stage` | 2 | primary | 1.27 | 2.90 | 0.32 | 31.8 % |
-| | | shadow | 1.84 | 3.00 | 0.84 | 83.8 % |
-| `cornell_box.stage` | 8 | primary | 5.18 | 9.63 | 0.87 | 76.0 % |
-| | | shadow | 9.16 | 15.00 | **2.16** | 95.9 % |
-| `bunny_mesh.stage` | 4 | primary | 3.85 | 7.00 | 0.85 | 54.5 % |
-| | | shadow | 3.28 | 7.00 | 0.28 | 9.0 % |
-| `dragon_mesh.stage` | 4 | primary | 4.23 | 7.00 | 1.23 | 54.5 % |
-| | | shadow | 2.99 | 6.39 | 0.30 | 11.0 % |
-
-**What the numbers correct.** The plan for these steps assumed the accumulator was expensive
-because it hands out many candidates. It does not: **object tests per ray stay under 1.3** on every
-scene, primary rays included. At four to eight primitives the accelerator is simply not where a
-primary ray spends its time.
-
-Two things the table does say:
-
-- **The interior of the tree prunes nothing.** A 4-primitive tree has 7 nodes, and the mesh scenes
-  test 7.00 boxes per ray — every node, every ray. The 3×3 floor and wall rectangles overlap the
-  whole view, so the root and both its children are hit by nearly every ray, and only the leaves
-  ever reject anything. `cornell_box` does better, 9.63 of 15 nodes. This is what ordering and
-  interval narrowing can attack.
-- **Shadow rays are the worst case, and `cornell_box` shows why.** 95.9 % of them are occluded, and
-  the current `unoccluded` still searches for the *nearest* hit rather than stopping at the first:
-  2.16 object tests where one would do.
-
-**And a limit to state plainly.** The gain from `intersect_p` is mostly *inside* each object test —
-the `Vec<Intersection>` allocated, the shading normal, the texture coordinates, the ∂p/∂u and ∂p/∂v
-computed and thrown away — and no counter here can see that. Expect `object_tests` on shadow rays
-to fall by roughly half on `cornell_box` and barely move on the mesh scenes, while the wall clock
-falls further. Saying so now avoids reading a modest counter movement as a failure.
-
-#### After `intersect_p` and the visibility tester — 2026-08-15
-
-Object tests per shadow ray, the figure this targeted:
-
-| scene | before | after |
-|---|---|---|
-| `default.stage` | 0.84 | **0.00** |
-| `cornell_box.stage` | 2.16 | **0.91** |
-| `bunny_mesh.stage` | 0.28 | **0.20** |
-| `dragon_mesh.stage` | 0.30 | **0.21** |
-
-The prediction above was right, and beside the point. `cornell_box` halved as expected;
-`default.stage` fell to zero, because with `far` now carrying the light's distance the leaf boxes
-beyond the light are rejected and no candidate survives at all. And then:
-
-**`bunny_mesh.stage`, 120×90×4: 38.9 s → 0.13 s.** Three hundred times, which is not a figure any
-counter in the table predicts, so it needed attributing rather than announcing. Two experiments
-failed to reproduce the slowness — restoring the degenerate tester alone did not, whether with
-`far = 0` or `far = f64::MAX`, because `intersect_p` short-circuits on the first candidate that
-reports a hit and a `NaN` ray makes the first candidate report one. The decisive one was removing
-`BackgroundInfiniteLight` from the *old* build: 38.9 s → 0.16 s.
-
-So the whole of it was that one light. Its tester built a ray between a point and itself, whose
-normalised direction is `NaN`, and **`NaN` defeats every rejection test in both accelerators** —
-`f64::max(NaN, tmin)` returns `tmin`, `f64::min(NaN, tmax)` returns `tmax`, so no slab ever
-rejects and every box reports a hit. Sent through `intersect(.., f64::MAX)`, each such ray
-therefore walked the entire scene tree *and the entire 138 881-node bunny mesh, testing all 69 451
-triangles* — once per NEE sample of that light, per bounce, per pixel sample.
-
-Two lessons worth keeping:
-
-- **The instrumentation could not see this**, and said so only in hindsight. `bvh_stats` casts
-  well-formed shadow rays aimed at the point light; the degenerate ones never existed in its ray
-  set. A counter measures the rays you thought to cast.
-- **A quantity that cannot be rejected is worse than a large one.** The same `NaN`-defeats-`max`
-  mechanism was already documented in `AABoundingBox::hit`, where the parallel-ray case is handled
-  explicitly rather than left to propagation. It bit again one level up, in the ray itself.
-
-`cornell_box.stage` also changes, and dramatically: a closed room was being lit by the sky, because
-the background light was never occluded by its own walls. It now looks like a Cornell box — dark
-corners, boxes casting shadows — instead of a washed-out white interior. That is the change the
-"fix it properly" decision bought, and it is a correctness fix, not a contrast tweak.
-
-**A defect in the instrumentation itself, found here.** The scene measurement is **not**
-reproducible: `BVHNode::choose_comparator` draws its split axis from an unseeded `random_double()`,
-so the tree — and with it every node and box count — differs run to run. Measured on
-`cornell_box.stage`, three consecutive runs: 9.63, 8.95, 9.31 box tests per primary ray.
-`object_tests` is far steadier, varying in the second decimal, because it depends on which
-primitives lie along the ray rather than on how they were grouped. Until the build is made
-deterministic, compare `object_tests` across commits and read the box counts as an order of
-magnitude. This is a second, independent reason to do the deterministic SAH split.
-
-### Correctness / robustness
-
-- [ ] **Needless `unsafe`** at [simple.rs:31-34](src/objects/simple.rs#L31) — a raw pointer
-      is used to read `intersections[0]`, but `Intersection` is `Copy`. Also assumes the
-      first element is the nearest; worth asserting that every `Intersectable` really does
-      return a distance-sorted list.
-- [x] **Infinite lights built a degenerate visibility tester** — both passed `(0,0,0)` for both
-      endpoints and ignored their `_intersection` argument, so the shadow ray had a null
-      direction. *Done*, and it turned out to be the most expensive defect found on this branch,
-      by three orders of magnitude. See the write-up under *BVH — scene*: a light at infinity has
-      no position to aim at, only a direction, which is why the two-point form could not express
-      it; `VisibilityTester::towards_infinity` does.
-- [x] **`AABoundingBox::new` inflated every axis to a minimum extent of 0.01**, which
-      biased every `half_area` and therefore every SAH cost. *Done.* The investigation
-      showed the clamp was not the guard it looked like: `Plane` and `Rectangle` pad
-      themselves by hand, so triangles — the SAH-critical path — were its only clients.
-      The real defect was in [`hit`](src/geom/aabound.rs), whose `tmax <= tmin`
-      rejected every zero-thickness slab; the clamp merely papered over it. Changes:
-      `hit` now rejects on `tmax < tmin` so a tangential hit counts (required: a bounding
-      box is a *conservative* bound); rays parallel to a slab are handled explicitly
-      instead of relying on `f64::max` silently dropping a NaN; the slab interval is
-      widened by the rounding bound 2γ(3); `new` stores the
-      bound faithfully with a `debug_assert`; `combine` and `Compound::get_bounding_box`
-      use `empty()` instead of an inverted box fixed up by accident; `Rectangle`
-      dropped its ±1.0 hand-padding for an exact flat bound. Four tests added for
-      degenerate and grazing cases.
-      The rounding bound has its own write-up in
-      [docs/arithmetique_flottante.md](docs/arithmetique_flottante.md): §0–§3 cover float
-      representation, the standard error model and γ(n); §4 derives 2γ(3) step by step,
-      with worked intervals and the counter-example that forces the magnitude form. The
-      doc comment on `hit` carries a condensed version of the same derivation.
-- [ ] **Mesh normals are parsed and never used** (build warning): no interpolated shading
-      normals, so meshes are visibly faceted. The geometric normal is derived as
-      `cross(dpdv, dpdu)` from default UVs, which is a roundabout route with a fragile
-      orientation.
-
-## Departures from a physical model
-
-- [ ] **No area lights — the biggest gap.** `DiffuseLight` is only a *material*; no
-      `AreaLight` is ever registered in `Scene::lights`. So NEE can never sample an
-      emissive panel, and [path.rs](src/integrators/path.rs) only accumulates emission when
-      `is_last_bounce_specular`. Net effect: **an emissive surface contributes nothing to
-      indirect lighting** — it is only visible on a direct view. This is why
-      [loader.rs](src/loader.rs) hard-codes a `PointLight` and a background light to get
-      scenes lit at all.
-- [ ] **No MIS.** `Light` has no `pdf_li`, so NEE and BSDF sampling cannot be weighted
-      against each other. Blocked on the item above.
-- [ ] **Russian roulette is commented out**
-      ([path.rs:93](src/integrators/path.rs#L93)); paths are cut dead at `max_depth`, and
-      the cut at [path.rs:65](src/integrators/path.rs#L65) happens *before* the last
-      vertex's light sampling — systematic energy loss.
-- [ ] **No tone mapping.** [`gamma_correct`](src/spectrum.rs#L21) is a `sqrt` (gamma 2.0,
-      not sRGB) and [`in_bound`](src/spectrum.rs#L134) hard-clips at 1.0, so all dynamic
-      range above 1 is discarded.
-- [ ] **`Spectrum` is an RGB triple with no declared colour space** — no primaries, no
-      white point. The name promises spectral rendering that does not exist.
-- [ ] **Lights are hard-coded in `Loader::load_scene`** and the `.stage` grammar has no
-      `light` production at all. Lights should be declarable in the scene file.
+# Défauts
+
+Relevés lors d'une lecture complète de l'arbre au commit `1859a9e` (2026-07-28), sur la branche
+`chore/revamp_bvh_for_trimesh`, plus ce que le chantier a trouvé en chemin. La case dit si l'entrée
+tient toujours.
+
+## Accélérateurs
+
+- [ ] **`AABound::get_bounding_box` est un calcul, pas un accesseur** — et rien ne le cache.
+      [`TriangleMesh`](src/shapes/triangle_mesh/triangle_mesh.rs) le recalcule en balayant **tous
+      les sommets**, `Transformed` transforme huit coins, `Compound` replie sur ses enfants ;
+      l'appel est récursif et arbitrairement coûteux. La construction du BVH de scène le rappelle
+      O(n log² n) fois — **26 671 appels pour 445 primitives**, 60 par primitive.
+      **Mesuré et écarté le 2026-08-20**, correctif écrit puis retiré : il gagne 1,2 ms sur une
+      exécution de 1,02 s, soit un millième d'un aperçu et un cinquante-millième d'une image finie,
+      contre un `subdivide` qui perd son `&mut self`. Le raisonnement complet, les tables et la
+      condition de réouverture — plus de mille primitives dans une scène réelle — sont en
+      [docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3. **Ne pas rouvrir sans ce chiffre-là.**
+- [ ] **Les feuilles de maillage tiennent un seul triangle**, ~2 nœuds par triangle, 110 Mo de nœuds
+      pour `dragon_vrip.ply` : [ideas/cout_traversee_bvh.md](ideas/cout_traversee_bvh.md). Bloqué sur
+      le sampler graine, et la raison compte.
+- [ ] **Le SAH binné n'est pas porté sur le BVH de scène**, étudié et garé :
+      [ideas/sah_bvh_scene.md](ideas/sah_bvh_scene.md).
+- [ ] **Chaque `intersect` de forme rend un `Vec<Intersection>` frais** (`IntersectionResult`), et
+      `Transformed::intersect` en construit un second pour tenir les copies transformées. Une touche
+      coûte donc une ou deux allocations tas lues une fois puis jetées. Les ratés sont gratuits —
+      `Vec::new()` n'alloue pas avant le premier push. Pas dans la revue d'origine ; remarqué en
+      prenant la référence de scène. C'est le coût par test que les compteurs ne peuvent pas voir, et
+      la raison pour laquelle `intersect_p` vaut plus que son effet sur `object_tests` ne le suggère.
+
+Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
+
+- [x] Coût SAH calculé sur la mauvaise boîte — l'aire d'un bin au lieu de celle de l'union (§3.1).
+- [x] Premier plan candidat dégénéré, subdivision arrêtée d'emblée (§3.1).
+- [x] `evaluate_sah` code mort et bogué, devenu l'oracle de test `exhaustive_split_cost` (§3.1).
+- [x] Partition comparant une position reconstruite là où le coût comptait des bins (§3.1).
+- [x] Boîte de chaque nœud testée deux fois (§3.1).
+- [x] `AABoundingBox::hit` recalculait trois réciproques par test de boîte (§3.1).
+- [x] Un maillage vide faisait récurser `build_stats` dans un nœud inexistant (§3.1).
+- [x] `query` clonait les primitives trouvées (§3.2).
+- [x] L'arbre de scène était un arbre de pointeurs (§3.2).
+- [x] Ni traversée ordonnée, ni resserrement de `far`, ni sortie anticipée (§3.2).
+- [x] Axe de coupe tiré au hasard, donc build non reproductible et accélérateur non mesurable (§3.2).
+- [x] `BVHNode::new` sur un vecteur vide récursait indéfiniment (§3.2).
+- [x] Pas d'`intersect_p` au niveau de la scène (§3.2).
+- [x] `intersect_p` n'atteignait pas l'intérieur des formes (§3.2).
+- [x] `Plane` rapportait une boîte non bornée, `±f64::MAX` (§3.2).
+
+## Justesse / robustesse
+
+- [ ] **`unsafe` inutile** en [simple.rs:31-34](src/objects/simple.rs#L31) — un pointeur brut sert à
+      lire `intersections[0]`, alors qu'`Intersection` est `Copy`. Suppose aussi que le premier
+      élément est le plus proche ; mériterait d'assérer que tout `Intersectable` rend bien une liste
+      triée par distance.
+- [ ] **Les normales de maillage sont parsées et jamais utilisées** (avertissement de build) : pas de
+      normales de shading interpolées, donc les maillages sont visiblement facettés. La normale
+      géométrique est dérivée de `cross(dpdv, dpdu)` sur des UV par défaut, route détournée à
+      l'orientation fragile.
+- [x] Les lumières à l'infini construisaient un testeur de visibilité dégénéré — le défaut le plus
+      coûteux du chantier, trois ordres de grandeur ([docs/mesures_bvh.md](docs/mesures_bvh.md) §3.3
+      et §2.2).
+- [x] `AABoundingBox::new` gonflait chaque axe à 0,01 d'extension minimale, biaisant tout coût SAH ;
+      le vrai défaut était dans `hit` ([docs/mesures_bvh.md](docs/mesures_bvh.md) §3.3, dérivation de
+      la borne 2γ(3) dans [docs/arithmetique_flottante.md](docs/arithmetique_flottante.md) §4).
+
+## Écarts au modèle physique
+
+- [ ] **Pas de lumières d'aire — le plus grand écart.**
+      [ideas/area_light.md](ideas/area_light.md) : `DiffuseLight` n'est qu'un matériau, aucun
+      `AreaLight` n'est enregistré dans `Scene::lights`, donc **une surface émissive ne contribue à
+      aucun éclairage indirect**. Ce fichier porte l'analyse et l'ordre d'attaque.
+- [ ] **Pas de MIS.** `Light` n'a pas de `pdf_li`, donc NEE et échantillonnage de BSDF ne peuvent pas
+      être pondérés l'un contre l'autre. Bloqué sur l'entrée ci-dessus, et c'est MIS qui fera tomber
+      le garde `is_last_bounce_specular`.
+- [ ] **La roulette russe est commentée** ([path.rs:93](src/integrators/path.rs#L93)) ; les chemins
+      sont coupés net à `max_depth`, et la coupe de [path.rs:65](src/integrators/path.rs#L65) tombe
+      *avant* l'échantillonnage de lumière du dernier sommet — perte d'énergie systématique.
+- [ ] **Pas de tone mapping.** [`gamma_correct`](src/spectrum.rs#L21) est un `sqrt` (gamma 2,0, pas
+      sRGB) et [`in_bound`](src/spectrum.rs#L134) écrête dur à 1,0 : toute la dynamique au-dessus de 1
+      est jetée.
+- [ ] **`Spectrum` est un triplet RGB sans espace de couleur déclaré** — ni primaires, ni point
+      blanc. Le nom promet un rendu spectral qui n'existe pas.
+- [ ] **Les lumières sont câblées dans `Loader::load_scene`** : une `PointLight` en (0, 2, 1) et un
+      `BackgroundInfiniteLight`, ajoutés à toute scène quoi qu'elle dise. Un fichier `.stage` ne
+      décrit donc pas son éclairage — il hérite de celui-là. Le travail de grammaire qui répare cela
+      est sous *Renderer & infrastructure*.
 
 ## Renderer & infrastructure
 
-- [ ] **Per-pixel round-robin dispatch** in [mt.rs](src/renderers/mt.rs): ~480 000 channel
-      messages for an 800×600 image, no load balancing (the schedule is fixed in advance,
-      so one thread inheriting a costly region holds up the frame), the main loop spins on
-      a non-blocking `try_recv` once the pixel iterator is exhausted, and the channels are
-      unbounded. [`Bounds2`](src/geom/bounds2.rs) already supports the tiling that fixes
-      all four.
-- [ ] **~50 lines duplicated** between [st.rs](src/renderers/st.rs) and
-      [mt.rs](src/renderers/mt.rs): `compute_pixel`, `Sampler2`, `image_write` are
-      identical. Extract `Film` (accumulate + write) and `Sampler`; the two renderers
-      should then differ only in scheduling.
-- [ ] **Renders are not reproducible.** `rand 0.3` via `thread_rng` is not seeded here, so
-      two runs cannot be compared — which makes every change to the integrator unverifiable.
-      Upgrading to `rand 0.8` also buys stratified/Sobol samplers.
-- [x] **The `examples/` directory no longer compiles** — 16 errors, all the same cause: the
-      `match config.integrator` in each example predates the `NAIVE` variant and is now
-      non-exhaustive. *Done.* Pruned, then fixed. Only two examples had a `.stage` twin, and
-      only one was a real duplicate: `csg_union_spheres.rs` matched its `.stage` value for
-      value and is gone. `cornell_box.stage` had drifted into a materials showcase — metal
-      and dielectric blocks, camera at z = 550, emission 7.0, a saturated green — so the
-      canonical box was ported to `test_files/cornell_box_canonical.stage` (two white
-      lambertian blocks, camera at z = 800, emission 15.0; needs `--fov 60 --far 2000`)
-      before `cornell_box.rs` was dropped. The 14 survivors got the missing arm, and with it
-      the only integrators under which most of them are visible at all — see the next entry.
-- [x] **Fifteen examples registered no light and rendered pure black.** *Done.* Under `PATH`
-      an empty `Scene::lights` makes `sample_light` return `None`, `background_radiance` sum
-      `le` over an empty set, and `is_last_bounce_specular` gate away any material emission:
-      three independent paths to zero. Each now adds the `BackgroundInfiniteLight` of "Ray
-      Tracing in One Weekend", the gradient `NaiveIntegrator` hard-codes, so `path` and
-      `naive` renders of one scene are comparable. [csg_bowl.rs](examples/csg_bowl.rs)
-      carries the derivation in full — including the departure it costs: `sample_li` draws
-      from a `SpherePdf` uniform over the whole sphere, so about half the samples land below
-      the horizon where no surface can see them. Unbiased, but the variance pays. The other
-      thirteen refer to it. Verified by removing the light and watching the image go black.
-- [ ] **`match config.integrator` is duplicated 16 times** — the 15 examples plus
-      [main.rs](src/main.rs) — and `match config.renderer` as many. §2 of CLAUDE.md asks that
-      a new variant of a concept arrive as a trait implementation, "pas par un `match` ou un
-      `enum` dans le code appelant"; this is that `match`, and it is why adding `NAIVE` broke
-      sixteen files at once. The fix is a factory beside each enum: `Type::build(max_depth)`
-      in [integrators.rs](src/integrators.rs), `Type::render_fn()` in
-      [renderers.rs](src/renderers.rs). Take `max_depth` rather than `&Config` — `config.rs`
-      already depends on `integrators::Type`, and passing `&Config` would close the cycle.
-- [ ] **No example carries an emissive surface any more**, `cornell_box.rs` having been
-      dropped. The visual witness of the missing `AreaLight` is now
-      `test_files/cornell_box.stage`, whose render goes through the lights
-      [loader.rs](src/loader.rs) hard-codes rather than anything the scene file declares.
-- [ ] Dead weight: `src/_keep.rs` and `src/shapes/triangle.cpp` are not compiled;
-      `integrators/whitted.rs` no longer compiles and is commented out of the module;
-      `crossbeam` is still declared in `Cargo.toml` but unused (`thread::scope` replaced
-      it); the build emits 24 warnings.
-- [ ] `edition = "2018"` in `Cargo.toml` vs `edition = "2021"` in `rustfmt.toml`.
-
-## Also worth noting
-
-The two oldest unchecked items above — "scene from text file loader" and "support for
-triangle based geometry" — look done (`src/loader/`, `src/shapes/triangle_mesh/`). Left
-unchecked deliberately: that is the author's call, not the reviewer's.
-
+- [ ] **Dispatch en tourniquet par pixel** dans [mt.rs](src/renderers/mt.rs) : ~480 000 messages de
+      canal pour une image 800×600, aucun équilibrage de charge (l'ordonnancement est fixé d'avance,
+      donc un thread héritant d'une région coûteuse retient toute l'image), la boucle principale
+      tourne à vide sur un `try_recv` non bloquant une fois l'itérateur de pixels épuisé, et les
+      canaux sont non bornés. [`Bounds2`](src/geom/bounds2.rs) sait déjà faire le pavage qui corrige
+      les quatre.
+- [ ] **~50 lignes dupliquées** entre [st.rs](src/renderers/st.rs) et [mt.rs](src/renderers/mt.rs) :
+      `compute_pixel`, `Sampler2`, `image_write` sont identiques. Extraire `Film` (accumulation +
+      écriture) et `Sampler` ; les deux renderers ne devraient alors différer que par
+      l'ordonnancement.
+- [ ] **Les rendus ne sont pas reproductibles.** `rand 0.3` par `thread_rng`, non graine ici, donc
+      deux exécutions ne sont pas comparables — ce qui rend invérifiable tout changement de
+      l'intégrateur. Passer à `rand 0.8` achète aussi les samplers stratifiés / Sobol. C'est l'item 2
+      de l'ordre de travail, avec deux clients qui l'attendent : la validation d'`AreaLight` et le
+      balayage de `t_trav`.
+- [ ] **`match config.integrator` est dupliqué 16 fois** — les 15 exemples plus
+      [main.rs](src/main.rs) — et `match config.renderer` autant. Le §2 de CLAUDE.md demande qu'une
+      nouvelle variante d'un concept arrive par une implémentation de trait, « pas par un `match` ou
+      un `enum` dans le code appelant » ; c'est ce `match`, et c'est pourquoi ajouter `NAIVE` a cassé
+      seize fichiers d'un coup. Le correctif est une fabrique à côté de chaque enum :
+      `Type::build(max_depth)` dans [integrators.rs](src/integrators.rs), `Type::render_fn()` dans
+      [renderers.rs](src/renderers.rs). Prendre `max_depth` plutôt que `&Config` — `config.rs` dépend
+      déjà d'`integrators::Type`, et passer `&Config` fermerait le cycle.
+- [ ] **Aucun exemple ne porte plus de surface émissive**, `cornell_box.rs` ayant été retiré. Le
+      témoin visuel de l'`AreaLight` manquante est désormais `test_files/cornell_box.stage`, dont le
+      rendu passe par les lumières que [loader.rs](src/loader.rs) câble plutôt que par quoi que ce
+      soit que le fichier de scène déclare.
+- [ ] **La grammaire `.stage` ne sait pas décrire une lumière.** Elle dit tout ce que le projet
+      possède — caméras, formes, matériaux, textures, transformations — sauf le seul concept sans
+      lequel une scène ne s'affiche pas. Le travail est la chaîne habituelle, mot-clé du
+      [lexer](src/loader/parser/lexer.rs) → [parser](src/loader/parser.rs) → nœud d'
+      [AST](src/loader/ast.rs) → méthode de [`Visitor`](src/loader/visitors.rs) → les deux visiteurs
+      (`PrintVisitor` doit refaire l'aller-retour, `SceneBuilderVisitor` doit appeler
+      `Scene::add_light`). Quatre décisions à prendre avant d'écrire, dont trois ne sont pas
+      évidentes :
+      **(1) Où vit le nœud.** `SceneNode` porte `objects: Vec<Box<dyn ObjectNode>>` ; une lumière est
+      membre de la scène et non d'un objet, donc un `lights: Vec<Box<dyn LightNode>>` frère est la
+      place juste — pas un `object light`, qui la ferait passer par le chemin forme + matériau.
+      **(2) Les lumières d'aire ne passent pas par cette production.** `diffuse_light` existe déjà
+      comme *matériau*, et c'est la bonne route : une surface émissive se déclare en posant ce
+      matériau sur un objet, et c'est le visiteur qui en tire l'`AreaLight`
+      ([ideas/area_light.md](ideas/area_light.md) §4). La production `light` ne couvre donc que les
+      lumières **sans géométrie** — `point`, `uniform_infinite`, `background_infinite` et son
+      dégradé à deux couleurs. Deux syntaxes pour un même concept serait le piège à éviter.
+      **(3) Une position se dit comme celle d'un objet.** `PointLight` prend un `Transform` ; la
+      grammaire a déjà `transform { translate … }`, donc réutiliser ce bloc plutôt qu'inventer un
+      `pos x y z` garde une seule façon de placer une chose dans la scène.
+      **(4) La migration est une rupture, et il faut la vouloir.** Le jour où le loader n'ajoute plus
+      rien, tout `.stage` sans bloc `light` rend du noir — ce qui est honnête, et demande de reprendre
+      les fichiers de `test_files/` un par un. C'est aussi ce qui rend le témoin d'`AreaLight`
+      démontrable : une scène éclairée par ce qu'elle déclare, et rien d'autre.
+- [ ] **Le mot-clé CSG `substraction` est orthographié à la française** — la forme anglaise est
+      `subtraction`, et le reste de la grammaire est en anglais. C'est dans la surface publique du
+      langage de scène, donc le renommer casse les `.stage` existants : accepter la rupture, ou
+      accepter les deux graphies le temps d'une transition.
+- [ ] Poids mort : `src/_keep.rs` et `src/shapes/triangle.cpp` ne sont pas compilés ;
+      `integrators/whitted.rs` ne compile plus et est commenté hors du module ; `crossbeam` est
+      toujours déclaré dans `Cargo.toml` sans être utilisé (`thread::scope` l'a remplacé) ; le build
+      émet 24 avertissements.
+- [ ] `edition = "2018"` dans `Cargo.toml` contre `edition = "2021"` dans `rustfmt.toml`.
+- [x] Le répertoire `examples/` ne compilait plus — 16 erreurs, toutes dues au `match
+      config.integrator` antérieur à la variante `NAIVE`. Élagué puis corrigé ; `cornell_box.stage`
+      avait dérivé en vitrine de matériaux, donc la boîte canonique a été portée dans
+      `test_files/cornell_box_canonical.stage` (deux blocs lambertiens blancs, caméra en z = 800,
+      émission 15,0 ; demande `--fov 60 --far 2000`).
+- [x] Quinze exemples n'enregistraient aucune lumière et rendaient du noir pur — sous `PATH`, un
+      `Scene::lights` vide offre trois chemins indépendants vers zéro. Chacun ajoute désormais le
+      `BackgroundInfiniteLight` de « Ray Tracing in One Weekend » ; [csg_bowl.rs](examples/csg_bowl.rs)
+      en porte la dérivation complète, y compris l'écart que cela coûte — `sample_li` tire dans un
+      `SpherePdf` uniforme sur toute la sphère, donc la moitié des échantillons tombent sous
+      l'horizon. Non biaisé, mais la variance se paie.

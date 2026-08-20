@@ -1,4 +1,8 @@
 // Test scene for Ray Training In One WeekEnd
+//
+// The 441 small spheres below are drawn from an unseeded generator, so this scene is a different
+// scene on every run — fine for an image, useless as a measurement. `test_files/many_spheres.stage`
+// is one draw of it frozen into the scene language, and that is the copy `bvh_stats` measures.
 
 use num_traits::ToPrimitive;
 

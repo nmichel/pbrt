@@ -1,0 +1,518 @@
+# One hundred meshes — the case `AABound::get_bounding_box` is measured on.
+#
+# The same 948-triangle bunny instanced 100 times on a 10 x 10 grid. Nothing here is about the
+# image: it exists because `get_bounding_box` on a `TriangleMesh` scans every vertex, so the number
+# of times a build calls it only shows on a scene made of meshes. Four primitives hide it entirely,
+# which is why every other scene in `test_files/` does.
+#
+# `bun_zipper_res4.ply` rather than the full bunny: the build cost per mesh is proportional to the
+# vertex count and so is the PLY parse, so a bigger mesh raises both and changes nothing about what
+# is visible. The grid step is 0.25, roughly twice the bunny's width, so the boxes do not overlap
+# and the tree has something to separate.
+
+camera pin_hole
+  pos 1.2 0.8 1.6
+  look 1.1 0.1 1.1
+  up 0.0 1.0 0.0
+
+scene
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.00 0.0 0.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.00 0.0 0.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.00 0.0 0.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.00 0.0 0.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.00 0.0 1.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.00 0.0 1.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.00 0.0 1.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.00 0.0 1.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.00 0.0 2.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.00 0.0 2.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.25 0.0 0.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.25 0.0 0.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.25 0.0 0.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.25 0.0 0.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.25 0.0 1.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.25 0.0 1.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.25 0.0 1.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.25 0.0 1.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.25 0.0 2.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.25 0.0 2.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.50 0.0 0.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.50 0.0 0.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.50 0.0 0.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.50 0.0 0.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.50 0.0 1.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.50 0.0 1.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.50 0.0 1.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.50 0.0 1.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.50 0.0 2.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.50 0.0 2.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.75 0.0 0.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.75 0.0 0.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.75 0.0 0.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.75 0.0 0.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.75 0.0 1.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.75 0.0 1.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.75 0.0 1.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.75 0.0 1.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.75 0.0 2.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 0.75 0.0 2.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.00 0.0 0.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.00 0.0 0.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.00 0.0 0.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.00 0.0 0.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.00 0.0 1.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.00 0.0 1.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.00 0.0 1.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.00 0.0 1.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.00 0.0 2.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.00 0.0 2.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.25 0.0 0.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.25 0.0 0.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.25 0.0 0.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.25 0.0 0.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.25 0.0 1.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.25 0.0 1.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.25 0.0 1.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.25 0.0 1.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.25 0.0 2.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.25 0.0 2.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.50 0.0 0.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.50 0.0 0.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.50 0.0 0.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.50 0.0 0.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.50 0.0 1.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.50 0.0 1.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.50 0.0 1.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.50 0.0 1.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.50 0.0 2.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.50 0.0 2.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.75 0.0 0.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.75 0.0 0.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.75 0.0 0.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.75 0.0 0.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.75 0.0 1.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.75 0.0 1.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.75 0.0 1.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.75 0.0 1.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.75 0.0 2.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 1.75 0.0 2.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.00 0.0 0.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.00 0.0 0.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.00 0.0 0.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.00 0.0 0.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.00 0.0 1.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.00 0.0 1.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.00 0.0 1.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.00 0.0 1.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.00 0.0 2.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.00 0.0 2.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.25 0.0 0.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.25 0.0 0.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.25 0.0 0.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.25 0.0 0.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.25 0.0 1.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.25 0.0 1.25 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.25 0.0 1.50 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.25 0.0 1.75 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.25 0.0 2.00 }
+  object transformed
+    object simple
+      mesh file "test_files/bun_zipper_res4.ply"
+      lambertian color 0.65 0.6 0.55
+    transform { translate 2.25 0.0 2.25 }

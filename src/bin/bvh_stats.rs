@@ -54,15 +54,17 @@
 //!
 //! Three things to know about reading those figures:
 //!
-//! - **The ray set is cast `TIMED_PASS_COUNT` times.** All the durations are printed, because a
-//!   single one says nothing without its own spread; the fastest is the one to compare, being the
-//!   least polluted by whatever else the machine was doing.
+//! - **Every duration is measured `TIMED_PASS_COUNT` times** — the load as well as the ray set. All
+//!   the passes are printed, because a single one says nothing without its own spread; the fastest
+//!   is the one to compare, being the least polluted by whatever else the machine was doing.
 //! - **The first pass is the odd one out.** It walks a tree that was just built, resident in
 //!   memory but not in cache. Its gap to the others measures how cold a tree starts, which is not
 //!   the same question as how fast it is traversed.
 //! - **A duration is diluted, never biased.** The traversal timing includes generating the rays,
 //!   and the load timing includes parsing the file — work identical between two builds of the same
-//!   geometry. A constant addition shrinks a relative difference without touching its sign.
+//!   geometry. A constant addition shrinks a relative difference without touching its sign. So a
+//!   change to a *build* is read on the load figure's **difference**, never on its ratio: parsing
+//!   is the floor both sides pay, and on a mesh scene it is the larger term by far.
 //!
 //! # What it does *not* measure
 //!
@@ -225,9 +227,7 @@ fn report_scene(path: &str) {
     config.output_width = SCENE_IMAGE_WIDTH;
     config.output_height = SCENE_IMAGE_HEIGHT;
 
-    let load_start = Instant::now();
-    let (scene, camera) = Loader::load_scene(&text, &config);
-    let load_duration = load_start.elapsed();
+    let ((scene, camera), load_durations) = timed_passes(|| Loader::load_scene(&text, &config));
 
     // One duration for the two ray sets: a shadow ray is cast from each point a primary ray hits,
     // so they are interleaved in a single pass and timing them apart would mean casting the
@@ -236,7 +236,7 @@ fn report_scene(path: &str) {
 
     println!("{}", path);
     println!("  primitives               {}", scene.primitive_count());
-    println!("  {:<24} {:.2?}", "load (parse + build)", load_duration);
+    report_durations("load (parse + build)", &load_durations);
     report_durations("both ray sets", &cast_durations);
     primary.report("primary rays");
     shadow.report("shadow rays");
@@ -286,9 +286,7 @@ fn cast_scene_ray_sets(scene: &Scene, camera: &dyn Camera) -> (SceneCast, SceneC
 }
 
 fn report_mesh(path: &str) {
-    let load_start = Instant::now();
-    let mesh = load_ply_mesh(path, false);
-    let load_duration = load_start.elapsed();
+    let (mesh, load_durations) = timed_passes(|| load_ply_mesh(path, false));
 
     let build = mesh.build_stats();
     let (cast, cast_durations) = timed_passes(|| cast_ray_set(&mesh));
@@ -300,7 +298,7 @@ fn report_mesh(path: &str) {
 
     println!("{}", path);
     println!("  triangles                {}", triangle_count);
-    println!("  {:<24} {:.2?}", "load (parse + build)", load_duration);
+    report_durations("load (parse + build)", &load_durations);
     println!("  nodes                    {} ({} leaves)", build.node_count, build.leaf_count);
     println!("  max depth                {}", build.max_depth);
     println!(

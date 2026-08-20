@@ -16,23 +16,36 @@ ou amender les entrées au fur et à mesure — c'est la mémoire longue du proj
 Un sujet reste une ligne dans `IDEAS.md` tant qu'une ligne suffit ; dès qu'il porte une analyse,
 il prend son propre fichier dans [ideas/](ideas/) et `IDEAS.md` n'en garde que l'entrée d'index.
 Ce répertoire n'est pas `docs/` : `docs/` décrit le code tel qu'il est, `ideas/` ce qui n'est pas
-fait. Le fichier d'un sujet disparaît quand le sujet atterrit.
+fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a appris passe dans
+`docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
+une entrée cochée y garde une ligne, pas son corps.
 
 **Chantier en cours** — aucun. Le sujet de la branche `chore/revamp_bvh_for_trimesh` est clos :
 SAH de maillage corrigé, `intersect_p` descendu dans les formes, arbre de scène à plat, traversée
-ordonnée avec resserrement de l'intervalle. L'ordre de travail d'`IDEAS.md` désigne `AreaLight`
-comme suite — les surfaces émissives ne contribuent aujourd'hui à aucun éclairage indirect.
+ordonnée avec resserrement de l'intervalle, test de boîte inliné. Ses mesures et ses arbitrages
+sont dans [docs/mesures_bvh.md](docs/mesures_bvh.md), dont le §4 tient les chiffres de référence
+auxquels comparer une mesure fraîche.
 
-Trois chantiers restent *voisins* du BVH et n'en font délibérément pas partie, chacun documenté
-dans `IDEAS.md` : `get_bounding_box` recalculé à chaque comparaison (à traiter avant qu'une scène
-grossisse), les feuilles de maillage à un seul triangle, et le SAH binné de la scène, mis de côté
-avec ses raisons.
+La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Y
+viennent d'abord le RNG graine, puis [`AreaLight`](ideas/area_light.md) — les surfaces émissives ne
+contribuent aujourd'hui à aucun éclairage indirect.
+
+Trois chantiers restent *voisins* du BVH et n'en font délibérément pas partie :
+[les feuilles de maillage à un seul triangle](ideas/cout_traversee_bvh.md), bloquées sur le sampler
+graine, [le SAH binné de la scène](ideas/sah_bvh_scene.md), mis de côté avec ses raisons, et le
+cache des bornes à la construction, écarté sur mesure — le correctif fonctionne et gagne un millième
+d'une exécution ([docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3, qui porte aussi la condition de
+réouverture). **Un gain de construction se rapporte à une exécution entière, jamais au chargement
+seul** ; c'est la leçon de ce dernier, et elle vaut pour le prochain.
 
 **Lancer les tests** — `cargo test` est vert en entier : 75 tests de bibliothèque, 8 doc-tests, et
 les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour tout changement de
 construction ou de traversée d'un accélérateur, `cargo run --release --bin bvh_stats -- <scène>`
 donne les compteurs à comparer ; ils ne voient que les rayons primaires et d'ombre, donc le
-chronomètre d'un rendu complet reste une mesure distincte et parfois divergente.
+chronomètre d'un rendu complet reste une mesure distincte et parfois divergente. Un changement de
+*construction* se mesure sur `test_files/many_spheres.stage` et pas ailleurs : c'est la seule scène
+dont le chargement n'est pas dominé par le parse d'un `.ply`
+([docs/mesures_bvh.md](docs/mesures_bvh.md) §0).
 
 ## 1. Structure
 
