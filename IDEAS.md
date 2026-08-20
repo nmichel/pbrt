@@ -81,6 +81,42 @@ departure from a physical model, (3) is a prerequisite to *validating* (2) and (
       traversal counted free, splitting always wins. Giving it pbrt's weight of ~1/8 of an
       intersection would shorten the tree and cut the memory, at some cost in triangle tests.
       Worth measuring both ways now that measuring is cheap.
+      **Amended by the duration baseline below**, which corrects the premise twice. The
+      `t_trav·A` term only bites where the two children nearly fill the parent, so at 1/8 it
+      shortens almost nothing — for two separated triangles the split cost collapses while the
+      leaf cost is `A·N`, and the margin is enormous. ~2 nodes per triangle is also the normal
+      shape of a top-down SAH build, pbrt included: its `maxPrimsInNode` is an upper bound that
+      *forces* splits, and below three primitives it splits at the midpoint without consulting
+      the cost model at all. What does argue for a shorter tree is the memory term measured
+      below, which `[3]` cannot express. Sequenced after the box-test entry: that one changes
+      `t_trav`'s denominator, so calibrating the constant first would date it immediately.
+- [x] **`AABoundingBox::hit` recomputes three reciprocals per box test.** `1.0 / ray.direction[i]`
+      per axis, per call ([aabound.rs](src/geom/aabound.rs)) — 16.31 box tests per ray on
+      `dragon_vrip` is **49 f64 divisions per ray, all recomputing the same three values**. They
+      are loop-invariant, but the call boundary hides them from LICM: `objdump` shows `hit` as a
+      110-instruction function reached by `bl`, never inlined, with three `fdiv` inside. A box
+      test measures ~18 ns, i.e. ~64 cycles at 3.5 GHz, and an f64 division is poorly pipelined
+      on this chip, so this is a serious share of the traversal — which the baseline below shows
+      *is* the traversal. pbrt passes a precomputed `invDir` into `Bounds3::IntersectP`; the
+      choice here is between that and a reciprocal cached on `Ray`, which would leave every
+      signature alone at the price of derived state to keep in step with `direction`. Hoisting
+      `1.0 / d` gives a bit-identical value, so images and counters must not move by one unit —
+      that invariant is the test. Concerns both accelerators, `hit` being shared.
+      *Done, and by neither of those two routes.* `#[inline(always)]` on `hit` **and** on
+      `BVHTree::hit_box` is the whole fix: the divisions were never the cost, the call boundary
+      was. Once it is gone, LICM hoists the three reciprocals into the traversal's prologue —
+      visible in the disassembly, three `fdiv` at +0xb4 with their results spilled and reloaded
+      per box test. Both attributes are needed: marking `hit` alone only moves the boundary out
+      to the counter wrapper, which measures as nothing at all. Figures below; counters and hit
+      counts identical to the unit on all six meshes and both scenes, which is what "bit-identical"
+      buys as a test.
+      **Two things measured and rejected, so they are not tried again.** A reciprocal cached on
+      `Ray` costs 3 to 7 % on `dragon_vrip` — nine alternating passes per variant, non-overlapping
+      round by round — and is neutral on the cache-resident meshes. The divisions being already
+      hoisted, all it adds is three `f64` to read out of a 50 % larger `Ray` on every box test, on
+      the one mesh where memory traffic is already the bottleneck. And the same attribute on the
+      *scene* `hit_box` is neutral: those trees hold 4 to 8 primitives over 3 to 4 levels, so a
+      traversal loop that short has nothing to hoist out of.
 - [x] **An empty mesh makes `build_stats` recurse into a node that does not exist.** `build`
       leaves a root with `tri_count == 0`, which `is_leaf` reports as an interior node, so a
       walk follows `left_first` into an empty `nodes`. `subdivide` is no longer affected — the
@@ -282,6 +318,134 @@ heuristic itself should be derived in the doc comment — why cost goes as area 
 count, what the probability argument behind it is, and why the areas must be those of the
 *unions* either side of the plane rather than of the individual bins. That derivation is
 precisely what would have made the current bug visible on reading.
+
+#### Duration baseline — 2026-08-20
+
+`bvh_stats` now times what it counts. The reason is written in its header: the counters rank two
+trees only when one wins on both, and a deeper tree trades box tests for triangle tests. Reading
+that trade needs `t_trav`, and weighing the counters with `t_trav` to elect `t_trav` is circular —
+so the arbiter is the wall clock over the same fixed ray set. Three passes, the fastest being the
+figure to compare.
+
+Apple M2 Pro, 16 GB, macOS 26.5.2, `--release`. Counters unchanged from the tables above, to the
+unit, on all six meshes and both scenes.
+
+| mesh | load (parse + build) | traversal, fastest of 3 | passes |
+|---|---|---|---|
+| `cube.ply` | 258 µs | **25.59 ms** | 30.27, 27.57, 25.59 |
+| `bun_zipper_res4.ply` | 995 µs | **42.41 ms** | 42.79, 42.81, 42.41 |
+| `bunny.ply` | 76.3 ms | **62.64 ms** | 67.85, 65.04, 62.64 |
+| `dragon_vrip_res4.ply` | 9.90 ms | **50.96 ms** | 51.48, 50.96, 51.50 |
+| `dragon_vrip_res3.ply` | 45.1 ms | **60.95 ms** | 63.12, 62.52, 60.95 |
+| `dragon_vrip.ply` | 929 ms | **100.11 ms** | 100.11, 103.13, 101.97 |
+
+| scene | load | both ray sets, fastest of 3 |
+|---|---|---|
+| `cornell_box_canonical.stage` | 99 µs | **3.09 ms** |
+| `bunny_mesh.stage` | 71.3 ms | **11.24 ms** |
+
+**The duration is the box-test count.** Dividing one by the other, over 240 000 rays per mesh:
+
+| mesh | nodes | node MB | box/ray | ns/ray | **ns per box test** |
+|---|---|---|---|---|---|
+| `cube.ply` | 11 | 0.0 | 5.83 | 106.6 | **18.3** |
+| `bun_zipper_res4.ply` | 1 811 | 0.1 | 10.04 | 176.7 | **17.6** |
+| `dragon_vrip_res4.ply` | 21 137 | 1.4 | 12.01 | 212.3 | **17.7** |
+| `dragon_vrip_res3.ply` | 92 929 | 5.9 | 13.75 | 254.0 | **18.5** |
+| `bunny.ply` | 138 881 | 8.9 | 14.19 | 261.0 | **18.4** |
+| `dragon_vrip.ply` | 1 724 381 | 110.4 | 16.31 | 417.1 | **25.6** |
+
+Five meshes in a 17.6–18.5 ns band, across four orders of magnitude of triangle count, with an
+intercept of nearly zero — so ray generation, which the header warns dilutes the figure, is in
+fact below the noise. Counters and clock agree, which is what validates the instrument.
+
+**The dragon breaks the line by 40 %, and it is memory.** It is the only mesh whose nodes — 110 MB
+at 64 bytes each — exceed every level of cache on this machine; `bunny` at 8.9 MB does not. `[3]`
+counts tests, not cache misses, so on a large mesh two fifths of the traversal time sits in a term
+the cost model has no place for, and shortening the tree attacks it independently of the
+box/triangle trade. That is an argument for the open leaf-size entry that the SAH cannot make.
+
+**What the table says about `t_trav`, which is more than nothing and less than a calibration.**
+Solving mesh pairs is useless: box and triangle counts are anti-correlated across these meshes — the
+tree deepens as the leaves thin — so the two regressors are collinear. Of the ten pairs, those not
+involving `cube` have determinants between 0.5 and 3 and return costs like −90 ns per triangle test.
+
+The constraint that makes it speak is physical rather than statistical: `c_box` must be *the same*
+on all five cache-resident meshes. Scanning a shared (`c_box`, `c_tri`) and minimising the spread of
+the former then bounds the latter — 4.8 % spread at `c_tri = 0`, 5.5 % at 3 ns, 6.5 % at 6 ns,
+10.4 % at 10 ns. So `c_box ≈ 17.6–18.5 ns` and **`c_tri ≲ 6 ns`**: a triangle test costs at most a
+third of a box test. A three-parameter scan adding a fixed per-ray cost keeps that cost at zero, so
+ray generation really is below the noise. And the disassembly agrees independently — `intersect_ray`
+is inlined, one division, three early exits, 15–20 cycles.
+
+`[2]` charges `t_trav` **per interior node visited**, and this traversal tests both children to
+order them, whence `box_tests = 2·(interior nodes) + 1` recorded above. So
+`TRAVERSAL_COST = 2·c_box/c_tri`, which lands between **6 and 12** — a factor of 50 to 100 above
+pbrt's 1/8, for reasons that belong to this code and not to the algorithm: our box test is a
+non-inlined call doing three divisions, our triangle test is inlined and exits early.
+
+Consequence for the build, from `Σ + t_trav·A < A·N`: as soon as `N ≤ t_trav` the right-hand side
+`(N − t_trav)·A` is negative while `Σ ≥ 0`, so **no node under ~7 triangles would ever be split**,
+and at `N = 16` with children at 0.55·A it splits only just. Equilibrium around 8–16 triangles per
+leaf, 8 to 16 times fewer nodes, and `dragon_vrip` back from 110 MB to 7–14 MB — inside cache, so
+the 40 % penalty above lifts at the same time. Both effects push the same way.
+
+Two corrections to the plan follow. The sweep range was centred far too low: `{0, 1, 2, 4, 8, 16}`,
+not `{0, 1/8, 1/2, 1}`. And the box-test entry above comes first, since it moves the numerator.
+
+**And a third, which blocks the sweep outright.** These rays are the coherent ones: they leave one
+point, travel together and re-enter nodes still warm, which is the population that *most* favours a
+deep tree, since it amortises node memory across neighbouring rays. Secondary rays start anywhere,
+pay full price per node, and would push the optimum shallower still. Electing `t_trav` on primaries
+alone would freeze an arbitration measured on a fifth of the problem into every build the renderer
+ever does — so the sweep waits on a seeded sampler, item 3 of the order of work, which this gives a
+second customer. The box-test entry was not blocked that way, which is why it went first: a cheaper
+box test is a gain for every ray there is, under no assumption about how the rays are distributed.
+
+#### After inlining the box test — 2026-08-20
+
+`#[inline(always)]` on `AABoundingBox::hit` and on `BVHTree::hit_box`, nothing else. Same machine
+and same protocol as the baseline above, fastest of three passes.
+
+| mesh | traversal | | box tests/ray | tri tests/ray |
+|---|---|---|---|---|
+| `cube.ply` | 24.76 → **23.04 ms** | −7 % | 5.83 | 1.19 |
+| `bun_zipper_res4.ply` | 41.18 → **34.79 ms** | −16 % | 10.04 | 0.77 |
+| `dragon_vrip_res4.ply` | 51.00 → **44.86 ms** | −12 % | 12.01 | 0.63 |
+| `dragon_vrip_res3.ply` | 60.29 → **53.13 ms** | −12 % | 13.75 | 0.60 |
+| `bunny.ply` | 62.63 → **55.22 ms** | −12 % | 14.19 | 0.58 |
+| `dragon_vrip.ply` | 100.88 → **84.18 ms** | −17 % | 16.31 | 0.58 |
+| `cornell_box_canonical.stage` | 3.09 → **2.64 ms** | −15 % | | |
+| `bunny_mesh.stage` | 11.24 → **9.73 ms** | −13 % | | |
+
+Not one counter moves, and neither does a hit count — 116 004, 47 693, 42 797, 43 451, 46 904,
+43 269, the same figures as every table above. That is the point of a bit-identical change: the
+counters are a complete regression test for it, and a single unit of movement would have meant a
+bug rather than a gain.
+
+The scene figures gain as much as the mesh ones although the scene wrapper was left alone, `hit`
+being shared: a scene traversal tests its own nodes' boxes through the same inlined function.
+
+**The dependency on the optimiser is accepted, and here is what it consists of.** Passing the
+reciprocals as an argument to `hit` — pbrt's shape, and the structural way to write the same
+hoisting — was weighed and turned down: the signature `hit(ray, tmin, tmax)` asks a question of
+geometry, and a fourth parameter carrying a cache would be the only thing in it that does not speak
+of the domain, in a function whose doc-comment is a derivation of floating-point error bounds. That
+is the trade `CLAUDE.md` settles against performance. What the gain rests on, precisely:
+`alwaysinline`, which the inliner must honour rather than weigh; `noalias` on `&mut TraversalStats`,
+so LLVM knows the counter cannot alias the ray; and LICM over a loop-invariant division. The
+nominal path, not a corner of the optimiser. And the failure mode is a lost 15 % of mesh traversal,
+never a wrong image — detectable by re-running `bvh_stats` against the figures above, which is what
+the instrument is for.
+
+Reopen it if a scene ever holds many meshes: the reciprocals are hoisted per *traversal*, so a ray
+recomputes them once per candidate mesh. At the 1 to 4 objects of today's scenes that is noise; at
+fifty the argument changes side.
+
+**Which revises `t_trav` downward.** A box test falls from ~18.4 to ~15.5 ns on the cache-resident
+meshes and from 25.6 to 21.5 ns on `dragon_vrip`, while the triangle test is untouched — so
+`TRAVERSAL_COST = 2·c_box/c_tri` lands between 5 and 10 rather than 6 and 12. Still forty-odd times
+pbrt's 1/8, so nothing about the leaf-size entry changes; only the sweep's centre moves.
 
 ### BVH — scene
 

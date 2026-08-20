@@ -313,6 +313,13 @@ impl AABoundingBox {
     /// Note the scope of this bound: it covers the arithmetic of the slab test only. Error
     /// already present in the inputs — notably the normalisation of `ray.direction` — is a
     /// separate matter and is not accounted for here.
+    /// `inline(always)`, and the reason is not the call overhead. The three `1.0 / direction[i]`
+    /// below depend on the ray alone, so they are invariant across an entire traversal — but a
+    /// call boundary hides that from the compiler, which then recomputes them on every box test,
+    /// some sixteen per ray on `dragon_vrip.ply`. Inlined, they are hoisted into the traversal's
+    /// prologue and computed once. Plain `#[inline]` was measured first and refused by the
+    /// optimiser, this function being large and called from several places.
+    #[inline(always)]
     pub fn hit(&self, ray: &Ray, mut tmin: f64, mut tmax: f64) -> Option<f64> {
         debug_assert!(!self.is_empty(), "AABoundingBox::hit called on an empty box: {:?}", self);
 

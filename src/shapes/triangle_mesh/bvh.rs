@@ -423,6 +423,12 @@ impl BVHTree {
     ///
     /// Every ray/box test in the traversal goes through here, so `box_tests` cannot drift
     /// out of step with the tests actually performed.
+    ///
+    /// `inline(always)` for the reason given on `AABoundingBox::hit`, and it takes both: marking
+    /// `hit` alone merely moves the call boundary out to this wrapper, which is enough to keep the
+    /// per-ray reciprocals from being hoisted. Measured, on `dragon_vrip.ply`: `hit` alone changes
+    /// nothing, the pair takes the traversal from 101 ms to 84 ms.
+    #[inline(always)]
     fn hit_box(node: &BVHNode, ray: &Ray, near: f64, far: f64, stats: &mut TraversalStats) -> Option<f64> {
         stats.box_tests += 1;
         node.bbox.hit(ray, near, far)

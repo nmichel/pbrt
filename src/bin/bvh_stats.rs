@@ -38,6 +38,32 @@
 //! file declares, and the rays are one per pixel centre of a small render at the renderer's own
 //! default settings.
 //!
+//! # Why there are durations too
+//!
+//! The counters rank two trees only when one of them wins on *both* — fewer box tests and fewer
+//! triangle tests. That is not the usual case: a deeper tree trades one for the other, and reading
+//! the trade requires knowing what a box test costs relative to a triangle test. Call that ratio
+//! `t_trav`, the very constant the surface-area heuristic needs and does not have
+//! (`docs/heuristique_aire_surface.md` §6). Weighing the counters with it to decide its own value
+//! would be circular, so the arbiter has to be something the counters cannot express: the wall
+//! clock over a fixed ray set.
+//!
+//! Which is what this tool is unusually well placed to time. Its ray sets draw no random number,
+//! so the *same* work is timed on every pass and between two commits — a comparison the renderer
+//! cannot offer while its sampler is unseeded.
+//!
+//! Three things to know about reading those figures:
+//!
+//! - **The ray set is cast `TIMED_PASS_COUNT` times.** All the durations are printed, because a
+//!   single one says nothing without its own spread; the fastest is the one to compare, being the
+//!   least polluted by whatever else the machine was doing.
+//! - **The first pass is the odd one out.** It walks a tree that was just built, resident in
+//!   memory but not in cache. Its gap to the others measures how cold a tree starts, which is not
+//!   the same question as how fast it is traversed.
+//! - **A duration is diluted, never biased.** The traversal timing includes generating the rays,
+//!   and the load timing includes parsing the file — work identical between two builds of the same
+//!   geometry. A constant addition shrinks a relative difference without touching its sign.
+//!
 //! # What it does *not* measure
 //!
 //! Only primary rays, which are coherent: they all start from one point and diverge slowly, plus
@@ -47,6 +73,8 @@
 //! counters mean nothing.
 
 use std::f64::consts::PI;
+use std::hint::black_box;
+use std::time::{Duration, Instant};
 use std::{env, fs};
 
 use pbrt::bvh::TraversalStats as SceneTraversalStats;
@@ -97,6 +125,12 @@ const SHADOW_NEAR: f64 = 0.00001;
 const SCENE_IMAGE_WIDTH: usize = 200;
 const SCENE_IMAGE_HEIGHT: usize = 150;
 
+/// Times the ray set is cast, so a duration is read against its own spread rather than trusted on
+/// one sample. Three is what the project already compares renders with — enough for two
+/// non-overlapping intervals to mean something, few enough that measuring the whole mesh set stays
+/// a matter of seconds.
+const TIMED_PASS_COUNT: usize = 3;
+
 fn main() {
     let paths: Vec<String> = env::args().skip(1).collect();
 
@@ -113,6 +147,39 @@ fn main() {
             report_mesh(path);
         }
     }
+}
+
+/// Casts the ray set `TIMED_PASS_COUNT` times, returning the first pass's counters and every
+/// duration.
+///
+/// Only the first pass's counters are kept, and nothing is lost by that: neither accelerator draws
+/// a random number, so every pass does the same work and counts the same figures. Which is also
+/// why the later passes' results can be discarded — but not without telling the compiler, hence
+/// the `black_box`: a result nobody reads is a computation an optimiser is entitled to delete, and
+/// deleting it here would time an empty loop.
+fn timed_passes<T>(mut cast: impl FnMut() -> T) -> (T, Vec<Duration>) {
+    let mut durations = Vec::with_capacity(TIMED_PASS_COUNT);
+
+    let start = Instant::now();
+    let first = cast();
+    durations.push(start.elapsed());
+
+    for _ in 1..TIMED_PASS_COUNT {
+        let start = Instant::now();
+        let pass = cast();
+        durations.push(start.elapsed());
+        drop(black_box(pass));
+    }
+
+    (first, durations)
+}
+
+/// Prints one timed measurement: the figure to compare, and the passes it was chosen from.
+fn report_durations(label: &str, durations: &[Duration]) {
+    let fastest = durations.iter().min().expect("a timed measurement makes at least one pass");
+    let passes: Vec<String> = durations.iter().map(|duration| format!("{:.2?}", duration)).collect();
+
+    println!("  {:<24} fastest {:.2?} of [{}]", label, fastest, passes.join(", "));
 }
 
 /// The point the shadow rays aim at: the `PointLight` that `Loader::load_scene` hard-codes into
@@ -158,11 +225,19 @@ fn report_scene(path: &str) {
     config.output_width = SCENE_IMAGE_WIDTH;
     config.output_height = SCENE_IMAGE_HEIGHT;
 
+    let load_start = Instant::now();
     let (scene, camera) = Loader::load_scene(&text, &config);
-    let (primary, shadow) = cast_scene_ray_sets(&scene, camera.as_ref());
+    let load_duration = load_start.elapsed();
+
+    // One duration for the two ray sets: a shadow ray is cast from each point a primary ray hits,
+    // so they are interleaved in a single pass and timing them apart would mean casting the
+    // primaries twice.
+    let ((primary, shadow), cast_durations) = timed_passes(|| cast_scene_ray_sets(&scene, camera.as_ref()));
 
     println!("{}", path);
     println!("  primitives               {}", scene.primitive_count());
+    println!("  {:<24} {:.2?}", "load (parse + build)", load_duration);
+    report_durations("both ray sets", &cast_durations);
     primary.report("primary rays");
     shadow.report("shadow rays");
     println!();
@@ -211,9 +286,12 @@ fn cast_scene_ray_sets(scene: &Scene, camera: &dyn Camera) -> (SceneCast, SceneC
 }
 
 fn report_mesh(path: &str) {
+    let load_start = Instant::now();
     let mesh = load_ply_mesh(path, false);
+    let load_duration = load_start.elapsed();
+
     let build = mesh.build_stats();
-    let cast = cast_ray_set(&mesh);
+    let (cast, cast_durations) = timed_passes(|| cast_ray_set(&mesh));
 
     let triangle_count = mesh.triangle_count();
     let mean_leaf_tri_count = build.total_leaf_tri_count as f64 / build.leaf_count as f64;
@@ -222,6 +300,7 @@ fn report_mesh(path: &str) {
 
     println!("{}", path);
     println!("  triangles                {}", triangle_count);
+    println!("  {:<24} {:.2?}", "load (parse + build)", load_duration);
     println!("  nodes                    {} ({} leaves)", build.node_count, build.leaf_count);
     println!("  max depth                {}", build.max_depth);
     println!(
@@ -251,6 +330,7 @@ fn report_mesh(path: &str) {
     println!("  nodes visited / ray      {:.2}", per_ray(cast.stats.nodes_visited));
     println!("  box tests / ray          {:.2}", per_ray(cast.stats.box_tests));
     println!("  triangle tests / ray     {:.2}", per_ray(cast.stats.triangle_tests));
+    report_durations("ray set traversal", &cast_durations);
     println!();
 }
 
