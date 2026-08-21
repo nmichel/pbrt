@@ -1,7 +1,8 @@
 # `t_trav` et la taille des feuilles — l'arbre de maillage est deux fois trop gros
 
-Indexé depuis [IDEAS.md](../IDEAS.md). Non fait, et **bloqué** sur le sampler graine — la raison est
-au [§4](#4-pourquoi-le-balayage-attend-le-sampler-graine), et c'est la partie à ne pas sauter.
+Indexé depuis [IDEAS.md](../IDEAS.md). Non fait, et **bloqué** sur le
+[sampler graine](rng_graine.md) — la raison est au
+[§4](#4-pourquoi-le-balayage-attend-le-sampler-graine), et c'est la partie à ne pas sauter.
 
 Les chiffres cités ici viennent de [docs/mesures_bvh.md](../docs/mesures_bvh.md), qui tient
 l'instrument et la chronologie.

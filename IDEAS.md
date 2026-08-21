@@ -17,7 +17,8 @@ faire ensuite.
 
 - [ ] **RNG graine + samplers stratifiés** — indépendant. Deux choses en dépendent : la validation
       d'`AreaLight` et le balayage de `t_trav`, aucune des deux n'étant démontrable sans un rendu
-      reproductible. Détail sous *Renderer & infrastructure*.
+      reproductible. Inventaire des tirages, décisions et ordre d'attaque dans
+      [ideas/rng_graine.md](ideas/rng_graine.md).
 - [ ] **`AreaLight`** — surfaces émissives enregistrées comme sources échantillonnables. Le plus grand
       écart au modèle physique du projet ; plan détaillé dans
       [ideas/area_light.md](ideas/area_light.md).
@@ -158,9 +159,9 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       l'ordonnancement.
 - [ ] **Les rendus ne sont pas reproductibles.** `rand 0.3` par `thread_rng`, non graine ici, donc
       deux exécutions ne sont pas comparables — ce qui rend invérifiable tout changement de
-      l'intégrateur. Passer à `rand 0.8` achète aussi les samplers stratifiés / Sobol. C'est l'item 2
-      de l'ordre de travail, avec deux clients qui l'attendent : la validation d'`AreaLight` et le
-      balayage de `t_trav`.
+      l'intégrateur. Analyse, structure et ordre d'attaque dans
+      [ideas/rng_graine.md](ideas/rng_graine.md), qui corrige au passage deux affirmations de cette
+      entrée : la cible est `rand 0.10`, et `rand` n'achète ni les samplers stratifiés ni Sobol.
 - [ ] **`match config.integrator` est dupliqué 16 fois** — les 15 exemples plus
       [main.rs](src/main.rs) — et `match config.renderer` autant. Le §2 de CLAUDE.md demande qu'une
       nouvelle variante d'un concept arrive par une implémentation de trait, « pas par un `match` ou
