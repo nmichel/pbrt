@@ -6,3 +6,4 @@ pbrt.code-workspace
 *.log
 .claude/settings.local.json
 
+/test_files/xyzrgb_dragon.ply
