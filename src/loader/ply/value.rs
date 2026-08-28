@@ -1,34 +1,6 @@
 use std::convert::TryFrom;
 
-use super::ply_data_type::PlyDataType;
-use super::ply_loader::{PropertyType, PropertyValue};
-
-/// Turns the next block of data of a PLY body into a primitive value.
-///
-/// This is the single seam between *what* a PLY property is — a type read from the header — and
-/// *how* its bytes are spelled on disk. A PLY body holds the very same sequence of values in all
-/// three encodings of the format; only the spelling of one value changes:
-///
-/// - in `ascii`, a block is a whitespace-separated token, and the conversion is a decimal parse;
-/// - in the two binary variants, a block is a fixed number of bytes, and the conversion is a
-///   reinterpretation under a declared byte order.
-///
-/// The trait is deliberately placed at the *primitive* level, below the notion of property. It
-/// knows nothing of `PropertyValue`, of lists, or of elements: everything above lives once in
-/// [`read_value`], shared by every implementation. Adding an encoding therefore means answering
-/// eight questions about single values, never restating how a property or a list is laid out.
-///
-/// Implementations are stateful — each call consumes the block it reads and advances to the next.
-pub trait ValueDecoder {
-    fn read_i8(&mut self) -> Result<i8, String>;
-    fn read_u8(&mut self) -> Result<u8, String>;
-    fn read_i16(&mut self) -> Result<i16, String>;
-    fn read_u16(&mut self) -> Result<u16, String>;
-    fn read_i32(&mut self) -> Result<i32, String>;
-    fn read_u32(&mut self) -> Result<u32, String>;
-    fn read_f32(&mut self) -> Result<f32, String>;
-    fn read_f64(&mut self) -> Result<f64, String>;
-}
+use super::{PlyDataType, PropertyType, PropertyValue, ValueDecoder};
 
 /// A list length read from the file is untrusted: a corrupt or misinterpreted count must not turn
 /// into a huge allocation before the reads themselves fail on missing data. Preallocation is

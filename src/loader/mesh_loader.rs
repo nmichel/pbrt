@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::fmt::Debug;
 
-use super::ply::{read_ply_file, PlyElementDesc, PlyElementProps, PlyEventObserver, PlyPropertyValue};
+use super::ply::{read_ply_file, ElementDesc, ElementProps, PlyEventObserver, PropertyValue};
 use crate::shapes::TriangleMesh;
 
 /// Builds a `TriangleMesh` from a PLY file.
@@ -33,13 +33,13 @@ struct MeshBuilder {
 }
 
 impl PlyEventObserver for MeshBuilder {
-    fn on_header_complete(&mut self, _header: &Vec<PlyElementDesc>) {}
+    fn on_header_complete(&mut self, _header: &Vec<ElementDesc>) {}
 
     fn on_vertex_start(&mut self) {}
 
-    fn on_vertex_event(self: &mut Self, props: &PlyElementProps, value: PlyPropertyValue) {
+    fn on_vertex_event(self: &mut Self, props: &ElementProps, value: PropertyValue) {
         match props {
-            PlyElementProps::VertexX | PlyElementProps::VertexY | PlyElementProps::VertexZ => {
+            ElementProps::VertexX | ElementProps::VertexY | ElementProps::VertexZ => {
                 self.vertices.push(f64::try_from(&value).unwrap());
             }
             _ => {}
@@ -50,7 +50,7 @@ impl PlyEventObserver for MeshBuilder {
 
     fn on_face_start(&mut self) {}
 
-    fn on_face_event(self: &mut Self, props: &PlyElementProps, value: PlyPropertyValue) {
+    fn on_face_event(self: &mut Self, props: &ElementProps, value: PropertyValue) {
         fn push_to_faces<T>(list: &[T], faces: &mut Vec<usize>, reverse: bool)
         where
             usize: TryFrom<T>,
@@ -70,12 +70,12 @@ impl PlyEventObserver for MeshBuilder {
         }
 
         match props {
-            PlyElementProps::FaceVertexIndices => {
+            ElementProps::FaceVertexIndices => {
                 match value {
-                    PlyPropertyValue::ListUInt32(list) => {
+                    PropertyValue::ListUInt32(list) => {
                         push_to_faces(&list[..], &mut self.faces, self.reverse);
                     }
-                    PlyPropertyValue::ListInt32(list) => {
+                    PropertyValue::ListInt32(list) => {
                         push_to_faces(&list[..], &mut self.faces, self.reverse);
                     }
                     _ => {}

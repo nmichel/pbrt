@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use super::ply_value_decoder::ValueDecoder;
+use super::ValueDecoder;
 
 /// The order in which a multi-byte scalar is laid out in a binary PLY body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

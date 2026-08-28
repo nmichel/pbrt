@@ -1,12 +1,10 @@
-use super::ply_ascii_decoder::AsciiDecoder;
-use super::ply_binary_decoder::{BinaryDecoder, Endianness};
-use super::ply_data_type::PlyDataType;
-use super::ply_event_observer::PlyEventObserver;
-use super::ply_format::PlyFormat;
-use super::ply_prop_type::ElementProps;
-use super::ply_value_decoder::{read_value, ValueDecoder};
-
 use std::convert::TryFrom;
+
+use self::ascii_decoder::AsciiDecoder;
+use self::binary_decoder::{BinaryDecoder, Endianness};
+use self::body::read_body;
+use self::format::PlyFormat;
+use self::header::read_header;
 
 #[derive(Debug, Clone)]
 pub enum PropertyType {
@@ -69,111 +67,47 @@ impl ElementDesc {
     }
 }
 
-/// Everything the header declares.
-#[derive(Debug)]
-struct PlyHeader {
-    format: PlyFormat,
-    elements: Vec<ElementDesc>,
-    body_offset: usize,
+/// Trait for observing events during the parsing of PLY files.
+pub trait PlyEventObserver {
+    fn on_header_complete(&mut self, header: &Vec<ElementDesc>) {}
+
+    fn on_vertex_start(&mut self) {}
+    fn on_vertex_event(&mut self, props: &ElementProps, value: PropertyValue) {}
+    fn on_vertex_end(&mut self) {}
+
+    fn on_face_start(&mut self) {}
+    fn on_face_event(&mut self, props: &ElementProps, value: PropertyValue) {}
+    fn on_face_end(&mut self) {}
+
+    fn on_data_complete(&mut self) {}
 }
 
-#[derive(Debug)]
-enum State {
-    Header,
-    Format,
-    Element,
-    Property,
-}
-
-#[derive(Debug)]
-struct Builder {
-    state: State,
-    format: Option<PlyFormat>,
-    elements: Vec<ElementDesc>,
-    current_element: Option<ElementDesc>,
-}
-
-impl Builder {
-    fn new() -> Builder {
-        Builder {
-            state: State::Header,
-            format: None,
-            elements: Vec::new(),
-            current_element: None,
-        }
-    }
-
-    fn new_element(&mut self, name: &str, count: usize) {
-        match self.current_element {
-            Some(ref element) => {
-                self.elements.push(element.clone());
-            }
-            None => {}
-        }
-        self.current_element = Some(ElementDesc::new(name, count));
-    }
-
-    fn end_element(&mut self) {
-        match self.current_element {
-            Some(ref element) => {
-                self.elements.push(element.clone());
-            }
-            None => {}
-        }
-        self.current_element = None;
-    }
-}
-
-fn handle_vertex(name: &ElementProps, value: PropertyValue, observer: &mut dyn PlyEventObserver) {
-    observer.on_vertex_event(name, value);
-}
-
-fn handle_face(name: &ElementProps, value: PropertyValue, observer: &mut dyn PlyEventObserver) {
-    observer.on_face_event(name, value);
-}
-
-fn discard(_name: &ElementProps, _value: PropertyValue, _observer: &mut dyn PlyEventObserver) {}
-
-/// Reads one occurrence of an element — every property the header declared for it, in order — and
-/// hands each value to `handler`.
-fn dispatch_event(
-    element_desc: &ElementDesc,
-    decoder: &mut dyn ValueDecoder,
-    observer: &mut dyn PlyEventObserver,
-    handler: fn(&ElementProps, PropertyValue, &mut dyn PlyEventObserver),
-) -> Result<(), String> {
-    for property in &element_desc.properties {
-        let value = read_value(decoder, &property.data_type)?;
-        handler(&property.name, value, observer);
-    }
-
-    Ok(())
-}
-
-fn load_element(element_desc: &ElementDesc, decoder: &mut dyn ValueDecoder, observer: &mut dyn PlyEventObserver) -> Result<(), String> {
-    match &element_desc.name[..] {
-        "vertex" => dispatch_event(element_desc, decoder, observer, handle_vertex),
-        "face" => dispatch_event(element_desc, decoder, observer, handle_face),
-        // An element we have no use for still has to be *read*. In a binary body nothing delimits
-        // one value from the next, so its bytes can only be stepped over by decoding them; leaving
-        // them in place would shift every element that follows.
-        _ => dispatch_event(element_desc, decoder, observer, discard),
-    }
-}
-
-/// Walks the data section: each element in the order the header declares it, repeated as many
-/// times as the header announced.
+/// Turns the next block of data of a PLY body into a primitive value.
 ///
-/// The counts are the only structure the body has — in binary there are no line breaks to fall
-/// back on, and in ASCII a value may not even sit on the line one would expect.
-fn read_body(decoder: &mut dyn ValueDecoder, elements: &[ElementDesc], observer: &mut dyn PlyEventObserver) -> Result<(), String> {
-    for element in elements {
-        for _ in 0..element.count {
-            load_element(element, decoder, observer)?;
-        }
-    }
-
-    Ok(())
+/// This is the single seam between *what* a PLY property is — a type read from the header — and
+/// *how* its bytes are spelled on disk. A PLY body holds the very same sequence of values in all
+/// three encodings of the format; only the spelling of one value changes:
+///
+/// - in `ascii`, a block is a whitespace-separated token, and the conversion is a decimal parse;
+/// - in the two binary variants, a block is a fixed number of bytes, and the conversion is a
+///   reinterpretation under a declared byte order.
+///
+/// The trait is deliberately placed at the *primitive* level, below the notion of property. It
+/// knows nothing of `PropertyValue`, of lists, or of elements: everything above lives once in
+/// `value::read_value`, shared by every implementation. Adding an encoding therefore means
+/// answering eight questions about single values, never restating how a property or a list is
+/// laid out.
+///
+/// Implementations are stateful — each call consumes the block it reads and advances to the next.
+pub trait ValueDecoder {
+    fn read_i8(&mut self) -> Result<i8, String>;
+    fn read_u8(&mut self) -> Result<u8, String>;
+    fn read_i16(&mut self) -> Result<i16, String>;
+    fn read_u16(&mut self) -> Result<u16, String>;
+    fn read_i32(&mut self) -> Result<i32, String>;
+    fn read_u32(&mut self) -> Result<u32, String>;
+    fn read_f32(&mut self) -> Result<f32, String>;
+    fn read_f64(&mut self) -> Result<f64, String>;
 }
 
 pub fn read_ply_file(path: &str, observer: &mut dyn PlyEventObserver) -> Result<(), String> {
@@ -215,128 +149,17 @@ pub fn read_ply_bytes(data: &[u8], observer: &mut dyn PlyEventObserver) -> Resul
     Ok(())
 }
 
-fn read_header(data: &[u8]) -> Result<PlyHeader, String> {
-    let mut builder = Builder::new();
-    let mut offset = 0;
+mod ascii_decoder;
+mod binary_decoder;
+mod body;
+mod data_type;
+mod element_props;
+mod format;
+mod header;
+mod value;
 
-    loop {
-        let (line, next_offset) = next_header_line(data, offset)?;
-        offset = next_offset;
-
-        let line = line.trim();
-        if line.is_empty() || line.starts_with("comment") || line.starts_with("obj_info") {
-            continue;
-        }
-
-        let segments: Vec<&str> = line.split_whitespace().collect();
-        if parse_header_line(&segments, &mut builder)? {
-            break;
-        }
-    }
-
-    let format = builder.format.ok_or_else(|| "Header has no 'format' line".to_string())?;
-
-    Ok(PlyHeader {
-        format: format,
-        elements: builder.elements,
-        body_offset: offset,
-    })
-}
-
-/// Returns the next header line and the offset just past its terminating newline.
-///
-/// The header is read from the raw bytes rather than from a `str`: in the binary encodings the
-/// bytes that follow `end_header` are not text, so the file cannot be validated as UTF-8 as a
-/// whole. Each header line is validated on its own instead.
-fn next_header_line(data: &[u8], offset: usize) -> Result<(&str, usize), String> {
-    if offset >= data.len() {
-        return Err("Unexpected end of header: 'end_header' was never reached".to_string());
-    }
-
-    let (line_bytes, next_offset) = match data[offset..].iter().position(|byte| *byte == b'\n') {
-        Some(index) => (&data[offset..offset + index], offset + index + 1),
-        None => (&data[offset..], data.len()),
-    };
-
-    let line = std::str::from_utf8(line_bytes).map_err(|err| format!("Header line at byte {} is not valid UTF-8: {}", offset, err))?;
-
-    Ok((line, next_offset))
-}
-
-/// Feeds one header line to the state machine. Returns `true` once `end_header` closes it.
-fn parse_header_line(segments: &[&str], builder: &mut Builder) -> Result<bool, String> {
-    match builder.state {
-        State::Header => {
-            match segments[..] {
-                ["ply"] => {
-                    builder.state = State::Format;
-                    Ok(false)
-                }
-                _ => Err("Header should start with 'ply'".to_string()),
-            }
-        }
-        State::Format => {
-            match segments[..] {
-                ["format", encoding, "1.0"] => {
-                    builder.format = Some(encoding.parse::<PlyFormat>()?);
-                    builder.state = State::Element;
-                    Ok(false)
-                }
-                _ => Err("Format should be 'format <ascii|binary_little_endian|binary_big_endian> 1.0'".to_string()),
-            }
-        }
-        State::Element => {
-            match segments[..] {
-                // Any element name is accepted, not just 'vertex' and 'face': an element we ignore
-                // still has to be declared for the ones after it to be found at the right place.
-                ["element", name, count] => {
-                    let count = count
-                        .parse::<usize>()
-                        .map_err(|err| format!("Invalid count '{}' for element '{}': {}", count, name, err))?;
-                    builder.new_element(name, count);
-                    builder.state = State::Property;
-                    Ok(false)
-                }
-                ["end_header"] => {
-                    builder.end_element();
-                    Ok(true)
-                }
-                _ => Err(format!("Expected an 'element' or 'end_header' line, found '{}'", segments.join(" "))),
-            }
-        }
-        State::Property => {
-            if segments[0] != "property" {
-                builder.state = State::Element;
-                return parse_header_line(segments, builder);
-            }
-
-            let property = match segments[..] {
-                ["property", data_type, name] => {
-                    PropertyDesc {
-                        name: name.parse::<ElementProps>()?,
-                        data_type: PropertyType::Scalar(data_type.parse::<PlyDataType>()?),
-                    }
-                }
-                ["property", "list", count_type, data_type, name] => {
-                    PropertyDesc {
-                        name: name.parse::<ElementProps>()?,
-                        data_type: PropertyType::List(count_type.parse::<PlyDataType>()?, data_type.parse::<PlyDataType>()?),
-                    }
-                }
-                _ => return Err(format!("Malformed property line: '{}'", segments.join(" "))),
-            };
-
-            builder
-                .current_element
-                .as_mut()
-                .ok_or_else(|| "A 'property' line must follow an 'element' line".to_string())?
-                .properties
-                .push(property);
-
-            Ok(false)
-        }
-    }
-}
+pub use self::data_type::PlyDataType;
+pub use self::element_props::ElementProps;
 
 #[cfg(test)]
 mod test {

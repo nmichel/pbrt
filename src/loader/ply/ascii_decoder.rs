@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
-use super::ply_value_decoder::ValueDecoder;
+use super::ValueDecoder;
 
 /// Reads the body of an `ascii` PLY file.
 ///

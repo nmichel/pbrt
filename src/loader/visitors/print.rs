@@ -1,5 +1,5 @@
 use super::super::ast::*;
-use super::super::ply::{read_ply_file, PlyElementDesc, PlyElementProps, PlyEventObserver, PlyPropertyValue};
+use super::super::ply::{read_ply_file, ElementDesc, ElementProps, PlyEventObserver, PropertyValue};
 use super::Visitor;
 
 pub struct PrintVisitor {
@@ -126,11 +126,11 @@ impl Visitor for PrintVisitor {
         struct PlyObserver {}
 
         impl PlyEventObserver for PlyObserver {
-            fn on_vertex_event(self: &mut Self, props: &PlyElementProps, value: PlyPropertyValue) {
+            fn on_vertex_event(self: &mut Self, props: &ElementProps, value: PropertyValue) {
                 println!("Vertex Event for Property: {:?} with Value: {:?}", props, value);
             }
 
-            fn on_face_event(self: &mut Self, props: &PlyElementProps, value: PlyPropertyValue) {
+            fn on_face_event(self: &mut Self, props: &ElementProps, value: PropertyValue) {
                 println!("Face Event for Property: {:?} with Value: {:?}", props, value);
             }
         }
