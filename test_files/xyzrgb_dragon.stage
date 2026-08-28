@@ -1,0 +1,55 @@
+# The XYZ RGB dragon is authored at scan scale, not unit scale:
+#   x in [-98.7, 103.1]   y in [-62.8, 49.3]   z in [-57.3, 76.9]
+# roughly 200 x 112 x 134 units, sitting on a base whose underside is at y = -62.8.
+# Everything below is sized from those bounds, since the .stage grammar has no scale.
+
+camera pin_hole
+  pos 55.0 5.0 150.0
+  look 0.0 -18.0 0.0
+  up 0.0 1.0 0.0
+
+scene
+  # floor — the checker scale is 0.002, i.e. one 250-unit square, to stay readable at this size
+  object transformed
+    object simple
+      rectangle 900 900
+      lambertian checkerboard
+        0.65 0.0 0.0
+        0.65 0.65 0.65
+        0.002
+    transform {
+      translate 0 -63 0
+    }
+
+  # wall
+  object transformed
+    object simple
+      rectangle 900 900
+      lambertian checkerboard
+        0.65 0.0 0.0
+        0.65 0.65 0.65
+        0.002
+    transform {
+      rotate_x 1.5708
+      translate 0 0 -240.0
+    }
+
+  object transformed
+    object simple
+        mesh file "test_files/xyzrgb_dragon.ply" reverse
+        metal 0.0 color 0.9 0.9 0.9
+        # dielectric 1.5 color 1.0 1.0 1.0
+    transform {
+      rotate_y 0.707
+      rotate_y 3.1416
+    }
+
+  # light source
+  object transformed
+    object simple
+      rectangle 900 900
+      diffuse_light color 5.0 5.0 5.0
+    transform {
+      rotate_y 3.1416
+      translate 0.0 400.0 0.0
+    }
