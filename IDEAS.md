@@ -116,6 +116,13 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       normales de shading interpolées, donc les maillages sont visiblement facettés. La normale
       géométrique est dérivée de `cross(dpdv, dpdu)` sur des UV par défaut, route détournée à
       l'orientation fragile.
+- [ ] **Un `.ply` à faces non triangulaires produit un maillage faux, en silence** —
+      [`MeshBuilder::on_face_event`](src/loader/mesh_loader.rs#L60) empile les indices à plat sans
+      trianguler, alors que `TriangleMesh` les relit par triplets : un quad devient un triangle et
+      un morceau du suivant. Le même point n'accepte que `ListInt32`/`ListUInt32`, donc un
+      `property list uchar ushort vertex_indices` rend un maillage vide plutôt qu'une erreur. Deux
+      défauts du *consommateur* d'événements, pas du lecteur `.ply`, qui lui lit les deux
+      correctement.
 - [x] Les lumières à l'infini construisaient un testeur de visibilité dégénéré — le défaut le plus
       coûteux du chantier, trois ordres de grandeur ([docs/mesures_bvh.md](docs/mesures_bvh.md) §3.3
       et §2.2).
