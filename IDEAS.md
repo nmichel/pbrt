@@ -116,6 +116,13 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       normales de shading interpolées, donc les maillages sont visiblement facettés. La normale
       géométrique est dérivée de `cross(dpdv, dpdu)` sur des UV par défaut, route détournée à
       l'orientation fragile.
+- [ ] **Un maillage sans coordonnées de texture reçoit les *mêmes* trois coins pour tous ses
+      triangles** — `DEFAULT_UV0..2` dans
+      [triangle_mesh.rs](src/shapes/triangle_mesh/triangle_mesh.rs). Toute texture en (u, v) s'y
+      répète donc à l'identique face par face et dessine la tessellation au lieu d'un motif :
+      `checkerboard` sur le dragon en est la démonstration. Deux routes, non exclusives —
+      paramétrer le maillage (dépliage, ou projection au chargement), ou n'y poser que des textures
+      *solides*, fonction de p.
 - [ ] **Un `.ply` à faces non triangulaires produit un maillage faux, en silence** —
       [`MeshBuilder::on_face_event`](src/loader/mesh_loader.rs#L60) empile les indices à plat sans
       trianguler, alors que `TriangleMesh` les relit par triplets : un quad devient un triangle et
