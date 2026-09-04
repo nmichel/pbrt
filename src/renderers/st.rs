@@ -3,6 +3,7 @@ use crate::config::Config;
 use crate::geom::bounds2::Bounds2;
 use crate::geom::vector2::{Vector2, Vector2f, Vector2u};
 use crate::integrators::Integrator;
+use crate::progress::ProgressBar;
 use crate::samplers::{IndependentSampler, Sampler};
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
@@ -20,6 +21,7 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
 
     let mut pixel_iter = patch.to_iter();
     let mut pixel_computed = 0;
+    let mut progress = ProgressBar::new(pixel_count as usize);
     while pixel_computed < image_width * image_height {
         match pixel_iter.next() {
             None => {}
@@ -35,10 +37,11 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
                 pixels[pixel_index + 3] = sample[3];
                 pixel_computed = pixel_computed + 1;
 
-                print!("done [{:?}]\r", (pixel_computed as f64 / pixel_count as f64 * 100.0) as u32);
+                progress.advance();
             }
         }
     }
+    progress.finish();
 
     image_write(&config.output_filename, &resolution, &pixels);
 }

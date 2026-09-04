@@ -175,6 +175,16 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       `compute_pixel` et `image_write` sont identiques. Les deux `Sampler2` en sont partis avec le
       chantier du RNG graine ; extraire `Film` (accumulation + écriture) réglerait le reste, et les
       deux renderers ne différeraient plus que par l'ordonnancement.
+- [ ] **La barre de progression écrit dans un fichier ce qu'elle destine à un terminal** —
+      [progress.rs](src/progress.rs) réécrit sa ligne avec un retour chariot et la colore en ANSI.
+      Hors terminal, ni l'un ni l'autre n'est interprété : un rendu redirigé y laisse **une seule
+      ligne** portant bout à bout les 121 états par lesquels la jauge est passée, séquences
+      d'échappement comprises — 12 142 octets mesurés, et ce volume ne dépend pas de la taille de
+      l'image, puisque la barre ne redessine que lorsque sa ligne change. Correctif retenu : une
+      option `--no-progress`, qui dit ce que l'utilisateur veut, plutôt qu'une détection par
+      `std::io::IsTerminal`, qui devine ce qu'il voudrait. Elle ne prend pas de valeur, donc elle
+      pose la même question que `--help` : celle de l'option qui n'est pas une paire
+      `--nom valeur`, aujourd'hui traitée hors de `OPTIONS` ([config.rs](src/config.rs)).
 - [x] **Les rendus sont reproductibles.** Même scène, mêmes options, même image — et indépendamment
       du nombre de threads comme du renderer choisi. `utils::random_double` n'existe plus.
       [docs/rendu_reproductible.md](docs/rendu_reproductible.md).

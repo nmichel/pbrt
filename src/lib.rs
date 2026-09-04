@@ -10,6 +10,7 @@ pub mod loader;
 pub mod materials;
 pub mod objects;
 pub mod pdfs;
+pub mod progress;
 pub mod renderers;
 pub mod samplers;
 pub mod scene;
