@@ -5,7 +5,7 @@ use crate::geom::vector2::{Vector2, Vector2f, Vector2u};
 use crate::integrators::Integrator;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
-use rand::distributions::{IndependentSample, Range};
+use rand::RngExt;
 
 pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &dyn Integrator) {
     let image_width = config.output_width as u32;
@@ -66,21 +66,17 @@ fn compute_pixel(
 }
 
 pub struct Sampler2 {
-    rng: rand::ThreadRng,
-    range: rand::distributions::Range<f64>,
+    rng: rand::rngs::ThreadRng,
 }
 
 impl Sampler2 {
     pub fn new() -> Self {
-        Sampler2 {
-            range: Range::new(0., 1.),
-            rng: rand::thread_rng(),
-        }
+        Sampler2 { rng: rand::rng() }
     }
 
     pub fn sample(&mut self) -> Vector2f {
-        let x = self.range.ind_sample(&mut self.rng);
-        let y = self.range.ind_sample(&mut self.rng);
+        let x = self.rng.random::<f64>();
+        let y = self.rng.random::<f64>();
         Vector2f { x, y }
     }
 }

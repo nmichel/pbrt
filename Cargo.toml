@@ -12,7 +12,7 @@ default-run = "pbrt"
 crossbeam = "0.7"
 num-traits = "~0.2.8"
 png = "~0.14.1"
-rand = "0.3"
+rand = "0.10"
 
 [profile.release]
 debug = true
