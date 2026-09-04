@@ -143,10 +143,9 @@ Les deux premières lignes ne parlent pas d'`AreaLight` mais sont ce qui rend la
 
 - [ ] Cacher boîte + centroïde de chaque primitive à `Scene::commit`, construire le BVH sur ce cache
       — indépendant, ~20 lignes, et prérequis de tout ce qui relit des bornes.
-- [ ] RNG graine, graine dans `Config` — deux rendus redeviennent comparables ; débloque aussi le
-      balayage de [cout_traversee_bvh.md](cout_traversee_bvh.md). Plan complet dans
-      [rng_graine.md](rng_graine.md).
-- [ ] Sampler stratifié en remplacement du `random_double` nu.
+- [x] RNG graine, graine dans `Config` — deux rendus sont comparables
+      ([docs/rendu_reproductible.md](../docs/rendu_reproductible.md)).
+- [ ] Sampler stratifié, indépendant de ce chantier : [sampler_stratifie.md](sampler_stratifie.md).
 - [ ] `AreaSampleable` + `ShapeSample`, implémentés sur `Rectangle` d'abord — c'est le panneau du
       Cornell box, et son échantillonnage uniforme est deux nombres.
 - [ ] Test de conservation d'aire sur cette implémentation, avant tout usage.

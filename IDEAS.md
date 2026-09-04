@@ -15,12 +15,6 @@ dit en une incise ; quand elle contraint l'ordre, c'est l'ordre qui s'adapte. Le
 plus bas portent le détail de chaque entrée — elles servent à retrouver un sujet, pas à savoir quoi
 faire ensuite.
 
-- [ ] **RNG graine** — **en cours** sur `feat/rework_sampling` : le sampler existe, rien ne l'appelle
-      encore. Deux choses en dépendent : la validation d'`AreaLight` et le balayage de `t_trav`,
-      aucune des deux n'étant démontrable sans un rendu reproductible. Ce qui reste à brancher est
-      dans [ideas/rng_graine.md](ideas/rng_graine.md) ; ce qui a atterri est décrit par
-      [docs/rendu_reproductible.md](docs/rendu_reproductible.md). Le sampler stratifié est écarté de
-      ce chantier et garde sa note de fin dans le fichier d'idée.
 - [ ] **`AreaLight`** — surfaces émissives enregistrées comme sources échantillonnables. Le plus grand
       écart au modèle physique du projet ; plan détaillé dans
       [ideas/area_light.md](ideas/area_light.md).
@@ -30,11 +24,15 @@ faire ensuite.
 - [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
       `is_last_bounce_specular` de l'intégrateur.
 - [ ] **Roulette russe** — dépend de MIS, et corrige au passage la coupe prématurée de `path.rs:65`.
+- [ ] **Sampler stratifié** — indépendant, et débloqué : le chantier du RNG graine en a livré tous
+      les prérequis, et de quoi le mesurer. **Rien n'en dépend**, d'où sa place ici plutôt qu'en
+      tête. Principe, prérequis acquis et travail restant dans
+      [ideas/sampler_stratifie.md](ideas/sampler_stratifie.md).
 - [ ] **Abstraction `Film` + ordonnancement par tuiles** — indépendant, et déduplique les deux
       renderers. Détail sous *Renderer & infrastructure*.
-- [ ] **Balayage de `t_trav`, et feuilles de maillage plus grosses** — dépend du sampler graine, pour
-      la raison qui compte : élire la constante sur les seuls rayons primaires figerait un arbitrage
-      mesuré sur un cinquième du problème ([ideas/cout_traversee_bvh.md](ideas/cout_traversee_bvh.md)).
+- [ ] **Balayage de `t_trav`, et feuilles de maillage plus grosses** — **débloqué** : les rayons
+      secondaires sont désormais reproductibles, donc l'arbitrage peut être mesuré sur eux et pas
+      sur le seul cinquième primaire ([ideas/cout_traversee_bvh.md](ideas/cout_traversee_bvh.md)).
 - [ ] **Nested dielectrics** — un transmetteur dans un autre, et deux formes partageant une face avec
       des matériaux différents, sont tous deux rendus faux aujourd'hui. Dépend d'un prérequis interne :
       déplacer le décalage anti-acné de la position vers l'intervalle du rayon.
@@ -53,6 +51,10 @@ faire ensuite.
 - [x] **Chantier BVH** — SAH de maillage corrigé, `intersect_p` descendu dans les formes, arbre de
       scène à plat, traversée ordonnée avec resserrement de l'intervalle, test de boîte inliné.
       Mesures et arbitrages dans [docs/mesures_bvh.md](docs/mesures_bvh.md).
+- [x] **Chantier du RNG graine** — un rendu répète son image, indépendamment du nombre de threads
+      et du renderer choisi. `Sampler`, `IndependentSampler`, `--seed`, et `utils::random_double`
+      supprimé. Contrat et clé de flux dans
+      [docs/rendu_reproductible.md](docs/rendu_reproductible.md).
 - [x] **Bornes cachées à la construction — mesuré, chiffré, et écarté.** Le correctif marche et ne
       vaut pas son diff : un millième d'un aperçu. Le sujet sort de cette liste et garde son entrée
       sous *Accélérateurs* avec sa condition de réouverture ; le corpus de mesure y a gagné deux
@@ -79,8 +81,8 @@ tient toujours.
       condition de réouverture — plus de mille primitives dans une scène réelle — sont en
       [docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3. **Ne pas rouvrir sans ce chiffre-là.**
 - [ ] **Les feuilles de maillage tiennent un seul triangle**, ~2 nœuds par triangle, 110 Mo de nœuds
-      pour `dragon_vrip.ply` : [ideas/cout_traversee_bvh.md](ideas/cout_traversee_bvh.md). Bloqué sur
-      le sampler graine, et la raison compte.
+      pour `dragon_vrip.ply` : [ideas/cout_traversee_bvh.md](ideas/cout_traversee_bvh.md). Plus
+      bloqué depuis que les rayons secondaires sont reproductibles.
 - [ ] **Le SAH binné n'est pas porté sur le BVH de scène**, étudié et garé :
       [ideas/sah_bvh_scene.md](ideas/sah_bvh_scene.md).
 - [ ] **Chaque `intersect` de forme rend un `Vec<Intersection>` frais** (`IntersectionResult`), et
@@ -169,15 +171,13 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       tourne à vide sur un `try_recv` non bloquant une fois l'itérateur de pixels épuisé, et les
       canaux sont non bornés. [`Bounds2`](src/geom/bounds2.rs) sait déjà faire le pavage qui corrige
       les quatre.
-- [ ] **~50 lignes dupliquées** entre [st.rs](src/renderers/st.rs) et [mt.rs](src/renderers/mt.rs) :
-      `compute_pixel`, `Sampler2`, `image_write` sont identiques. Extraire `Film` (accumulation +
-      écriture) et `Sampler` ; les deux renderers ne devraient alors différer que par
-      l'ordonnancement.
-- [ ] **Les rendus ne sont pas reproductibles.** Deux exécutions ne sont pas comparables, ce qui rend
-      invérifiable tout changement de l'intégrateur. `Sampler` et `IndependentSampler` existent
-      désormais, mais tout ce qui tire passe encore par `utils::random_double` et les deux
-      `Sampler2` ; la liste des sites et le commit qui les branche sont dans
-      [ideas/rng_graine.md](ideas/rng_graine.md) §1.
+- [ ] **Lignes dupliquées** entre [st.rs](src/renderers/st.rs) et [mt.rs](src/renderers/mt.rs) :
+      `compute_pixel` et `image_write` sont identiques. Les deux `Sampler2` en sont partis avec le
+      chantier du RNG graine ; extraire `Film` (accumulation + écriture) réglerait le reste, et les
+      deux renderers ne différeraient plus que par l'ordonnancement.
+- [x] **Les rendus sont reproductibles.** Même scène, mêmes options, même image — et indépendamment
+      du nombre de threads comme du renderer choisi. `utils::random_double` n'existe plus.
+      [docs/rendu_reproductible.md](docs/rendu_reproductible.md).
 - [ ] **`match config.integrator` est dupliqué 16 fois** — les 15 exemples plus
       [main.rs](src/main.rs) — et `match config.renderer` autant. Le §2 de CLAUDE.md demande qu'une
       nouvelle variante d'un concept arrive par une implémentation de trait, « pas par un `match` ou

@@ -1,8 +1,10 @@
 # `t_trav` et la taille des feuilles — l'arbre de maillage est deux fois trop gros
 
-Indexé depuis [IDEAS.md](../IDEAS.md). Non fait, et **bloqué** sur le
-[sampler graine](rng_graine.md) — la raison est au
-[§4](#4-pourquoi-le-balayage-attend-le-sampler-graine), et c'est la partie à ne pas sauter.
+Indexé depuis [IDEAS.md](../IDEAS.md). Non fait, et **plus bloqué** : ce qui manquait était un jeu
+de rayons secondaires reproductible, et un rendu répète désormais son image
+([docs/rendu_reproductible.md](../docs/rendu_reproductible.md)). Pourquoi il faut ces rayons-là est
+au [§4](#4-pourquoi-le-balayage-doit-voir-les-rayons-secondaires), et c'est la partie à ne pas
+sauter.
 
 Les chiffres cités ici viennent de [docs/mesures_bvh.md](../docs/mesures_bvh.md), qui tient
 l'instrument et la chronologie.
@@ -70,7 +72,7 @@ même sens.
 Et une correction au plan qui traînait : la plage de balayage était centrée beaucoup trop bas.
 `{0, 1, 2, 4, 8, 16}`, pas `{0, 1/8, 1/2, 1}`.
 
-## 4. Pourquoi le balayage attend le sampler graine
+## 4. Pourquoi le balayage doit voir les rayons secondaires
 
 Le jeu de rayons de `bvh_stats` est fait de **rayons primaires cohérents** : ils partent d'un même
 point, voyagent ensemble et rentrent dans des nœuds encore chauds. C'est la population qui favorise
@@ -79,7 +81,9 @@ rayons secondaires partent de partout, paient le nœud plein tarif, et pousserai
 arbre encore plus plat.
 
 Élire `t_trav` sur les seuls primaires figerait donc dans **tous** les builds que le renderer fera
-un arbitrage mesuré sur un cinquième du problème. Le balayage attend le sampler graine.
+un arbitrage mesuré sur un cinquième du problème. Les mesurer demande un jeu de rayons secondaires
+reproductible, ce qui existe maintenant — et reste à construire dans `bvh_stats`, qui ne lance
+aujourd'hui que des primaires et un rayon d'ombre par touche.
 
 C'est exactement ce qui n'a *pas* bloqué l'inlining du test de boîte, et c'est pourquoi celui-là est
 passé d'abord : un test de boîte moins cher est un gain pour tous les rayons qui existent, sous

@@ -20,25 +20,30 @@ fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a ap
 `docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
 une entrée cochée y garde une ligne, pas son corps.
 
-**Chantier en cours** — aucun. Le sujet de la branche `chore/revamp_bvh_for_trimesh` est clos :
-SAH de maillage corrigé, `intersect_p` descendu dans les formes, arbre de scène à plat, traversée
-ordonnée avec resserrement de l'intervalle, test de boîte inliné. Ses mesures et ses arbitrages
-sont dans [docs/mesures_bvh.md](docs/mesures_bvh.md), dont le §4 tient les chiffres de référence
-auxquels comparer une mesure fraîche.
+**Chantier en cours** — aucun. Le sujet de la branche `feat/rework_sampling` est clos : un rendu
+répète son image, indépendamment du nombre de threads et du renderer choisi, `utils::random_double`
+a cédé la place au trait `Sampler`, et `--seed` choisit lequel des rendus possibles on veut. Contrat
+et clé de flux dans [docs/rendu_reproductible.md](docs/rendu_reproductible.md).
+
+Avant lui, `chore/revamp_bvh_for_trimesh` : ses mesures et ses arbitrages sont dans
+[docs/mesures_bvh.md](docs/mesures_bvh.md), dont le §4 tient les chiffres de référence auxquels
+comparer une mesure fraîche.
 
 La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Y
-viennent d'abord le RNG graine, puis [`AreaLight`](ideas/area_light.md) — les surfaces émissives ne
-contribuent aujourd'hui à aucun éclairage indirect.
+vient d'abord [`AreaLight`](ideas/area_light.md) — le plus grand écart au modèle physique du projet,
+les surfaces émissives ne contribuant à aucun éclairage indirect —, et trois entrées en dépendent :
+la production `light` de la grammaire, MIS, puis la roulette russe.
 
 Trois chantiers restent *voisins* du BVH et n'en font délibérément pas partie :
-[les feuilles de maillage à un seul triangle](ideas/cout_traversee_bvh.md), bloquées sur le sampler
-graine, [le SAH binné de la scène](ideas/sah_bvh_scene.md), mis de côté avec ses raisons, et le
+[les feuilles de maillage à un seul triangle](ideas/cout_traversee_bvh.md), débloquées mais
+demandant qu'on ajoute un jeu de rayons secondaires à `bvh_stats`,
+[le SAH binné de la scène](ideas/sah_bvh_scene.md), mis de côté avec ses raisons, et le
 cache des bornes à la construction, écarté sur mesure — le correctif fonctionne et gagne un millième
 d'une exécution ([docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3, qui porte aussi la condition de
 réouverture). **Un gain de construction se rapporte à une exécution entière, jamais au chargement
 seul** ; c'est la leçon de ce dernier, et elle vaut pour le prochain.
 
-**Lancer les tests** — `cargo test` est vert en entier : 75 tests de bibliothèque, 8 doc-tests, et
+**Lancer les tests** — `cargo test` est vert en entier : 99 tests de bibliothèque, 8 doc-tests, et
 les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour tout changement de
 construction ou de traversée d'un accélérateur, `cargo run --release --bin bvh_stats -- <scène>`
 donne les compteurs à comparer ; ils ne voient que les rayons primaires et d'ombre, donc le

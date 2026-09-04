@@ -15,9 +15,10 @@ doc-comment de `IndependentSampler` en donne une version resserrée, suffisante 
 sans quitter le fichier. En cas de doute sur la forme de la clé, c'est la §2 qu'il faut ouvrir ;
 sur le rôle de la graine, la §5.
 
-Le branchement du sampler dans les renderers — qui construit celui d'un échantillon, et quand —
-n'est pas décrit ici : il est dans [ideas/rng_graine.md](../ideas/rng_graine.md) tant qu'il n'est
-pas fait.
+Le renderer construit un sampler par (pixel, échantillon) dans `compute_pixel`, et le passe à la
+caméra, aux matériaux, aux lumières et à l'intégrateur — voir [`st.rs`](../src/renderers/st.rs). Ce
+que ce document décrit est donc en service : deux exécutions d'une même commande rendent la même
+image, quel que soit le nombre de threads et quel que soit le renderer.
 
 Références :
 

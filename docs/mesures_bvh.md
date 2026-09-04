@@ -66,7 +66,8 @@ du tout à mesurer une construction. Deux s'y sont ajoutées le 2026-08-20 pour 
 - **Ce sont les rayons cohérents.** Ils partent d'un même point, voyagent ensemble et rentrent dans
   des nœuds encore chauds : c'est la population qui favorise le *plus* un arbre profond. Les rayons
   secondaires partent de partout, paient le nœud plein tarif, et pousseraient l'optimum vers un
-  arbre plus plat. Les mesurer demande le sampler graine — voir
+  arbre plus plat. Les mesurer demande d'ajouter un jeu de rayons secondaires à cet outil, ce que
+  rien n'empêche plus depuis qu'un rendu se répète — voir
   [ideas/cout_traversee_bvh.md](../ideas/cout_traversee_bvh.md).
 
 ---
@@ -455,11 +456,11 @@ raisons dont la seconde est la vraie :
 
 - `bvh_stats` ne charge que `.ply` et `.stage`, et un exemple est un binaire séparé qui construit sa
   scène en Rust. Obstacle mécanique.
-- Ses 441 petites sphères sont **tirées d'un `random_double()` non graine**. La géométrie diffère
-  donc à chaque exécution, donc l'arbre aussi, donc aucun compteur n'est comparable à lui-même —
-  exactement le défaut que l'axe de coupe aléatoire avait, corrigé au [§3.2](#32-bvh--scène), et
-  pour lequel le même argument vaut : un accélérateur dont le coût ne se mesure pas ne s'améliore
-  pas exprès.
+- Ses 441 petites sphères étaient **tirées d'un générateur non amorcé**, donc la géométrie différait
+  à chaque exécution, donc l'arbre aussi, et aucun compteur n'était comparable à lui-même — exactement
+  le défaut que l'axe de coupe aléatoire avait, corrigé au [§3.2](#32-bvh--scène). L'exemple tire
+  aujourd'hui d'un sampler amorcé par `--seed`, mais la première raison suffit à garder
+  `many_spheres.stage` : un accélérateur dont le coût ne se mesure pas ne s'améliore pas exprès.
 
 `many_spheres.stage` est cette scène **gelée** : un tirage, transcrit une fois dans le langage
 `.stage`, positions et matériaux écrits dans le fichier. La géométrie devient une propriété du
