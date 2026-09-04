@@ -94,7 +94,7 @@ fn main() {
         process::exit(1)
     });
 
-    println!("Redering with configuration settings: {:#?}", &config);
+    println!("{}", &config);
 
     let integrator: Box<dyn Integrator> = match config.integrator {
         integrators::Type::NAIVE => Box::new(NaiveIntegrator::new(config.max_depth)),
