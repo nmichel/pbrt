@@ -24,7 +24,6 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
         match pixel_iter.next() {
             None => {}
             Some(coords) => {
-                // println!("\n\n* Pixel {:?}", &coords);
                 let mut spectrum = compute_pixel(config, integrator, coords, camera, scene);
 
                 spectrum.gamma_correct();

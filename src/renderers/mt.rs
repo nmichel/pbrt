@@ -36,19 +36,14 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
         let mut handles: Vec<ScopedJoinHandle<()>> = Vec::new();
         let mut senders: Vec<mpsc::Sender<Request>> = Vec::new();
 
-        for i in 0..(config.threads) {
+        for _ in 0..(config.threads) {
             let (tx, rx): (mpsc::Sender<Request>, mpsc::Receiver<Request>) = mpsc::channel();
             let upstream_tx = upstream_tx.clone();
 
             let handle = s.spawn(move || {
-                println!("Start thread {:?}", i);
-
                 loop {
                     match rx.recv().unwrap() {
-                        Request::Quit => {
-                            println!("[{:?}] QUIT !", i);
-                            break;
-                        }
+                        Request::Quit => break,
 
                         Request::Compute { coords } => {
                             let spectrum = compute_pixel(config, integrator, coords, camera, scene);
@@ -57,7 +52,6 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
                         }
                     }
                 }
-                println!("End thread {:?}", i);
             });
             handles.push(handle);
             senders.push(tx);
@@ -93,9 +87,8 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
             }
         }
 
-        for i in 0..(config.threads) {
-            println!("Sending QUIT order to [{:?}]", i);
-            senders[i].send(Request::Quit).unwrap();
+        for sender in &senders {
+            sender.send(Request::Quit).unwrap();
         }
 
         handles.drain(..).for_each(|handle| {

@@ -87,8 +87,6 @@ impl Intersectable for AABox {
             normal_max = &AABox::X_NEG;
         }
 
-        // println!("tmin {:?} | tmax {:?}", tmin, tmax);
-
         let tymin: f64;
         let tymax: f64;
         let normal_ymin: &NormalAndDerivatives;
