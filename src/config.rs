@@ -76,6 +76,8 @@ struct OptionDesc {
     /// Reads `value` into the matching field. It takes the name back so that a rejected value
     /// can name the option it was handed to.
     set: fn(&mut Config, &'static str, &str) -> Result<(), ConfigError>,
+    /// Writes the matching field back out, as the value this option would accept.
+    show: fn(&Config) -> String,
 }
 
 /// Reads `value` as a `T`, turning a refusal into the error that names the option.
@@ -192,62 +194,77 @@ static OPTIONS: [OptionDesc; 15] = [
     OptionDesc {
         name: "--input",
         set: parse_input_filename,
+        show: |config| config.input_filename.clone(),
     },
     OptionDesc {
         name: "--output",
         set: parse_output_filename,
+        show: |config| config.output_filename.clone(),
     },
     OptionDesc {
         name: "--near",
         set: parse_near,
+        show: |config| config.near.to_string(),
     },
     OptionDesc {
         name: "--far",
         set: parse_far,
+        show: |config| config.far.to_string(),
     },
     OptionDesc {
         name: "--fov",
         set: parse_fov,
+        show: |config| config.fov_deg.to_string(),
     },
     OptionDesc {
         name: "--output_width",
         set: parse_output_width,
+        show: |config| config.output_width.to_string(),
     },
     OptionDesc {
         name: "--output_height",
         set: parse_output_height,
+        show: |config| config.output_height.to_string(),
     },
     OptionDesc {
         name: "--max_depth",
         set: parse_max_depth,
+        show: |config| config.max_depth.to_string(),
     },
     OptionDesc {
         name: "--samples_ppx",
         set: parse_samples_ppx,
+        show: |config| config.samples_ppx.to_string(),
     },
     OptionDesc {
         name: "--threads",
         set: parse_threads,
+        show: |config| config.threads.to_string(),
     },
     OptionDesc {
         name: "--lens_radius",
         set: parse_lens_radius,
+        show: |config| config.lens_radius.to_string(),
     },
     OptionDesc {
         name: "--focal_distance",
         set: parse_focal_distance,
+        show: |config| config.focal_distance.to_string(),
     },
     OptionDesc {
         name: "--seed",
         set: parse_seed,
+        show: |config| config.seed.to_string(),
     },
     OptionDesc {
         name: "--integrator",
         set: parse_integrator,
+        show: |config| config.integrator.to_string(),
     },
     OptionDesc {
         name: "--renderer",
         set: parse_renderer,
+        show: |config| config.renderer.to_string(),
     },
 ];
 
@@ -305,41 +322,40 @@ impl Config {
     }
 }
 
+/// The title the framed table carries, above every row.
+const TABLE_TITLE: &str = "Rendering configuration";
+
+/// Draws the configuration as a framed table: a title spanning the whole width, then one row per
+/// option — the name a command line would use, and the value that command line would give it.
+///
+/// It walks [`OPTIONS`], the same list `new` reads from, which is what makes the two agree by
+/// construction: a row cannot go missing without the option itself going missing. The values are
+/// written as the options accept them, `path` and not `PATH`, so that the rows read back as a
+/// command line reproducing the run.
 impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "
-        input_filename : {:?}\n
-        output_filename : {:?}\n
-        near : {:?}\n
-        far : {:?}\n
-        fov_deg : {:?}\n
-        output_width : {:?}\n
-        output_height : {:?}\n
-        max_depth : {:?}\n
-        samples_ppx : {:?}\n
-        threads : {:?}\n
-        lens_radius : {:?}\n
-        focal_distance : {:?}\n
-        seed : {:?}\n
-        integrator : {:?}\n
-        ",
-            self.input_filename,
-            self.output_filename,
-            self.near,
-            self.far,
-            self.fov_deg,
-            self.output_width,
-            self.output_height,
-            self.max_depth,
-            self.samples_ppx,
-            self.threads,
-            self.lens_radius,
-            self.focal_distance,
-            self.seed,
-            self.integrator
-        )
+        let values: Vec<String> = OPTIONS.iter().map(|desc| (desc.show)(self)).collect();
+
+        // Each column is as wide as its widest cell, so no width is fixed once and left to rot:
+        // a longer option name or a longer path widens the frame instead of breaking it. Widths
+        // count characters and not bytes, which a path outside ASCII would inflate.
+        let name_column = OPTIONS.iter().map(|desc| desc.name.chars().count()).max().unwrap_or(0);
+        let widest_value = values.iter().map(|value| value.chars().count()).max().unwrap_or(0);
+        // The title spans both columns and the divider between them. A title wider than that
+        // stretches the value column rather than overflowing the frame.
+        let value_column = widest_value.max(TABLE_TITLE.chars().count().saturating_sub(name_column + 3));
+        let title_span = name_column + value_column + 3;
+
+        let name_rule = "─".repeat(name_column + 2);
+        let value_rule = "─".repeat(value_column + 2);
+
+        writeln!(f, "┌{}┐", "─".repeat(title_span + 2))?;
+        writeln!(f, "│ {TABLE_TITLE:<title_span$} │")?;
+        writeln!(f, "├{name_rule}┬{value_rule}┤")?;
+        for (desc, value) in OPTIONS.iter().zip(values.iter()) {
+            writeln!(f, "│ {:<name_column$} │ {:<value_column$} │", desc.name, value)?;
+        }
+        write!(f, "└{name_rule}┴{value_rule}┘")
     }
 }
 
@@ -419,6 +435,32 @@ mod tests {
         let config = Config::new(&command_line(&["--threads", "4", "--threads", "8"])).unwrap();
 
         assert_eq!(8, config.threads);
+    }
+
+    /// The table is a command line, so feeding it back yields the configuration it came from.
+    /// This is what one list serving both parsing and printing buys, and the test fails the
+    /// moment a row and an option disagree.
+    ///
+    /// An option row is the only line carrying two cells, so the frame and the title sort
+    /// themselves out of the way.
+    #[test]
+    fn the_printed_table_reads_back_as_the_configuration_it_shows() {
+        let config = Config::new(&command_line(&["--samples_ppx", "64", "--integrator", "normal", "--renderer", "st"])).unwrap();
+        let table = config.to_string();
+
+        let mut arguments: Vec<&str> = Vec::new();
+        for row in table.lines() {
+            let cells: Vec<&str> = row.split('│').collect();
+            if cells.len() != 4 {
+                continue;
+            }
+            arguments.push(cells[1].trim());
+            arguments.push(cells[2].trim());
+        }
+        let read_back = Config::new(&command_line(&arguments)).unwrap();
+
+        assert_eq!(OPTIONS.len() * 2, arguments.len());
+        assert_eq!(table, read_back.to_string());
     }
 
     #[test]
