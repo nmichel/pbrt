@@ -18,6 +18,16 @@ pub struct Config {
     pub threads: usize,
     pub lens_radius: f64,
     pub focal_distance: f64,
+
+    /// Chooses which set of paths a render traces.
+    ///
+    /// It is an *option* and not an internal constant, because the promise is "same scene, same
+    /// options, same image": two seeds give two renders, each repeatable. That is how one tells a
+    /// noisy speckle from a bug once two runs have become bit-identical, and how one measures the
+    /// spread of an estimator, which a single realisation cannot give.
+    /// See `docs/rendu_reproductible.md` §5.
+    pub seed: u64,
+
     pub integrator: integrators::Type,
     pub renderer: renderers::Type,
 }
@@ -72,6 +82,10 @@ fn parse_focal_distance(config: &mut Config, value: &String) {
     config.focal_distance = f64::from_str(value).unwrap();
 }
 
+fn parse_seed(config: &mut Config, value: &String) {
+    config.seed = u64::from_str(value).unwrap();
+}
+
 fn parse_integrator(config: &mut Config, value: &String) {
     match value.as_str() {
         "path" => {
@@ -123,6 +137,7 @@ pub fn default_config() -> Config {
         threads: 1,
         lens_radius: 0.0,
         focal_distance: 1.0,
+        seed: 0,
         integrator: integrators::Type::PATH,
         renderer: renderers::Type::MT,
     }
@@ -145,6 +160,7 @@ impl Config {
             ("--threads", parse_threads as OptionParserFn),
             ("--lens_radius", parse_lens_radius as OptionParserFn),
             ("--focal_distance", parse_focal_distance as OptionParserFn),
+            ("--seed", parse_seed as OptionParserFn),
             ("--integrator", parse_integrator as OptionParserFn),
             ("--renderer", parse_renderer as OptionParserFn),
         ]
@@ -189,6 +205,7 @@ impl fmt::Display for Config {
         threads : {:?}\n
         lens_radius : {:?}\n
         focal_distance : {:?}\n
+        seed : {:?}\n
         integrator : {:?}\n
         ",
             self.input_filename,
@@ -203,6 +220,7 @@ impl fmt::Display for Config {
             self.threads,
             self.lens_radius,
             self.focal_distance,
+            self.seed,
             self.integrator
         )
     }

@@ -85,9 +85,10 @@ use pbrt::config::default_config;
 use pbrt::geom::aabound::AABound;
 use pbrt::geom::matrix4::Matrix4;
 use pbrt::geom::ray::Ray;
-use pbrt::geom::vector2::Vector2u;
+use pbrt::geom::vector2::{Vector2f, Vector2u};
 use pbrt::geom::vector3::Vector3f;
 use pbrt::loader::{load_ply_mesh, Loader};
+use pbrt::samplers::Sampler;
 use pbrt::scene::Scene;
 use pbrt::shapes::triangle_mesh::TraversalStats as MeshTraversalStats;
 use pbrt::shapes::TriangleMesh;
@@ -243,6 +244,37 @@ fn report_scene(path: &str) {
     println!();
 }
 
+/// The film position of the ray a pixel gets in a measurement: its centre.
+///
+/// Centre and not corner: a corner ray of an axis-aligned mesh can land exactly on a shared
+/// triangle edge, a degenerate case that has no reason to be over-represented in a measurement.
+fn pixel_centre(pixel_x: f64, pixel_y: f64) -> Vector2f {
+    Vector2f::new(pixel_x + 0.5, pixel_y + 0.5)
+}
+
+/// A `Sampler` whose every draw is zero.
+///
+/// **Not a sampler in any statistical sense**: an estimator fed by it is a single point evaluation,
+/// so it is biased, and rendering an image with it would be meaningless. It lives here rather than
+/// in `samplers/` for that reason — nothing that renders should be able to reach it.
+///
+/// What it is for: a camera draws its own optical quantities, so measuring requires *giving* it
+/// numbers rather than letting it invent them, and the numbers a measurement wants are constants.
+/// Zero is the useful constant — `ThinLensCamera` maps it to the middle of its aperture, so any
+/// camera handed this sampler casts the ray a pinhole would. That is what keeps these ray sets
+/// free of any random number, and a ray set that moved between two runs would measure nothing.
+struct ZeroSampler;
+
+impl Sampler for ZeroSampler {
+    fn get_1d(&mut self) -> f64 {
+        0.0
+    }
+
+    fn get_2d(&mut self) -> Vector2f {
+        Vector2f::new(0.0, 0.0)
+    }
+}
+
 /// Casts two ray sets and counts them apart: the camera's primary rays, and one shadow ray from
 /// each point they hit.
 ///
@@ -258,7 +290,7 @@ fn cast_scene_ray_sets(scene: &Scene, camera: &dyn Camera) -> (SceneCast, SceneC
 
     for pixel_y in 0..SCENE_IMAGE_HEIGHT {
         for pixel_x in 0..SCENE_IMAGE_WIDTH {
-            let ray = camera.get_ray(pixel_x as f64 + 0.5, pixel_y as f64 + 0.5);
+            let ray = camera.get_ray(&pixel_centre(pixel_x as f64, pixel_y as f64), &mut ZeroSampler);
 
             primary.ray_count += 1;
             let interaction = scene.intersect_instrumented(&ray, NEAR, FAR, &mut primary.stats);
@@ -365,10 +397,7 @@ fn cast_ray_set(mesh: &TriangleMesh) -> RaySetCast {
 
         for pixel_y in 0..IMAGE_SIDE {
             for pixel_x in 0..IMAGE_SIDE {
-                // Pixel centre, not corner: a corner ray of an axis-aligned mesh can land
-                // exactly on a shared triangle edge, a degenerate case that has no reason
-                // to be over-represented in a measurement.
-                let ray = camera.get_ray(pixel_x as f64 + 0.5, pixel_y as f64 + 0.5);
+                let ray = camera.get_ray(&pixel_centre(pixel_x as f64, pixel_y as f64), &mut ZeroSampler);
 
                 cast.ray_count += 1;
                 if mesh.intersect_instrumented(&ray, NEAR, FAR, &mut cast.stats).is_some() {

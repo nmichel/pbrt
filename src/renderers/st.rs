@@ -3,9 +3,9 @@ use crate::config::Config;
 use crate::geom::bounds2::Bounds2;
 use crate::geom::vector2::{Vector2, Vector2f, Vector2u};
 use crate::integrators::Integrator;
+use crate::samplers::{IndependentSampler, Sampler};
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
-use rand::RngExt;
 
 pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &dyn Integrator) {
     let image_width = config.output_width as u32;
@@ -20,13 +20,12 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
 
     let mut pixel_iter = patch.to_iter();
     let mut pixel_computed = 0;
-    let mut sample = Sampler2::new();
     while pixel_computed < image_width * image_height {
         match pixel_iter.next() {
             None => {}
             Some(coords) => {
                 // println!("\n\n* Pixel {:?}", &coords);
-                let mut spectrum = compute_pixel(config, integrator, coords, camera, scene, &mut sample);
+                let mut spectrum = compute_pixel(config, integrator, coords, camera, scene);
 
                 spectrum.gamma_correct();
                 let sample = spectrum.to_rgb();
@@ -45,40 +44,18 @@ pub fn render(config: &Config, scene: &Scene, camera: &dyn Camera, integrator: &
     image_write(&config.output_filename, &resolution, &pixels);
 }
 
-fn compute_pixel(
-    config: &Config,
-    integrator: &dyn Integrator,
-    pixel_coords: Vector2<u32>,
-    camera: &dyn Camera,
-    scene: &Scene,
-    sampler: &mut Sampler2,
-) -> Spectrum {
-    let mut ns = config.samples_ppx;
+fn compute_pixel(config: &Config, integrator: &dyn Integrator, pixel_coords: Vector2<u32>, camera: &dyn Camera, scene: &Scene) -> Spectrum {
     let mut res = Spectrum::new(0.0, 0.0, 0.0);
-    let pixel_coords = Vector2f::from(pixel_coords);
-    while ns > 0 {
-        let pixel_coords = pixel_coords + sampler.sample();
-        let ray = camera.get_ray(pixel_coords.x, pixel_coords.y);
+    let pixel_origin = Vector2f::from(pixel_coords);
+    for sample_index in 0..config.samples_ppx {
+        // One sampler per sample, keyed on the pixel and the index — so the numbers this path
+        // draws depend on neither the thread nor the order pixels are handed out.
+        let mut sampler = IndependentSampler::new(config.seed, &pixel_coords, sample_index);
+        let p_film = pixel_origin + sampler.get_2d();
+        let ray = camera.get_ray(&p_film, &mut sampler);
         res += integrator.li(&ray, &scene, config.max_depth, config.near, config.far);
-        ns -= 1;
     }
     res * (1.0 / (config.samples_ppx as f64))
-}
-
-pub struct Sampler2 {
-    rng: rand::rngs::ThreadRng,
-}
-
-impl Sampler2 {
-    pub fn new() -> Self {
-        Sampler2 { rng: rand::rng() }
-    }
-
-    pub fn sample(&mut self) -> Vector2f {
-        let x = self.rng.random::<f64>();
-        let y = self.rng.random::<f64>();
-        Vector2f { x, y }
-    }
 }
 
 fn image_write(filename: &str, resolution: &Vector2u, data: &Vec<u8>) {

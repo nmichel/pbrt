@@ -3,7 +3,7 @@ use crate::geom::matrix4::Matrix4;
 use crate::geom::ray::Ray;
 use crate::geom::vector2::{Vector2f, Vector2u};
 use crate::geom::vector3::Vector3f;
-use crate::utils::random_double;
+use crate::samplers::Sampler;
 use std::f64::consts::PI;
 
 /// A uniform sample of the unit disk, drawn from a sample of the unit square.
@@ -97,15 +97,15 @@ impl ThinLensCamera {
 }
 
 impl Camera for ThinLensCamera {
-    fn get_ray(&self, pixel_x: f64, pixel_y: f64) -> Ray {
-        let pixel3d = Vector3f::new(pixel_x, pixel_y, 0.0);
+    /// Draws the two numbers its aperture needs, and nothing else.
+    fn get_ray(&self, p_film: &Vector2f, sampler: &mut dyn Sampler) -> Ray {
+        let pixel3d = Vector3f::new(p_film.x, p_film.y, 0.0);
         let mut camera_vector = &self.raster_to_screen * &pixel3d;
         camera_vector.normalize();
 
         let ray = Ray::new(&Vector3f::new(0.0, 0.0, 0.0), &camera_vector);
 
-        let lens_sample = Vector2f::new(random_double(), random_double());
-        let pixel_lens = sample_uniform_disk(&lens_sample) * self.lens_radius;
+        let pixel_lens = sample_uniform_disk(&sampler.get_2d()) * self.lens_radius;
         let ft = self.focal_distance / camera_vector.z;
 
         let origin = Vector3f::new(pixel_lens.x, pixel_lens.y, 0.0);

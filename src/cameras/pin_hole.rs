@@ -1,8 +1,9 @@
 use super::Camera;
 use crate::geom::matrix4::Matrix4;
 use crate::geom::ray::Ray;
-use crate::geom::vector2::Vector2u;
+use crate::geom::vector2::{Vector2f, Vector2u};
 use crate::geom::vector3::Vector3f;
+use crate::samplers::Sampler;
 
 /// A naive camera implementation
 pub struct PinHoleCamera {
@@ -39,8 +40,10 @@ impl PinHoleCamera {
 }
 
 impl Camera for PinHoleCamera {
-    fn get_ray(&self, pixel_x: f64, pixel_y: f64) -> Ray {
-        let pixel3d = Vector3f::new(pixel_x, pixel_y, 0.0);
+    /// Draws nothing: a pinhole has no aperture, so every ray of a pixel leaves the same point and
+    /// only `p_film` tells them apart.
+    fn get_ray(&self, p_film: &Vector2f, _sampler: &mut dyn Sampler) -> Ray {
+        let pixel3d = Vector3f::new(p_film.x, p_film.y, 0.0);
         let mut camera_vector = &self.raster_to_screen * &pixel3d;
         camera_vector.normalize();
         Ray::new(
