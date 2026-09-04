@@ -43,7 +43,7 @@ d'une exécution ([docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3, qui porte au
 réouverture). **Un gain de construction se rapporte à une exécution entière, jamais au chargement
 seul** ; c'est la leçon de ce dernier, et elle vaut pour le prochain.
 
-**Lancer les tests** — `cargo test` est vert en entier : 99 tests de bibliothèque, 8 doc-tests, et
+**Lancer les tests** — `cargo test` est vert en entier : 113 tests de bibliothèque, 10 doc-tests, et
 les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour tout changement de
 construction ou de traversée d'un accélérateur, `cargo run --release --bin bvh_stats -- <scène>`
 donne les compteurs à comparer ; ils ne voient que les rayons primaires et d'ombre, donc le
