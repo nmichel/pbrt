@@ -52,6 +52,14 @@ chronomètre d'un rendu complet reste une mesure distincte et parfois divergente
 dont le chargement n'est pas dominé par le parse d'un `.ply`
 ([docs/mesures_bvh.md](docs/mesures_bvh.md) §0).
 
+**Préfixe de sujet** — le titre de chaque commit d'une branche de travail commence par le sujet de
+cette branche, entre crochets : `[sampling]`, `[bvh]`. Le dépôt ne fusionne qu'en *fast-forward*,
+donc les commits d'une branche arrivent tels quels dans l'historique de `master`, sans commit de
+fusion pour dire d'où ils viennent — le préfixe est la seule chose qui les regroupe après coup, et
+qui rende `git log --oneline | grep '\[sampling\]'` possible. Court, en anglais comme le reste du
+message, et **le même pour toute la branche** : un commit qui n'y entre pas est le signe qu'il
+appartient à une autre.
+
 **Messages de commit** — le corps ne dépasse pas **20 lignes**. Ce n'est pas une invitation à en
 dire moins : ce qui débordait était surtout des tables de mesure et des arbitrages, et ceux-là ont
 désormais leur place — `docs/` pour ce qui décrit le code tel qu'il est, `ideas/` pour ce qui reste
