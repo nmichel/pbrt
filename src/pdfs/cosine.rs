@@ -1,5 +1,5 @@
+use crate::geom::vector2::Vector2f;
 use crate::geom::vector3::Vector3f;
-use crate::utils::random_double;
 use std::f64::consts::PI;
 
 use super::Pdf;
@@ -11,10 +11,10 @@ impl Pdf for CosinePdf {
         (direction.z / PI).abs()
     }
 
-    fn generate(&self) -> Vector3f {
+    fn generate(&self, u: &Vector2f) -> Vector3f {
         let two_pi = 2.0 * PI;
-        let phi = two_pi * random_double();
-        let r2 = random_double();
+        let phi = two_pi * u.x;
+        let r2 = u.y;
         let r2_sqrt = r2.sqrt();
         let cos_theta = (1.0 - r2).sqrt();
         let x = phi.cos() * r2_sqrt;
@@ -29,6 +29,7 @@ mod tests {
     use super::*;
     use crate::geom::vector3::Vector3f;
     use crate::pdfs::cosine::CosinePdf;
+    use crate::utils::random_double;
     use std::f64::consts::FRAC_1_PI;
 
     #[test]
@@ -39,7 +40,8 @@ mod tests {
 
         for _ in 0..samples {
             // Sample a direction in local coordinates (z+ is normal)
-            let wi: Vector3f = pdf.generate();
+            let u = Vector2f::new(random_double(), random_double());
+            let wi: Vector3f = pdf.generate(&u);
             let cos_theta = wi.z.max(0.0);
 
             // Lambertian BRDF is 1/π

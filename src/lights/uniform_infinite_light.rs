@@ -1,9 +1,11 @@
 use super::{Light, LightLiSample, LightType, VisibilityTester};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
+use crate::geom::vector2::Vector2f;
 use crate::pdfs::sphere::SpherePdf;
 use crate::pdfs::Pdf;
 use crate::spectrum::Spectrum;
+use crate::utils::random_double;
 
 pub struct UniformInfiniteLight {
     i: Spectrum,
@@ -27,7 +29,8 @@ impl Light for UniformInfiniteLight {
     fn sample_li(&self, intersection: &Intersection) -> Option<(LightLiSample, VisibilityTester)> {
         let sphere_pdf = SpherePdf {};
 
-        let wi = sphere_pdf.generate();
+        let u = Vector2f::new(random_double(), random_double());
+        let wi = sphere_pdf.generate(&u);
         let pdf = sphere_pdf.value(&wi);
         let spectrum = self.i;
 

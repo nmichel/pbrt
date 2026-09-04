@@ -1,11 +1,13 @@
 use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
+use crate::geom::vector2::Vector2f;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::pdfs::sphere::SpherePdf;
 use crate::pdfs::Pdf;
 use crate::textures::*;
+use crate::utils::random_double;
 use std::sync::Arc;
 
 pub struct Metal {
@@ -53,7 +55,8 @@ impl Material for Metal {
         // targets fall below the horizon and are absorbed by the `local_target.z > 0.0` test
         // below, so a fuzzy metal is slightly darker. Replacing the blur with a microfacet BRDF is
         // the fix that would make the question moot.
-        let fuzz_offset = SpherePdf {}.generate() * self.fuzz;
+        let fuzz_sample = Vector2f::new(random_double(), random_double());
+        let fuzz_offset = SpherePdf {}.generate(&fuzz_sample) * self.fuzz;
         let mut local_target = local_reflected + fuzz_offset;
         local_target.normalize();
 
