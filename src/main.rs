@@ -1,4 +1,4 @@
-use pbrt::config::Config;
+use pbrt::config::{self, Config};
 use pbrt::integrators::{self, Integrator, NaiveIntegrator, NormalIntegrator, PathIntegrator};
 use pbrt::loader::Loader;
 use pbrt::renderers;
@@ -6,8 +6,16 @@ use std::{env, fs, process};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    // Asking for the option list is not a render, so it is answered before a configuration is
+    // built — and answered even when the rest of the line would be refused.
+    if config::help_requested(&args) {
+        println!("{}", config::usage());
+        return;
+    }
+
     let config = Config::new(&args).unwrap_or_else(|err| {
-        eprintln!("Problem parsing arguments: {}", err);
+        eprintln!("{}, try {} for the option list", err, config::HELP_OPTION);
         process::exit(1);
     });
 

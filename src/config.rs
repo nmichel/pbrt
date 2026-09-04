@@ -78,6 +78,8 @@ struct OptionDesc {
     set: fn(&mut Config, &'static str, &str) -> Result<(), ConfigError>,
     /// Writes the matching field back out, as the value this option would accept.
     show: fn(&Config) -> String,
+    /// One line of help, for `usage`.
+    help: &'static str,
 }
 
 /// Reads `value` as a `T`, turning a refusal into the error that names the option.
@@ -195,81 +197,141 @@ static OPTIONS: [OptionDesc; 15] = [
         name: "--input",
         set: parse_input_filename,
         show: |config| config.input_filename.clone(),
+        help: "scene to render, in the .stage language",
     },
     OptionDesc {
         name: "--output",
         set: parse_output_filename,
         show: |config| config.output_filename.clone(),
+        help: "PNG file the image is written to",
     },
     OptionDesc {
         name: "--near",
         set: parse_near,
         show: |config| config.near.to_string(),
+        help: "distance below which an intersection is ignored",
     },
     OptionDesc {
         name: "--far",
         set: parse_far,
         show: |config| config.far.to_string(),
+        help: "distance beyond which a ray hits nothing",
     },
     OptionDesc {
         name: "--fov",
         set: parse_fov,
         show: |config| config.fov_deg.to_string(),
+        help: "field of view, in degrees",
     },
     OptionDesc {
         name: "--output_width",
         set: parse_output_width,
         show: |config| config.output_width.to_string(),
+        help: "image width, in pixels",
     },
     OptionDesc {
         name: "--output_height",
         set: parse_output_height,
         show: |config| config.output_height.to_string(),
+        help: "image height, in pixels",
     },
     OptionDesc {
         name: "--max_depth",
         set: parse_max_depth,
         show: |config| config.max_depth.to_string(),
+        help: "longest path traced, in bounces",
     },
     OptionDesc {
         name: "--samples_ppx",
         set: parse_samples_ppx,
         show: |config| config.samples_ppx.to_string(),
+        help: "paths traced per pixel",
     },
     OptionDesc {
         name: "--threads",
         set: parse_threads,
         show: |config| config.threads.to_string(),
+        help: "workers the mt renderer starts",
     },
     OptionDesc {
         name: "--lens_radius",
         set: parse_lens_radius,
         show: |config| config.lens_radius.to_string(),
+        help: "lens radius; zero keeps the whole scene sharp",
     },
     OptionDesc {
         name: "--focal_distance",
         set: parse_focal_distance,
         show: |config| config.focal_distance.to_string(),
+        help: "distance the lens is focused on",
     },
     OptionDesc {
         name: "--seed",
         set: parse_seed,
         show: |config| config.seed.to_string(),
+        help: "chooses which set of paths a render traces",
     },
     OptionDesc {
         name: "--integrator",
         set: parse_integrator,
         show: |config| config.integrator.to_string(),
+        help: "how light transport is solved",
     },
     OptionDesc {
         name: "--renderer",
         set: parse_renderer,
         show: |config| config.renderer.to_string(),
+        help: "how the pixel loop is driven",
     },
 ];
 
 fn find_option(name: &str) -> Option<&'static OptionDesc> {
     OPTIONS.iter().find(|desc| desc.name == name)
+}
+
+/// The name that asks for the option list instead of for a render.
+///
+/// It is not one of [`OPTIONS`]: it takes no value, and it yields no configuration — it replaces
+/// the run rather than describing it. What a process does about that is the caller's business,
+/// which is why `new` does not know the name and `usage` only prints it.
+pub const HELP_OPTION: &str = "--help";
+
+/// Whether `args` asks for the option list.
+///
+/// Anywhere on the line and the answer is yes, including after an option that would otherwise be
+/// refused: someone who writes `--treads 8 --help` is asking precisely because they are unsure of
+/// a name.
+pub fn help_requested(args: &[String]) -> bool {
+    args.iter().any(|token| token == HELP_OPTION)
+}
+
+/// The option list: for each one, its name, what it sets, and what it is worth when the command
+/// line stays silent about it.
+///
+/// The defaults are not spelled out here. They are read off [`default_config`] through the very
+/// `show` that prints a configuration, so a default that changes cannot go on being advertised
+/// as what it used to be.
+pub fn usage() -> String {
+    let defaults = default_config();
+    let name_column = OPTIONS.iter().map(|desc| desc.name.len()).max().unwrap_or(0).max(HELP_OPTION.len());
+    let help_column = OPTIONS.iter().map(|desc| desc.help.len()).max().unwrap_or(0);
+
+    let mut rows = vec![
+        "usage: pbrt [--option value]...".to_string(),
+        String::new(),
+        format!("  {:<name_column$}  {:<help_column$}  [default]", "option", "what it sets"),
+    ];
+    for desc in OPTIONS.iter() {
+        rows.push(format!(
+            "  {:<name_column$}  {:<help_column$}  [{}]",
+            desc.name,
+            desc.help,
+            (desc.show)(&defaults)
+        ));
+    }
+    rows.push(format!("  {:<name_column$}  {}", HELP_OPTION, "print this list and render nothing"));
+
+    rows.join("\n")
 }
 
 /// The settings a run uses when the command line says nothing.
@@ -461,6 +523,23 @@ mod tests {
 
         assert_eq!(OPTIONS.len() * 2, arguments.len());
         assert_eq!(table, read_back.to_string());
+    }
+
+    /// Same list, third use: an option missing from the help is an option that does not exist.
+    #[test]
+    fn the_option_list_mentions_every_option() {
+        let usage = usage();
+
+        for desc in OPTIONS.iter() {
+            assert!(usage.contains(desc.name), "{} is missing from the option list", desc.name);
+        }
+        assert!(usage.contains(HELP_OPTION));
+    }
+
+    #[test]
+    fn help_is_seen_even_next_to_a_line_that_would_be_refused() {
+        assert!(help_requested(&command_line(&["--treads", "8", "--help"])));
+        assert!(!help_requested(&command_line(&["--threads", "8"])));
     }
 
     #[test]
