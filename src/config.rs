@@ -1,3 +1,4 @@
+use crate::table::Table;
 use crate::{integrators, renderers};
 use std::error::Error;
 use std::fmt;
@@ -396,28 +397,12 @@ const TABLE_TITLE: &str = "Rendering configuration";
 /// command line reproducing the run.
 impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let values: Vec<String> = OPTIONS.iter().map(|desc| (desc.show)(self)).collect();
-
-        // Each column is as wide as its widest cell, so no width is fixed once and left to rot:
-        // a longer option name or a longer path widens the frame instead of breaking it. Widths
-        // count characters and not bytes, which a path outside ASCII would inflate.
-        let name_column = OPTIONS.iter().map(|desc| desc.name.chars().count()).max().unwrap_or(0);
-        let widest_value = values.iter().map(|value| value.chars().count()).max().unwrap_or(0);
-        // The title spans both columns and the divider between them. A title wider than that
-        // stretches the value column rather than overflowing the frame.
-        let value_column = widest_value.max(TABLE_TITLE.chars().count().saturating_sub(name_column + 3));
-        let title_span = name_column + value_column + 3;
-
-        let name_rule = "─".repeat(name_column + 2);
-        let value_rule = "─".repeat(value_column + 2);
-
-        writeln!(f, "┌{}┐", "─".repeat(title_span + 2))?;
-        writeln!(f, "│ {TABLE_TITLE:<title_span$} │")?;
-        writeln!(f, "├{name_rule}┬{value_rule}┤")?;
-        for (desc, value) in OPTIONS.iter().zip(values.iter()) {
-            writeln!(f, "│ {:<name_column$} │ {:<value_column$} │", desc.name, value)?;
+        let mut table = Table::new(TABLE_TITLE);
+        for desc in OPTIONS.iter() {
+            table.push(desc.name, &(desc.show)(self));
         }
-        write!(f, "└{name_rule}┴{value_rule}┘")
+
+        write!(f, "{table}")
     }
 }
 

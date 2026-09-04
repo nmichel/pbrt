@@ -16,4 +16,5 @@ pub mod samplers;
 pub mod scene;
 pub mod shapes;
 pub mod spectrum;
+pub mod table;
 pub mod textures;
