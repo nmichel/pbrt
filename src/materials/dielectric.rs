@@ -4,8 +4,8 @@ use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
+use crate::samplers::Sampler;
 use crate::textures::*;
-use crate::utils::random_double;
 use std::sync::Arc;
 
 #[non_exhaustive]
@@ -29,7 +29,7 @@ impl Dielectric {
 }
 
 impl Material for Dielectric {
-    fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<ScatterInfo> {
+    fn scatter(&self, _ray: &Ray, interaction: &Interaction, sampler: &mut dyn Sampler) -> Option<ScatterInfo> {
         // see https://graphics.stanford.edu/courses/cs148-10-summer/docs/2006--degreve--reflection_refraction.pdf
 
         let Interaction { ref intersection, .. } = interaction;
@@ -85,7 +85,7 @@ impl Material for Dielectric {
                 let reflectance = fresnel(local_wo, local_outward_normal, ni, nt);
                 let local_scatter_direction: Vector3f;
                 let scattered_ray_origin: Vector3f;
-                if random_double() < reflectance {
+                if sampler.get_1d() < reflectance {
                     local_scatter_direction = local_reflected;
                     let shift_avoid_acne = world_outward_normal * 0.001;
                     scattered_ray_origin = p + &shift_avoid_acne;

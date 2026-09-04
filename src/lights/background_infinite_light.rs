@@ -1,11 +1,10 @@
 use super::{Light, LightLiSample, LightType, VisibilityTester};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
-use crate::geom::vector2::Vector2f;
 use crate::pdfs::sphere::SpherePdf;
 use crate::pdfs::Pdf;
+use crate::samplers::Sampler;
 use crate::spectrum::Spectrum;
-use crate::utils::random_double;
 
 pub struct BackgroundInfiniteLight {
     f: Spectrum,
@@ -29,11 +28,10 @@ impl Light for BackgroundInfiniteLight {
         self.f * (1.0 - factor) + self.t * factor
     }
 
-    fn sample_li(&self, intersection: &Intersection) -> Option<(LightLiSample, VisibilityTester)> {
+    fn sample_li(&self, intersection: &Intersection, sampler: &mut dyn Sampler) -> Option<(LightLiSample, VisibilityTester)> {
         let sphere_pdf = SpherePdf {};
 
-        let u = Vector2f::new(random_double(), random_double());
-        let wi = sphere_pdf.generate(&u);
+        let wi = sphere_pdf.generate(&sampler.get_2d());
         let pdf = sphere_pdf.value(&wi);
         let factor = 0.5 * (wi.y + 1.0);
         let spectrum = self.f * (1.0 - factor) + self.t * factor;

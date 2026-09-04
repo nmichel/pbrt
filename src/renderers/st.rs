@@ -53,7 +53,7 @@ fn compute_pixel(config: &Config, integrator: &dyn Integrator, pixel_coords: Vec
         let mut sampler = IndependentSampler::new(config.seed, &pixel_coords, sample_index);
         let p_film = pixel_origin + sampler.get_2d();
         let ray = camera.get_ray(&p_film, &mut sampler);
-        res += integrator.li(&ray, &scene, config.max_depth, config.near, config.far);
+        res += integrator.li(&ray, &scene, config.max_depth, config.near, config.far, &mut sampler);
     }
     res * (1.0 / (config.samples_ppx as f64))
 }

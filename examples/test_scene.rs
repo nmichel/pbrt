@@ -16,11 +16,11 @@ use pbrt::integrators::{self, *};
 use pbrt::lights::BackgroundInfiniteLight;
 use pbrt::materials::{Dielectric, Lambertian, Material, Metal, RefractionIndices};
 use pbrt::objects::{Simple, Transformed};
+use pbrt::samplers::{IndependentSampler, Sampler};
 use pbrt::scene::Scene;
 use pbrt::shapes::Sphere;
 use pbrt::spectrum::Spectrum;
 use pbrt::textures::*;
-use pbrt::utils::random_double;
 use pbrt::{colors, renderers};
 use std::sync::Arc;
 use std::{env, f64, process};
@@ -92,17 +92,22 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     // background and the image is uniformly black.
     scene.add_light(Arc::new(BackgroundInfiniteLight::new(colors::WHITE, Spectrum::new(0.5, 0.7, 1.0))));
 
+    // The spheres are placed at random, so the scene is a property of the seed rather than of
+    // the run: `--seed 0` always builds this same field. There is no pixel here, so the key is
+    // the seed alone.
+    let mut sampler = IndependentSampler::new(config.seed, &Vector2u::new(0, 0), 0);
+
     for a in -11..10 {
         for b in -11..10 {
-            let choose_mat = random_double();
+            let choose_mat = sampler.get_1d();
             let material: Arc<dyn Material>;
 
             if choose_mat < 0.7 {
-                let color = Spectrum::new(random_double(), random_double(), random_double());
+                let color = Spectrum::new(sampler.get_1d(), sampler.get_1d(), sampler.get_1d());
                 material = Arc::new(Lambertian::new(Arc::new(PlainColor::new(color))));
             }
             else if choose_mat < 0.85 {
-                let color = Spectrum::new(random_double(), random_double(), random_double());
+                let color = Spectrum::new(sampler.get_1d(), sampler.get_1d(), sampler.get_1d());
                 material = Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(color))));
             }
             else {
@@ -110,9 +115,9 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
             }
 
             let center = Vector3f::new(
-                a.to_f64().unwrap() + 0.9 * random_double(),
+                a.to_f64().unwrap() + 0.9 * sampler.get_1d(),
                 0.2,
-                b.to_f64().unwrap() + 0.9 * random_double(),
+                b.to_f64().unwrap() + 0.9 * sampler.get_1d(),
             );
             scene.add_object(Arc::new(Transformed::new(
                 Arc::new(Simple::new(Arc::new(Sphere::new(0.2)), material)),

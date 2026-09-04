@@ -3,6 +3,7 @@ use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::interaction::Interaction;
 use crate::materials::ScatterInfo;
+use crate::samplers::Sampler;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
 
@@ -27,7 +28,7 @@ impl NaiveIntegrator {
 }
 
 impl Integrator for NaiveIntegrator {
-    fn li(&self, ray: &Ray, scene: &Scene, depth: usize, near: f64, far: f64) -> Spectrum {
+    fn li(&self, ray: &Ray, scene: &Scene, depth: usize, near: f64, far: f64, sampler: &mut dyn Sampler) -> Spectrum {
         if depth <= 0 {
             return colors::BLACK;
         }
@@ -38,10 +39,10 @@ impl Integrator for NaiveIntegrator {
                     Some(emitted) => emitted,
                     None => Spectrum::new(0.0, 0.0, 0.0),
                 };
-                match material.scatter(ray, &interaction) {
+                match material.scatter(ray, &interaction, sampler) {
                     Some(ScatterInfo { attenuation, scattered, pdf }) => {
                         let abs_cos = vector3::dot(&scattered.direction, &interaction.intersection.n).abs();
-                        emitted + attenuation * &self.li(&scattered, scene, depth - 1, near, far) * abs_cos / pdf
+                        emitted + attenuation * &self.li(&scattered, scene, depth - 1, near, far, sampler) * abs_cos / pdf
                     }
                     None => emitted,
                 }

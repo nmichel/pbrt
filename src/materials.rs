@@ -2,6 +2,7 @@ use crate::colors;
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
+use crate::samplers::Sampler;
 use crate::spectrum::Spectrum;
 
 pub struct ScatterInfo {
@@ -17,7 +18,11 @@ impl ScatterInfo {
 }
 
 pub trait Material: Send + Sync {
-    fn scatter(&self, _ray: &Ray, _interaction: &Interaction) -> Option<ScatterInfo> {
+    /// Samples an outgoing direction, drawing whatever numbers the bsdf needs from `sampler`.
+    ///
+    /// A specular material consumes one number or none, a lambertian two; the caller is told
+    /// neither, which is what lets a material change its bsdf without changing the integrator.
+    fn scatter(&self, _ray: &Ray, _interaction: &Interaction, _sampler: &mut dyn Sampler) -> Option<ScatterInfo> {
         None
     }
 

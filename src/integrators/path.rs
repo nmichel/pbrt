@@ -4,9 +4,9 @@ use crate::geom::vector3;
 use crate::interaction::{self, Interaction};
 use crate::lights::{Light, LightType, UniformInfiniteLight};
 use crate::materials::ScatterInfo;
+use crate::samplers::Sampler;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
-use crate::utils::random_double;
 
 use super::Integrator;
 
@@ -28,14 +28,14 @@ impl PathIntegrator {
         Self { max_depth }
     }
 
-    fn sample_light<'a>(&self, scene: &'a Scene, _interaction: &Interaction) -> Option<SampledLight<'a>> {
+    fn sample_light<'a>(&self, scene: &'a Scene, sampler: &mut dyn Sampler) -> Option<SampledLight<'a>> {
         let light_counts = scene.get_light_count();
 
         if light_counts == 0 {
             return None;
         }
 
-        let light_index = (random_double() * light_counts as f64).min(light_counts as f64 - 1.0) as usize;
+        let light_index = (sampler.get_1d() * light_counts as f64).min(light_counts as f64 - 1.0) as usize;
         let light_ref = scene.get_light_at(light_index).unwrap();
         Some(SampledLight {
             light: light_ref,
@@ -45,7 +45,7 @@ impl PathIntegrator {
 }
 
 impl Integrator for PathIntegrator {
-    fn li(&self, ray: &Ray, scene: &Scene, depth: usize, near: f64, far: f64) -> Spectrum {
+    fn li(&self, ray: &Ray, scene: &Scene, depth: usize, near: f64, far: f64, sampler: &mut dyn Sampler) -> Spectrum {
         let mut beta: Spectrum = colors::WHITE;
         let mut accumulated_radiance: Spectrum = colors::BLACK;
         let mut current_ray: Ray = ray.clone();
@@ -67,8 +67,8 @@ impl Integrator for PathIntegrator {
                 }
 
                 // Sample direct illumination
-                if let Some(ref sampled_light) = self.sample_light(scene, &interaction) {
-                    if let Some((ref sample_li, ref visibility_tester)) = sampled_light.light.sample_li(&interaction.intersection) {
+                if let Some(ref sampled_light) = self.sample_light(scene, sampler) {
+                    if let Some((ref sample_li, ref visibility_tester)) = sampled_light.light.sample_li(&interaction.intersection, sampler) {
                         let wi = &sample_li.wi;
                         let f = material.f(&-current_ray.direction, wi, &interaction) * vector3::dot(wi, &interaction.intersection.n).abs();
                         if visibility_tester.unoccluded(scene) {
@@ -78,7 +78,7 @@ impl Integrator for PathIntegrator {
                     }
                 }
 
-                if let Some(ref scatter_info) = material.scatter(&current_ray, &interaction) {
+                if let Some(ref scatter_info) = material.scatter(&current_ray, &interaction, sampler) {
                     // Sample outgoing direction to continue the path
                     let abs_cos_theta = vector3::dot(&scatter_info.scattered.direction, &interaction.intersection.n).abs();
                     beta *= scatter_info.attenuation * abs_cos_theta / scatter_info.pdf;
@@ -93,7 +93,7 @@ impl Integrator for PathIntegrator {
                 // Possibly terminate the path with Russian roulette
                 // q is the probability of continuing the path
                 let q = beta.max_component_value();
-                if random_double() > q {
+                if sampler.get_1d() > q {
                     break; // terminate the path
                 }
 

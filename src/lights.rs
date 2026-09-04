@@ -1,6 +1,7 @@
 use super::geom::intersectable::Intersection;
 use super::geom::ray::Ray;
 use super::geom::vector3::Vector3f;
+use super::samplers::Sampler;
 use super::scene::Scene;
 use super::spectrum::Spectrum;
 
@@ -97,7 +98,9 @@ pub trait Light: Send + Sync {
         Spectrum::new(0.0, 0.0, 0.0)
     }
 
-    fn sample_li(&self, _intersection: &Intersection) -> Option<(LightLiSample, VisibilityTester)>;
+    /// Samples a point on the light as seen from `intersection`, drawing from `sampler` if the
+    /// source has an extent. A point light needs no number at all.
+    fn sample_li(&self, _intersection: &Intersection, _sampler: &mut dyn Sampler) -> Option<(LightLiSample, VisibilityTester)>;
 }
 
 mod background_infinite_light;

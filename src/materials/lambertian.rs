@@ -2,14 +2,13 @@ use super::{same_hemisphere, Material, ScatterInfo};
 use crate::colors;
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
-use crate::geom::vector2::Vector2f;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::pdfs::cosine::CosinePdf;
 use crate::pdfs::Pdf;
+use crate::samplers::Sampler;
 use crate::spectrum::Spectrum;
 use crate::textures::*;
-use crate::utils::random_double;
 use std::sync::Arc;
 
 pub struct Lambertian {
@@ -23,13 +22,12 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, _ray: &Ray, interaction: &Interaction) -> Option<ScatterInfo> {
+    fn scatter(&self, _ray: &Ray, interaction: &Interaction, sampler: &mut dyn Sampler) -> Option<ScatterInfo> {
         let Interaction { ref intersection, .. } = interaction;
         let Intersection { ref p, ref n, .. } = intersection;
 
         let pdf: CosinePdf = CosinePdf {};
-        let u = Vector2f::new(random_double(), random_double());
-        let local_wi: Vector3f = pdf.generate(&u);
+        let local_wi: Vector3f = pdf.generate(&sampler.get_2d());
         let wi: Vector3f = intersection.local_to_world(&local_wi);
 
         let shift_avoid_acne = n * 0.001;

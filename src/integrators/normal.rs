@@ -1,6 +1,7 @@
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
+use crate::samplers::Sampler;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
 
@@ -15,7 +16,7 @@ impl NormalIntegrator {
 }
 
 impl Integrator for NormalIntegrator {
-    fn li(&self, ray: &Ray, scene: &Scene, _depth: usize, near: f64, far: f64) -> Spectrum {
+    fn li(&self, ray: &Ray, scene: &Scene, _depth: usize, near: f64, far: f64, _sampler: &mut dyn Sampler) -> Spectrum {
         match scene.intersect(&ray, near, far) {
             Some(interaction) => {
                 let Interaction { ref intersection, .. } = interaction;

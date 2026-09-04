@@ -27,9 +27,10 @@ impl Pdf for CosinePdf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geom::vector2::Vector2u;
     use crate::geom::vector3::Vector3f;
     use crate::pdfs::cosine::CosinePdf;
-    use crate::utils::random_double;
+    use crate::samplers::{IndependentSampler, Sampler};
     use std::f64::consts::FRAC_1_PI;
 
     #[test]
@@ -38,10 +39,12 @@ mod tests {
         let samples = 100000;
         let pdf = CosinePdf {};
 
+        // A fixed seed, so this test either passes or fails, always the same way.
+        let mut sampler = IndependentSampler::new(0, &Vector2u::new(0, 0), 0);
+
         for _ in 0..samples {
             // Sample a direction in local coordinates (z+ is normal)
-            let u = Vector2f::new(random_double(), random_double());
-            let wi: Vector3f = pdf.generate(&u);
+            let wi: Vector3f = pdf.generate(&sampler.get_2d());
             let cos_theta = wi.z.max(0.0);
 
             // Lambertian BRDF is 1/π
