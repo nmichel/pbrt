@@ -11,6 +11,7 @@ pub mod materials;
 pub mod objects;
 pub mod pdfs;
 pub mod renderers;
+pub mod samplers;
 pub mod scene;
 pub mod shapes;
 pub mod spectrum;

@@ -15,10 +15,12 @@ dit en une incise ; quand elle contraint l'ordre, c'est l'ordre qui s'adapte. Le
 plus bas portent le détail de chaque entrée — elles servent à retrouver un sujet, pas à savoir quoi
 faire ensuite.
 
-- [ ] **RNG graine + samplers stratifiés** — indépendant. Deux choses en dépendent : la validation
-      d'`AreaLight` et le balayage de `t_trav`, aucune des deux n'étant démontrable sans un rendu
-      reproductible. Inventaire des tirages, décisions et ordre d'attaque dans
-      [ideas/rng_graine.md](ideas/rng_graine.md).
+- [ ] **RNG graine** — **en cours** sur `feat/rework_sampling` : le sampler existe, rien ne l'appelle
+      encore. Deux choses en dépendent : la validation d'`AreaLight` et le balayage de `t_trav`,
+      aucune des deux n'étant démontrable sans un rendu reproductible. Ce qui reste à brancher est
+      dans [ideas/rng_graine.md](ideas/rng_graine.md) ; ce qui a atterri est décrit par
+      [docs/rendu_reproductible.md](docs/rendu_reproductible.md). Le sampler stratifié est écarté de
+      ce chantier et garde sa note de fin dans le fichier d'idée.
 - [ ] **`AreaLight`** — surfaces émissives enregistrées comme sources échantillonnables. Le plus grand
       écart au modèle physique du projet ; plan détaillé dans
       [ideas/area_light.md](ideas/area_light.md).
@@ -171,11 +173,11 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       `compute_pixel`, `Sampler2`, `image_write` sont identiques. Extraire `Film` (accumulation +
       écriture) et `Sampler` ; les deux renderers ne devraient alors différer que par
       l'ordonnancement.
-- [ ] **Les rendus ne sont pas reproductibles.** `rand 0.3` par `thread_rng`, non graine ici, donc
-      deux exécutions ne sont pas comparables — ce qui rend invérifiable tout changement de
-      l'intégrateur. Analyse, structure et ordre d'attaque dans
-      [ideas/rng_graine.md](ideas/rng_graine.md), qui corrige au passage deux affirmations de cette
-      entrée : la cible est `rand 0.10`, et `rand` n'achète ni les samplers stratifiés ni Sobol.
+- [ ] **Les rendus ne sont pas reproductibles.** Deux exécutions ne sont pas comparables, ce qui rend
+      invérifiable tout changement de l'intégrateur. `Sampler` et `IndependentSampler` existent
+      désormais, mais tout ce qui tire passe encore par `utils::random_double` et les deux
+      `Sampler2` ; la liste des sites et le commit qui les branche sont dans
+      [ideas/rng_graine.md](ideas/rng_graine.md) §1.
 - [ ] **`match config.integrator` est dupliqué 16 fois** — les 15 exemples plus
       [main.rs](src/main.rs) — et `match config.renderer` autant. Le §2 de CLAUDE.md demande qu'une
       nouvelle variante d'un concept arrive par une implémentation de trait, « pas par un `match` ou

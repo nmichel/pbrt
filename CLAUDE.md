@@ -114,6 +114,23 @@ Règles qui découlent de ce découpage :
 - Préférer une étape intermédiaire nommée à une expression dense. Les grandeurs physiques
   méritent un nom même utilisées une seule fois.
 - Les commentaires et doc-comments du code sont **en anglais**, comme le reste du code.
+- **Le texte écrit en français doit être du français correct.** `docs/`, `ideas/`, `IDEAS.md` et
+  ce fichier sont en français ; le code, ses commentaires et les messages de commit sont en
+  anglais, par la règle ci-dessus. Un anglicisme n'est pas du jargon dès lors qu'un mot
+  français existe : « client » pour l'utilisateur d'une fonction — dire *appelant* ou *usage* —,
+  « graine » employé comme adjectif — dire *à graine fixe* —, « flaker » — dire *échouer par
+  intermittence*. En revanche un terme technique sans équivalent établi se garde tel quel :
+  `sampler`, `renderer`, *path tracing* sont le nom de la chose, et les traduire nuirait.
+- **Un commentaire et un document décrivent l'état actuel**, ni le passé ni le futur : ce qui a
+  changé appartient au message de commit, ce qui n'est pas fait à `IDEAS.md` et `ideas/`. Ce n'est
+  pas une question de goût — un commentaire qui raconte devient un *mensonge* dès que le code
+  bouge, quand un commentaire qui décrit ne peut que se périmer avec lui. Deux formes sont
+  admises : le **présent**, et le **contrefactuel au présent** — ce qui casserait sans cette ligne,
+  quelle alternative est écartée et pourquoi. Le second se confond aisément avec de l'histoire, et
+  la conversion est mécanique : « remplace un axe tiré au hasard, donc l'arbre changeait de forme »
+  devient « un axe au hasard ferait changer l'arbre d'une exécution à l'autre ». Même tri pour les
+  chiffres : ceux qui caractérisent le code actuel restent, les autres vont au commit. Une
+  exception se demande explicitement.
 - Éviter le `unsafe`. Il n'a aujourd'hui aucune justification dans ce projet ; toute
   introduction doit être argumentée par une mesure, pas par une intuition.
 - Pas de constante magique nue : une tolérance, un epsilon, un décalage anti-acné doit être
