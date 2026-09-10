@@ -14,11 +14,17 @@ const RIGHT_TEE: char = '┤';
 const TOP_TEE: char = '┬';
 const BOTTOM_TEE: char = '┴';
 
+/// The divider between the two columns is one column wide, as every piece of the frame is.
+const DIVIDER_WIDTH: usize = 1;
+
+/// What the tables of this module are drawn with.
+const PADDING: Padding = Padding { horizontal: 1, vertical: 0 };
+
 /// A framed table of two columns, under a title spanning the whole of it.
 ///
 /// ```text
-/// ┌──────────┬──────────┐
-/// │ title    │          │   ← the title spans both columns and the divider between them
+/// ┌─────────────────────┐
+/// │ title               │   ← no divider here: the title spans both columns and the one below
 /// ├──────────┬──────────┤
 /// │ label    │ value    │
 /// └──────────┴──────────┘
@@ -33,7 +39,7 @@ const BOTTOM_TEE: char = '┴';
 /// table serve a configuration printed once and a progress report redrawn every second.
 pub struct Table {
     title: String,
-    rows: Vec<(String, String)>,
+    rows: Vec<Row>,
 }
 
 impl Table {
@@ -46,58 +52,167 @@ impl Table {
 
     /// Adds a row, its label in the left column and its value in the right.
     ///
-    /// A value holding newlines makes a row as tall as it is, the label on the row's middle line
-    /// and nothing on the others — which is what lets a cell carry something framed on its own.
+    /// Either cell may hold newlines, and the row is then as tall as the taller of the two, each
+    /// cell centred in that height. That is what lets a one-word label sit beside a cell framed
+    /// on its own rather than above it.
+    ///
+    /// A row is cut and squared up as it arrives, because neither depends on anything but the row
+    /// itself. What needs the whole table — how wide the columns come out — waits for [`draw`].
     pub fn push(&mut self, label: &str, value: &str) {
-        self.rows.push((label.to_string(), value.to_string()));
+        self.rows.push(Row::cut(label, value).aligned());
     }
 
     /// The drawn lines, frame included, in order and without their line terminators.
     pub fn lines(&self) -> Vec<String> {
-        let rows: Vec<(&str, Vec<&str>)> = self.rows.iter().map(|(label, value)| (label.as_str(), segments(value))).collect();
-
-        let label_column = rows.iter().map(|(label, _)| display_width(label)).max().unwrap_or(0);
-        let widest_value = rows
-            .iter()
-            .flat_map(|(_, segments)| segments.iter())
-            .map(|segment| display_width(segment))
-            .max()
-            .unwrap_or(0);
-        // The title spans both columns and the divider between them: two cells with a space on
-        // each side, and one vertical between them, is `label + value + 3`.
-        let value_column = widest_value.max(display_width(&self.title).saturating_sub(label_column + 3));
-        let title_span = label_column + value_column + 3;
-
-        let label_rule: String = std::iter::repeat(HORIZONTAL).take(label_column + 2).collect();
-        let value_rule: String = std::iter::repeat(HORIZONTAL).take(value_column + 2).collect();
-
-        let mut lines = vec![
-            format!(
-                "{TOP_LEFT}{}{TOP_RIGHT}",
-                std::iter::repeat(HORIZONTAL).take(title_span + 2).collect::<String>()
-            ),
-            format!("{VERTICAL} {} {VERTICAL}", pad(&self.title, title_span)),
-            format!("{LEFT_TEE}{label_rule}{TOP_TEE}{value_rule}{RIGHT_TEE}"),
-        ];
-        for (label, segments) in &rows {
-            // The label sits on the row's middle line, not its first: a tall cell — a boxed gauge
-            // is three lines — should carry its name beside its content rather than above it. An
-            // even count has no middle, and the label leans to the line above, as a caption does.
-            let label_line = (segments.len() - 1) / 2;
-
-            for (index, segment) in segments.iter().enumerate() {
-                let label = if index == label_line { *label } else { "" };
-                lines.push(format!(
-                    "{VERTICAL} {} {VERTICAL} {} {VERTICAL}",
-                    pad(label, label_column),
-                    pad(segment, value_column)
-                ));
-            }
-        }
-        lines.push(format!("{BOTTOM_LEFT}{label_rule}{BOTTOM_TEE}{value_rule}{BOTTOM_RIGHT}"));
-
-        lines
+        draw(&self.title, &self.rows, &PADDING)
     }
+}
+
+/// The lines, joined by newlines and with none at the end — a block to hand to `println!`.
+impl fmt::Display for Table {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.lines().join("\n"))
+    }
+}
+
+/// The blank room a table keeps around what its cells hold.
+///
+/// Every width and height elsewhere in this module is measured on content alone; this is what
+/// turns those into a drawn size, and it is the only place a table's spacing is decided.
+struct Padding {
+    /// Blank columns between a cell and each border beside it.
+    horizontal: usize,
+    /// Blank lines between a row's cells and each rule above and below them.
+    vertical: usize,
+}
+
+impl Padding {
+    /// The columns the title has to itself: both content columns, the blanks that flank the
+    /// divider, and the divider it spans over. Not the blanks at the two ends — the title has its
+    /// own pair of those, which is why they are absent here.
+    fn title_span(&self, columns: &Columns) -> usize {
+        columns.label + columns.value + 2 * self.horizontal + DIVIDER_WIDTH
+    }
+
+    /// A content width once the blank the frame keeps on each side of it is counted in.
+    fn around(&self, content: usize) -> usize {
+        content + 2 * self.horizontal
+    }
+}
+
+/// A row's two cells, each cut into the lines it occupies.
+///
+/// A cell's height needs no separate reckoning: it is the length of its own list.
+struct Row {
+    label: Vec<String>,
+    value: Vec<String>,
+}
+
+impl Row {
+    fn cut(label: &str, value: &str) -> Row {
+        Row {
+            label: cut_into_lines(label),
+            value: cut_into_lines(value),
+        }
+    }
+
+    /// The lines the row takes, which is what its taller cell takes.
+    fn height(&self) -> usize {
+        self.label.len().max(self.value.len())
+    }
+
+    /// The same row with both cells as tall as the row, each centred in that height.
+    ///
+    /// Heights only. Widths are not settled here because settling them means knowing how much
+    /// blank the frame keeps beside a cell, and that is the frame's business — a cell leaves this
+    /// step holding exactly what it holds.
+    fn aligned(self) -> Row {
+        let height = self.height();
+
+        Row {
+            label: centred(self.label, height),
+            value: centred(self.value, height),
+        }
+    }
+}
+
+/// What each column measures: the content alone, with no blank around it.
+struct Columns {
+    label: usize,
+    value: usize,
+}
+
+impl Columns {
+    /// The width of the widest cell in each column.
+    fn fitting(rows: &[Row]) -> Columns {
+        Columns {
+            label: widest(rows.iter().flat_map(|row| row.label.iter())),
+            value: widest(rows.iter().flat_map(|row| row.value.iter())),
+        }
+    }
+
+    /// The same columns, widened if the title asks for more room than they leave it.
+    ///
+    /// The value column takes the whole difference: a title is a caption for the table, not a
+    /// reason to push its first column away from its own content.
+    fn stretched_for(self, title: &str, padding: &Padding) -> Columns {
+        let missing = display_width(title).saturating_sub(padding.title_span(&self));
+
+        Columns {
+            value: self.value + missing,
+            ..self
+        }
+    }
+}
+
+/// The whole of what a table looks like, drawn around cells that hold their content and nothing
+/// else.
+///
+/// Everything that depends on the decoration is here and only here: how wide the columns come
+/// out, how much blank stands beside a cell and above a row, and the pieces of the frame. The
+/// steps before this one measure and align content, and none of them has to know that a border
+/// exists.
+fn draw(title: &str, rows: &[Row], padding: &Padding) -> Vec<String> {
+    let columns = Columns::fitting(rows).stretched_for(title, padding);
+    let label_rule = rule(padding.around(columns.label));
+    let value_rule = rule(padding.around(columns.value));
+    let title_span = padding.title_span(&columns);
+
+    let mut lines = vec![
+        format!("{TOP_LEFT}{}{TOP_RIGHT}", rule(padding.around(title_span))),
+        framed(&[(title, title_span)], padding),
+        format!("{LEFT_TEE}{label_rule}{TOP_TEE}{value_rule}{RIGHT_TEE}"),
+    ];
+    lines.extend(rows.iter().flat_map(|row| draw_row(row, &columns, padding)));
+    lines.push(format!("{BOTTOM_LEFT}{label_rule}{BOTTOM_TEE}{value_rule}{BOTTOM_RIGHT}"));
+
+    lines
+}
+
+/// One row's lines, the vertical padding added above and below its cells.
+fn draw_row(row: &Row, columns: &Columns, padding: &Padding) -> Vec<String> {
+    let above_and_below = vec![String::new(); padding.vertical];
+    let labels = above_and_below.iter().chain(row.label.iter()).chain(above_and_below.iter());
+    let values = above_and_below.iter().chain(row.value.iter()).chain(above_and_below.iter());
+
+    labels
+        .zip(values)
+        .map(|(label, value)| framed(&[(label, columns.label), (value, columns.value)], padding))
+        .collect()
+}
+
+/// A line of cells, each grown to the width it is given and set between borders, with the blank
+/// of `padding` on either side of it.
+///
+/// Both kinds of line in a table are this: the title is one cell spanning the width, a row is
+/// two. Writing either by hand means counting blanks in a format string, and a miscount reads as
+/// a table that leans.
+fn framed(cells: &[(&str, usize)], padding: &Padding) -> String {
+    let blank = " ".repeat(padding.horizontal);
+    let divider = VERTICAL.to_string();
+    let padded: Vec<String> = cells.iter().map(|(cell, width)| format!("{blank}{}{blank}", pad(cell, *width))).collect();
+
+    format!("{VERTICAL}{}{VERTICAL}", padded.join(&divider))
 }
 
 /// The three lines of a frame drawn tight around `content`, which must hold no newline.
@@ -109,33 +224,52 @@ impl Table {
 ///
 /// The pieces come from here rather than from the caller so that one module keeps the whole
 /// box-drawing vocabulary.
-pub fn boxed(content: &str) -> Vec<String> {
-    let rule: String = std::iter::repeat(HORIZONTAL).take(display_width(content)).collect();
+pub fn boxed(content: &str) -> [String; 3] {
+    let edge = rule(display_width(content));
 
-    vec![
-        format!("{TOP_LEFT}{rule}{TOP_RIGHT}"),
+    [
+        format!("{TOP_LEFT}{edge}{TOP_RIGHT}"),
         format!("{VERTICAL}{content}{VERTICAL}"),
-        format!("{BOTTOM_LEFT}{rule}{BOTTOM_RIGHT}"),
+        format!("{BOTTOM_LEFT}{edge}{BOTTOM_RIGHT}"),
     ]
 }
 
-/// The lines of a cell, an empty cell counting as one line rather than none.
-fn segments(value: &str) -> Vec<&str> {
-    let lines: Vec<&str> = value.lines().collect();
+/// The lines of a cell, an empty cell counting as one blank line rather than none.
+fn cut_into_lines(cell: &str) -> Vec<String> {
+    let lines: Vec<String> = cell.lines().map(String::from).collect();
 
     if lines.is_empty() {
-        vec![""]
+        vec![String::new()]
     }
     else {
         lines
     }
 }
 
-/// The lines, joined by newlines and with none at the end — a block to hand to `println!`.
-impl fmt::Display for Table {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.lines().join("\n"))
-    }
+/// `cell` grown to `height` lines, its own sitting in the middle and the rest left empty.
+///
+/// Content in the middle and not at the top: a tall cell — a boxed gauge is three lines — should
+/// carry its label beside its content rather than above it. Both columns are grown by this same
+/// rule, which is why the label needs no rule of its own. When the blank lines do not divide
+/// evenly the extra one goes below, so the content leans up, as a caption does.
+fn centred(cell: Vec<String>, height: usize) -> Vec<String> {
+    let above = (height - cell.len()) / 2;
+
+    let mut lines = vec![String::new(); above];
+    lines.extend(cell);
+    lines.resize(height, String::new());
+
+    lines
+}
+
+/// The widest of a set of lines, in columns.
+fn widest<'a>(lines: impl Iterator<Item = &'a String>) -> usize {
+    lines.map(|line| display_width(line)).max().unwrap_or(0)
+}
+
+/// A horizontal rule of `width` columns.
+fn rule(width: usize) -> String {
+    std::iter::repeat(HORIZONTAL).take(width).collect()
 }
 
 /// `cell`, followed by the spaces that bring it to `width` columns.
@@ -231,14 +365,36 @@ mod tests {
     }
 
     /// A row is the only line carrying two cells, so the frame and the title tell themselves
-    /// apart from it — which is how the configuration round-trip test reads a table back.
+    /// apart from it — which is how the configuration round-trip test reads a table back, and
+    /// what the drawing in this module's own documentation has to agree with.
     #[test]
-    fn a_row_carries_two_cells_and_the_frame_carries_none() {
+    fn a_row_carries_two_cells_and_neither_the_title_nor_the_frame_does() {
         let lines = two_rows().lines();
 
         assert_eq!(4, lines[3].split(VERTICAL).count());
         assert_eq!(3, lines[1].split(VERTICAL).count());
         assert_eq!(1, lines[0].split(VERTICAL).count());
+        // The top rule spans the whole table, so it carries no joint either.
+        assert_eq!(1, lines[0].split(TOP_TEE).count());
+        assert_eq!(2, lines[2].split(TOP_TEE).count());
+    }
+
+    /// Both columns are grown by the same rule, so a label of several lines is laid out exactly
+    /// as a value of several lines is — and, unlike a label treated as one string, it does not
+    /// carry a newline into the middle of a drawn line.
+    #[test]
+    fn a_multi_line_label_is_laid_out_like_a_multi_line_value() {
+        let mut table = Table::new("A title");
+        table.push("one\ntwo", "a\nb\nc");
+        let lines = table.lines();
+        let width = display_width(&lines[0]);
+
+        assert_eq!(7, lines.len());
+        assert!(lines[3].contains("one"));
+        assert!(lines[4].contains("two"));
+        for line in &lines {
+            assert_eq!(width, display_width(line), "{line}");
+        }
     }
 
     /// A tall cell carries its label beside its content, not above it — which for three lines
@@ -252,6 +408,23 @@ mod tests {
         assert!(!lines[3].contains("tall"));
         assert!(lines[4].contains("tall"));
         assert!(!lines[5].contains("tall"));
+    }
+
+    /// Widths and heights are measured on content alone, and the blank around it comes from the
+    /// padding and nowhere else — so changing the padding changes the drawn size and nothing
+    /// about what the cells hold.
+    #[test]
+    fn the_padding_is_what_decides_the_drawn_size() {
+        let tight = Padding { horizontal: 0, vertical: 0 };
+        let loose = Padding { horizontal: 2, vertical: 1 };
+        let rows = vec![Row::cut("label", "value").aligned()];
+
+        let drawn = |padding: &Padding| draw("A title", &rows, padding);
+
+        // Two blanks per side of two cells, so eight columns more than none at all.
+        assert_eq!(display_width(&drawn(&tight)[0]) + 8, display_width(&drawn(&loose)[0]));
+        // And one blank line above the row, one below.
+        assert_eq!(drawn(&tight).len() + 2, drawn(&loose).len());
     }
 
     #[test]
