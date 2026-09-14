@@ -1,11 +1,13 @@
 use crate::table::{boxed, display_width, Table};
 use std::io::{self, Write};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// The table's title, and the label of each of its rows.
 const TITLE: &str = "Rendering progress";
 const GAUGE_LABEL: &str = "progress";
 const ELAPSED_LABEL: &str = "elapsed";
+const REMAINING_LABEL: &str = "remaining";
+const TOTAL_LABEL: &str = "total";
 
 /// Cells the gauge is wide, borders excluded. Forty is enough for every percent to move the fill
 /// at least every third step, and short enough to leave a terminal room for the rest.
@@ -31,19 +33,34 @@ const BOTTOM_LINE: usize = 2;
 
 const SECONDS_PER_MINUTE: u64 = 60;
 const MINUTES_PER_HOUR: u64 = 60;
+const MILLIS_PER_SECOND: u128 = 1_000;
+
+/// The share of the work below which no forecast is offered.
+///
+/// Under one percent the extrapolation is carried by the handful of steps that happen to have
+/// run: one pixel of a million announces three hours, and the figure swings by minutes from one
+/// redraw to the next. One percent of a 1280×720 image is nine thousand pixels, enough for the
+/// average to settle into something worth reading.
+const FORECAST_FROM_PERCENT: usize = 1;
+
+/// What a duration reads as while it cannot be forecast. As wide as an `HH:MM:SS`, so that the
+/// frame does not breathe at the moment the forecast appears.
+const UNKNOWN_DURATION: &str = "--:--:--";
 
 /// A table redrawn in place on the terminal while a render runs, holding a gauge and the time
 /// spent so far.
 ///
 /// ```text
-/// ┌──────────┬──────────────────────────────────────────────────┐
+/// ┌───────────┬─────────────────────────────────────────────────┐
 /// │ Rendering progress                                          │
-/// ├──────────┬──────────────────────────────────────────────────┤
-/// │          │ ┌────────────────────────────────────────┐       │
-/// │ progress │ │███████████████████                     │  48%  │
-/// │          │ └────────────────────────────────────────┘       │
-/// │ elapsed  │ 00:01:23                                         │
-/// └──────────┴──────────────────────────────────────────────────┘
+/// ├───────────┬─────────────────────────────────────────────────┤
+/// │           │ ┌────────────────────────────────────────┐      │
+/// │ progress  │ │███████████████████                     │  48% │
+/// │           │ └────────────────────────────────────────┘      │
+/// │ elapsed   │ 00:01:23                                        │
+/// │ remaining │ 00:01:29                                        │
+/// │ total     │ 00:02:52                                        │
+/// └───────────┴─────────────────────────────────────────────────┘
 /// ```
 ///
 /// Three things shape what follows:
@@ -111,14 +128,18 @@ impl ProgressReport {
         let share = self.done.min(self.total);
         let filled = share * GAUGE_WIDTH / self.total;
         let percent = share * 100 / self.total;
-        let seconds = self.started.elapsed().as_secs();
+        let so_far = self.started.elapsed();
+        let seconds = so_far.as_secs();
 
+        // The forecast rows are a function of the share done and the time it took, and both are
+        // in this key already — so they cannot go stale between two redraws without one of these
+        // three moving first, and the cadence is the one the gauge alone would have.
         if self.drawn == Some((filled, percent, seconds)) {
             return;
         }
         self.drawn = Some((filled, percent, seconds));
 
-        let lines = table(&gauge(filled, percent), &elapsed(seconds)).lines();
+        let lines = table(&gauge(filled, percent), &Durations::at(share, self.total, so_far)).lines();
 
         // One string, one write, one flush: a line at a time would show the table being built.
         let mut frame = String::new();
@@ -168,13 +189,63 @@ fn gauge(filled: usize, percent: usize) -> String {
     )
 }
 
-/// The elapsed cell, as `HH:MM:SS`.
+/// The three durations a report shows: what the render has taken, what is left of it, and what it
+/// is heading for in all.
+///
+/// They are held together because two of the three are read off the same extrapolation, and
+/// because three cells of identical shape passed one after another are three chances to hand the
+/// table the wrong one.
+struct Durations {
+    elapsed: String,
+    remaining: String,
+    total: String,
+}
+
+impl Durations {
+    /// The three cells after `so_far`, with `share` of the job's `steps` done.
+    ///
+    /// The forecast assumes **the steps left cost what the steps done have cost on average**, so
+    /// the whole job is heading for `so_far × steps / share`. That assumption is false in the
+    /// small: pixels are handed out in scan order, and a band of empty background does not cost
+    /// what the mesh below it costs, so the figure drifts while the render crosses an expensive
+    /// region and comes back as it leaves. Averaging over the whole run rather than over the last
+    /// steps is what keeps it from chasing that relief — a sliding window would follow it and
+    /// swing harder.
+    ///
+    /// `steps` is never zero: [`ProgressReport::new`] sees to that.
+    fn at(share: usize, steps: usize, so_far: Duration) -> Durations {
+        let elapsed = so_far.as_secs();
+
+        if share * 100 / steps < FORECAST_FROM_PERCENT {
+            return Durations {
+                elapsed: clock(elapsed),
+                remaining: UNKNOWN_DURATION.to_string(),
+                total: UNKNOWN_DURATION.to_string(),
+            };
+        }
+
+        // Milliseconds rather than seconds, because a job whose first percent passes in under a
+        // second would otherwise forecast a total of zero. The product is taken in `u128`, which
+        // leaves it no room to overflow at any scale a render reaches.
+        let total = (so_far.as_millis() * steps as u128 / share as u128 / MILLIS_PER_SECOND) as u64;
+
+        Durations {
+            elapsed: clock(elapsed),
+            // The two agree at the end: at the last step the forecast is the elapsed time itself,
+            // so the table closes on a remaining of zero rather than on a stale guess.
+            remaining: clock(total.saturating_sub(elapsed)),
+            total: clock(total),
+        }
+    }
+}
+
+/// A duration cell, as `HH:MM:SS`.
 ///
 /// Fixed fields rather than the shortest form that fits, so that the cell does not change width
 /// from one second to the next and the frame does not breathe. Hours are not capped, and a render
 /// that runs past a hundred of them widens the cell by a character — which changes nothing, since
 /// the value column is already as wide as the gauge.
-fn elapsed(seconds: u64) -> String {
+fn clock(seconds: u64) -> String {
     let hours = seconds / (SECONDS_PER_MINUTE * MINUTES_PER_HOUR);
     let minutes = (seconds / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
     let seconds = seconds % SECONDS_PER_MINUTE;
@@ -182,10 +253,12 @@ fn elapsed(seconds: u64) -> String {
     format!("{hours:02}:{minutes:02}:{seconds:02}")
 }
 
-fn table(gauge: &str, elapsed: &str) -> Table {
+fn table(gauge: &str, durations: &Durations) -> Table {
     let mut table = Table::new(TITLE);
     table.push(GAUGE_LABEL, gauge);
-    table.push(ELAPSED_LABEL, elapsed);
+    table.push(ELAPSED_LABEL, &durations.elapsed);
+    table.push(REMAINING_LABEL, &durations.remaining);
+    table.push(TOTAL_LABEL, &durations.total);
     table
 }
 
@@ -267,38 +340,97 @@ mod tests {
     /// The clock is the second thing that moves the table, and it is why the render does not look
     /// stuck between two percents.
     #[test]
-    fn the_elapsed_row_reads_as_hours_minutes_and_seconds() {
-        assert_eq!("00:00:00", elapsed(0));
-        assert_eq!("00:00:59", elapsed(59));
-        assert_eq!("00:01:00", elapsed(60));
-        assert_eq!("01:00:00", elapsed(3600));
-        assert_eq!("12:34:56", elapsed(12 * 3600 + 34 * 60 + 56));
+    fn a_duration_reads_as_hours_minutes_and_seconds() {
+        assert_eq!("00:00:00", clock(0));
+        assert_eq!("00:00:59", clock(59));
+        assert_eq!("00:01:00", clock(60));
+        assert_eq!("01:00:00", clock(3600));
+        assert_eq!("12:34:56", clock(12 * 3600 + 34 * 60 + 56));
     }
 
     /// Every second of a render draws the same width, so the frame does not breathe.
     #[test]
-    fn the_elapsed_cell_keeps_its_width() {
-        let widths: Vec<usize> = (0..3600 * 4).map(|seconds| elapsed(seconds).chars().count()).collect();
+    fn a_duration_cell_keeps_its_width() {
+        let widths: Vec<usize> = (0..3600 * 4).map(|seconds| clock(seconds).chars().count()).collect();
 
         assert!(widths.iter().all(|width| *width == widths[0]));
     }
 
+    /// The forecast extrapolates: half the job in a minute is a job of two minutes, one of which
+    /// is left.
+    #[test]
+    fn the_forecast_reads_the_rest_of_the_job_off_the_part_already_done() {
+        let durations = Durations::at(50, 100, Duration::from_secs(60));
+
+        assert_eq!("00:01:00", durations.elapsed);
+        assert_eq!("00:01:00", durations.remaining);
+        assert_eq!("00:02:00", durations.total);
+    }
+
+    /// What `finish` leaves on screen: nothing left to do, and a total that is the render's own
+    /// duration rather than a guess at it.
+    #[test]
+    fn a_finished_job_forecasts_the_time_it_actually_took() {
+        let durations = Durations::at(100, 100, Duration::from_secs(95));
+
+        assert_eq!("00:01:35", durations.elapsed);
+        assert_eq!("00:00:00", durations.remaining);
+        assert_eq!(durations.elapsed, durations.total);
+    }
+
+    /// Below the threshold the extrapolation is carried by a handful of steps and says nothing,
+    /// so the table says nothing either — but the time actually spent is never in doubt.
+    #[test]
+    fn no_forecast_is_offered_before_the_job_is_worth_extrapolating() {
+        let durations = Durations::at(1, 1_000_000, Duration::from_secs(3));
+
+        assert_eq!("00:00:03", durations.elapsed);
+        assert_eq!(UNKNOWN_DURATION, durations.remaining);
+        assert_eq!(UNKNOWN_DURATION, durations.total);
+
+        // One percent of the same job is where the forecast starts.
+        let durations = Durations::at(10_000, 1_000_000, Duration::from_secs(3));
+
+        assert_eq!("00:05:00", durations.total);
+    }
+
+    /// The forecast appears mid-render, so the cell it lands in must be the width the placeholder
+    /// held — a table that widens under way would leave the old frame behind it.
+    #[test]
+    fn the_placeholder_is_as_wide_as_a_duration() {
+        assert_eq!(display_width(&clock(0)), display_width(UNKNOWN_DURATION));
+    }
+
+    /// A forecast in milliseconds and not in seconds: a job whose first percent passes in under a
+    /// second still forecasts a duration rather than zero.
+    #[test]
+    fn a_fast_first_percent_still_forecasts_a_duration() {
+        let durations = Durations::at(1, 100, Duration::from_millis(600));
+
+        assert_eq!("00:01:00", durations.total);
+    }
+
+    /// The table as a half-done render draws it.
+    fn half_drawn() -> Vec<String> {
+        table(&gauge(20, 50), &Durations::at(50, 100, Duration::from_secs(83))).lines()
+    }
+
     /// The table is redrawn over itself, so the cursor must climb exactly as far as the last draw
-    /// went down. Eight lines: its own frame and title, the three the boxed gauge takes, and the
-    /// one the clock takes.
+    /// went down. Ten lines: its own frame and title, the three the boxed gauge takes, and one
+    /// for each of the three durations.
     #[test]
     fn the_table_is_the_height_the_cursor_climbs_back() {
-        let lines = table(&gauge(20, 50), &elapsed(83)).lines();
+        let lines = half_drawn();
 
-        assert_eq!(8, lines.len());
-        assert_eq!("\x1b[8A", cursor_up(lines.len()));
+        assert_eq!(10, lines.len());
+        assert_eq!("\x1b[10A", cursor_up(lines.len()));
     }
 
     /// The gauge is three lines tall inside a cell, and the table stays a table: every line of it
     /// still comes out the same width, colour escapes and inner frame included.
     #[test]
     fn a_boxed_gauge_does_not_break_the_table() {
-        let lines = table(&gauge(20, 50), &elapsed(83)).lines();
+        let lines = half_drawn();
         let width = display_width(&lines[0]);
 
         for line in &lines {
