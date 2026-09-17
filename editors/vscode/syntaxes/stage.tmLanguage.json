@@ -1,0 +1,91 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Stage",
+  "scopeName": "source.stage",
+  "patterns": [
+    {
+      "name": "comment.line.number-sign.stage",
+      "match": "#.*$"
+    },
+    {
+      "name": "invalid.illegal.empty-string.stage",
+      "match": "\"\""
+    },
+    {
+      "name": "string.quoted.double.stage",
+      "match": "\"[^\"]*\""
+    },
+    {
+      "name": "invalid.illegal.number.stage",
+      "match": "(?<![\\w.])[+-]?[0-9]+\\.?[0-9]*[eE][+-]?[0-9]+"
+    },
+    {
+      "name": "invalid.illegal.number.stage",
+      "match": "(?<![\\w.])[+-]?\\.[0-9]+"
+    },
+    {
+      "name": "constant.numeric.stage",
+      "match": "(?<![\\w.])[+-]?[0-9]+(?:\\.[0-9]*)?"
+    },
+    {
+      "name": "keyword.control.stage",
+      "match": "\\b(?:camera|scene|object|transform|elem)\\b"
+    },
+    {
+      "name": "support.type.camera.stage",
+      "match": "\\b(?:pin_hole|thin_lens)\\b"
+    },
+    {
+      "name": "storage.type.object.stage",
+      "match": "\\b(?:simple|transformed|compound)\\b"
+    },
+    {
+      "name": "support.type.shape.stage",
+      "match": "\\b(?:sphere|rectangle|plane|cylinder|aabox|mesh|csg)\\b"
+    },
+    {
+      "name": "support.function.csg.stage",
+      "match": "\\b(?:union|intersection|substraction)\\b"
+    },
+    {
+      "name": "support.class.material.stage",
+      "match": "\\b(?:lambertian|metal|dielectric|diffuse_light)\\b"
+    },
+    {
+      "name": "support.function.texture.stage",
+      "match": "\\b(?:color|checkerboard)\\b"
+    },
+    {
+      "name": "support.function.transform.stage",
+      "match": "\\b(?:translate|rotate_x|rotate_y|rotate_z)\\b"
+    },
+    {
+      "name": "variable.parameter.stage",
+      "match": "\\b(?:pos|look|up|radius|focal_length|file)\\b"
+    },
+    {
+      "name": "constant.language.flag.stage",
+      "match": "\\b(?:reverse)\\b"
+    },
+    {
+      "name": "punctuation.section.block.stage",
+      "match": "[{}]"
+    },
+    {
+      "name": "invalid.illegal.bracket.stage",
+      "match": "[\\[\\]()]"
+    },
+    {
+      "name": "invalid.illegal.identifier.stage",
+      "match": "(?<![\\w])_[A-Za-z0-9_]*"
+    },
+    {
+      "name": "invalid.illegal.identifier.stage",
+      "match": "(?<![\\w])[A-Za-z][A-Za-z0-9_]*"
+    },
+    {
+      "name": "invalid.illegal.character.stage",
+      "match": "[^\\s]"
+    }
+  ]
+}

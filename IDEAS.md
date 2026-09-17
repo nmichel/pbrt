@@ -206,8 +206,10 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       [lexer](src/loader/parser/lexer.rs) → [parser](src/loader/parser.rs) → nœud d'
       [AST](src/loader/ast.rs) → méthode de [`Visitor`](src/loader/visitors.rs) → les deux visiteurs
       (`PrintVisitor` doit refaire l'aller-retour, `SceneBuilderVisitor` doit appeler
-      `Scene::add_light`). Quatre décisions à prendre avant d'écrire, dont trois ne sont pas
-      évidentes :
+      `Scene::add_light`) → et le support éditeur d'[editors/vscode/](editors/vscode/), que
+      [tests/vscode_grammar_sync.rs](tests/vscode_grammar_sync.rs) rend obligatoire : tant qu'un
+      mot-clé neuf n'y est ni coloré ni documenté, `cargo test` est rouge. Quatre décisions à prendre
+      avant d'écrire, dont trois ne sont pas évidentes :
       **(1) Où vit le nœud.** `SceneNode` porte `objects: Vec<Box<dyn ObjectNode>>` ; une lumière est
       membre de la scène et non d'un objet, donc un `lights: Vec<Box<dyn LightNode>>` frère est la
       place juste — pas un `object light`, qui la ferait passer par le chemin forme + matériau.
@@ -227,7 +229,9 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
 - [ ] **Le mot-clé CSG `substraction` est orthographié à la française** — la forme anglaise est
       `subtraction`, et le reste de la grammaire est en anglais. C'est dans la surface publique du
       langage de scène, donc le renommer casse les `.stage` existants : accepter la rupture, ou
-      accepter les deux graphies le temps d'une transition.
+      accepter les deux graphies le temps d'une transition. Le renommage traverse aussi
+      [editors/vscode/](editors/vscode/) — coloration et entrée de survol —, et
+      [tests/vscode_grammar_sync.rs](tests/vscode_grammar_sync.rs) échoue tant que ce n'est pas fait.
 - [ ] Poids mort : `src/_keep.rs` et `src/shapes/triangle.cpp` ne sont pas compilés ;
       `integrators/whitted.rs` ne compile plus et est commenté hors du module ; `crossbeam` est
       toujours déclaré dans `Cargo.toml` sans être utilisé (`thread::scope` l'a remplacé) ; le build

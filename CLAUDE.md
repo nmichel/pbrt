@@ -43,9 +43,10 @@ d'une exécution ([docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3, qui porte au
 réouverture). **Un gain de construction se rapporte à une exécution entière, jamais au chargement
 seul** ; c'est la leçon de ce dernier, et elle vaut pour le prochain.
 
-**Lancer les tests** — `cargo test` est vert en entier : 113 tests de bibliothèque, 10 doc-tests, et
-les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour tout changement de
-construction ou de traversée d'un accélérateur, `cargo run --release --bin bvh_stats -- <scène>`
+**Lancer les tests** — `cargo test` est vert en entier : 134 tests de bibliothèque, 2 tests
+d'intégration, 10 doc-tests, et les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour
+tout changement de construction ou de traversée d'un accélérateur,
+`cargo run --release --bin bvh_stats -- <scène>`
 donne les compteurs à comparer ; ils ne voient que les rayons primaires et d'ombre, donc le
 chronomètre d'un rendu complet reste une mesure distincte et parfois divergente. Un changement de
 *construction* se mesure sur `test_files/many_spheres.stage` et pas ailleurs : c'est la seule scène
@@ -111,7 +112,9 @@ Règles qui découlent de ce découpage :
 - Le chargement de scène est isolé derrière le patron **Visitor** (`loader/visitors.rs`) :
   l'AST ne construit rien, les visiteurs ne parsent rien. Ajouter une primitive au langage
   `.stage` implique de traverser lexer → parser → nœud d'AST → méthode de `Visitor` → les deux
-  visiteurs. Ne pas court-circuiter cette chaîne.
+  visiteurs → le support éditeur d'[editors/vscode/](editors/vscode/), où le mot-clé neuf se
+  colore et se documente. Ne pas court-circuiter cette chaîne ; son dernier maillon n'est pas
+  facultatif, `tests/vscode_grammar_sync.rs` le vérifie.
 - Une nouvelle variante d'un concept existant s'ajoute par une implémentation de trait, pas par
   un `match` ou un `enum` dans le code appelant.
 

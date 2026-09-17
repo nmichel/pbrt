@@ -1,0 +1,39 @@
+{
+  "name": "pbrt-stage",
+  "displayName": "pbrt — langage de scène .stage",
+  "description": "Coloration syntaxique et aide contextuelle pour le langage de scène .stage",
+  "version": "0.1.0",
+  "publisher": "local",
+  "private": true,
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:stage"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "stage",
+        "aliases": [
+          "Stage"
+        ],
+        "extensions": [
+          ".stage"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "stage",
+        "scopeName": "source.stage",
+        "path": "./syntaxes/stage.tmLanguage.json"
+      }
+    ]
+  }
+}
