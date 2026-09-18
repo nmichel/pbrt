@@ -112,6 +112,26 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
 
 ## Justesse / robustesse
 
+- [ ] **Les deux lumières infinies consomment en monde ce que `Pdf` promet en local.**
+      [`Pdf`](src/pdfs.rs#L9) documente ses directions comme étant celles du repère de shading, et
+      [uniform_infinite_light.rs:31](src/lights/uniform_infinite_light.rs#L31) comme
+      [background_infinite_light.rs:34](src/lights/background_infinite_light.rs#L34) passent le
+      résultat de `SpherePdf::generate` directement en `LightLiSample::wi`, que `path.rs` traite
+      comme une direction monde. **Sans effet sur l'image** — la loi uniforme sur la sphère est
+      invariante par rotation, donc les mêmes nombres sont valides dans les deux repères —, mais
+      c'est le seul endroit du dépôt où la convention est violée à l'exécution, et il le restera
+      tant que rien ne distingue les deux repères dans le type. Deux routes : convertir par
+      `ShadingFrame`, ou reconnaître qu'une loi invariante par rotation n'appartient à aucun repère
+      et le dire dans `SpherePdf`.
+- [ ] **`SpherePdf` n'a pas de test de conservation d'énergie**, là où
+      [`CosinePdf`](src/pdfs/cosine.rs#L37) et [`HemispherePdf`](src/pdfs/hemisphere.rs#L36) en ont
+      un ; le §4 de CLAUDE.md en fait une obligation pour toute pdf. C'est aussi celle des trois dont
+      la densité est la plus facile à contredire par mégarde, puisqu'elle est constante.
+- [ ] **Les trois `Pdf::generate` partagent le même squelette (θ, φ) → direction** —
+      [cosine.rs:16](src/pdfs/cosine.rs#L16), [hemisphere.rs:16](src/pdfs/hemisphere.rs#L16),
+      [sphere.rs:16](src/pdfs/sphere.rs#L16) : `phi.cos() * r`, `phi.sin() * r`, `z = cos_theta`.
+      Seule la loi en cos θ diffère, et c'est la seule chose qu'un lecteur cherche ; un
+      `spherical_direction(sin_theta, cos_theta, phi)` ne laisserait que cela visible.
 - [ ] **`unsafe` inutile** en [simple.rs:31-34](src/objects/simple.rs#L31) — un pointeur brut sert à
       lire `intersections[0]`, alors qu'`Intersection` est `Copy`. Suppose aussi que le premier
       élément est le plus proche ; mériterait d'assérer que tout `Intersectable` rend bien une liste
