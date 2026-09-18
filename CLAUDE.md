@@ -20,13 +20,15 @@ fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a ap
 `docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
 une entrée cochée y garde une ligne, pas son corps.
 
-**Chantier en cours** — `chore/shading_frame`, préfixe `[shading]`. Le repère de shading est un type,
-[`ShadingFrame`](src/geom/shading_frame.rs), qui porte la base, la convention « z est la normale » et
-la dérivation du changement de repère ; les matériaux le construisent une fois par `scatter` au lieu
-de le reconstruire à chaque conversion. `reflect` et `same_hemisphere` y vivent, le cosinus
+**Chantier en cours** — aucun. Le sujet de la branche `chore/shading_frame` est clos : le repère de
+shading est un type, [`ShadingFrame`](src/geom/shading_frame.rs), qui porte la base, la convention
+« z est la normale » et la dérivation du changement de repère, là où elle était énoncée trois fois et
+la base reconstruite à chaque conversion. `reflect` et `same_hemisphere` y vivent, le cosinus
 surnuméraire d'une distribution de Dirac est devenu `materials::cancel_integrator_cosine`, et
-`vector3::abs_dot` porte le |cos θ| des intégrateurs, qui est en espace monde. Tout cela est un
-refactor : l'image est identique au bit près.
+`vector3::abs_dot` porte le |cos θ| des intégrateurs, qui est en espace monde. C'était un refactor :
+l'image est restée identique au bit près à chaque commit. Ce qu'il a trouvé sans le traiter est dans
+`IDEAS.md`, et la sortie de `cancel_integrator_cosine` — qui, elle, ne sera pas neutre sur l'image —
+dans [ideas/cosinus_dirac.md](ideas/cosinus_dirac.md).
 
 Avant lui, `feat/rework_sampling` : un rendu répète son image, indépendamment du nombre de threads et
 du renderer choisi, `utils::random_double` a cédé la place au trait `Sampler`, et `--seed` choisit

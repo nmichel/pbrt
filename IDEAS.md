@@ -22,7 +22,9 @@ faire ensuite.
       production doit *ne pas* couvrir, et atterrit dans le même visiteur. Retire les lumières câblées
       du loader. Détail sous *Renderer & infrastructure*.
 - [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
-      `is_last_bounce_specular` de l'intégrateur.
+      `is_last_bounce_specular` de l'intégrateur, et emporte avec lui
+      [le cosinus qu'un bsdf spéculaire divise](ideas/cosinus_dirac.md), qui se règle dans le même
+      geste et pas avant.
 - [ ] **Roulette russe** — dépend de MIS, et corrige au passage la coupe prématurée de `path.rs:65`.
 - [ ] **Sampler stratifié** — indépendant, et débloqué : le chantier du RNG graine en a livré tous
       les prérequis, et de quoi le mesurer. **Rien n'en dépend**, d'où sa place ici plutôt qu'en
@@ -170,6 +172,15 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
 - [ ] **Pas de MIS.** `Light` n'a pas de `pdf_li`, donc NEE et échantillonnage de BSDF ne peuvent pas
       être pondérés l'un contre l'autre. Bloqué sur l'entrée ci-dessus, et c'est MIS qui fera tomber
       le garde `is_last_bounce_specular`.
+- [ ] **Un matériau spéculaire encode la formule de son intégrateur** —
+      [`cancel_integrator_cosine`](src/materials.rs) divise par |cos θᵢ| ce que l'intégrateur va
+      multiplier par |cos θᵢ|. Le résultat est juste, et c'est la convention de pbrt-v3 ; la couture,
+      elle, est percée, et la singularité en |cos θᵢ| → 0 n'est tenue que par la géométrie des deux
+      appelants. Le correctif est un discriminant porté par l'échantillon et non par le matériau,
+      comme le `BSDFSample` de pbrt-v4 ; à faire **avec MIS**, qui réécrit la même pondération et
+      supprime l'unique usage d'`is_specular()`. Deux fausses pistes, dont un pdf falsifié qui
+      contaminerait MIS, et le fait que l'image ne sera plus identique au bit près :
+      [ideas/cosinus_dirac.md](ideas/cosinus_dirac.md).
 - [ ] **La roulette russe est commentée** ([path.rs:93](src/integrators/path.rs#L93)) ; les chemins
       sont coupés net à `max_depth`, et la coupe de [path.rs:65](src/integrators/path.rs#L65) tombe
       *avant* l'échantillonnage de lumière du dernier sommet — perte d'énergie systématique.
