@@ -57,10 +57,7 @@ impl Material for Metal {
             let shift_avoid_acne = n * 0.001;
             let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
 
-            // see https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#SpecularReflection
-            // Handling of extra cosine because of delta distribution
-            let abs_cos_theta = local_target.z.abs();
-            let attenuation = self.albedo.shade(intersection) / abs_cos_theta;
+            let attenuation = super::cancel_integrator_cosine(self.albedo.shade(intersection), &local_target);
 
             Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
         }

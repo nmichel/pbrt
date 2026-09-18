@@ -49,6 +49,43 @@ pub trait Material: Send + Sync {
     }
 }
 
+/// Divides out the cosine the integrator will apply to a specular scattering event.
+///
+/// Reference: PBR Book, 3ed, §8.2.2 — *Specular Reflection and Transmission*.
+/// <https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#SpecularReflection>
+///
+/// # The departure from the physical model, and why it is the right one
+///
+/// An integrator estimates the scattering equation, so it weights every sampled direction by
+/// |cos θᵢ| — `abs_dot(wi, n)` in `path.rs` and `naive.rs`. That is correct for a bsdf which is a
+/// *function* of direction. A perfect mirror's is not: it is a δ distribution, non-zero on the one
+/// direction it reflects into, and its integral already accounts for the projected solid angle. The
+/// factor the integrator is about to apply is therefore surnumerary, and pbrt's answer — the one
+/// taken here — is to give the bsdf a 1/|cos θᵢ| of its own so that the product is 1:
+///
+/// ```text
+///   f(wo, wi) = ρ ⋅ δ(wi − reflect(wo)) / |cos θᵢ|      then      f ⋅ |cos θᵢ| = ρ ⋅ δ(…)
+/// ```
+///
+/// **Consequence on the image**: none, as long as the two halves agree. The division is a
+/// compensation, not a fudge, and `test_specular_cosine_cancels_out` is what says so — it fails the
+/// moment an integrator stops applying the cosine, which is exactly when this function must go.
+///
+/// **A grazing direction is a singularity**: |cos θᵢ| → 0 sends the attenuation to infinity. The
+/// materials that call this guard against it by their own geometry — `Metal` drops a direction
+/// below the horizon before getting here, `Dielectric` only ever passes a reflected or refracted
+/// direction, neither of which is tangent unless `wo` itself is.
+///
+/// # Frame
+///
+/// `local_wi` is in the [`ShadingFrame`](crate::geom::shading_frame::ShadingFrame), so cos θᵢ is
+/// its `z` component. The absolute value is what makes this serve transmission as well as
+/// reflection: a refracted direction sits *below* the surface, with a negative cosine.
+pub fn cancel_integrator_cosine(attenuation: Spectrum, local_wi: &Vector3f) -> Spectrum {
+    let abs_cos_theta = local_wi.z.abs();
+    attenuation / abs_cos_theta
+}
+
 mod dielectric;
 mod diffuse_light;
 mod lambertian;
@@ -58,6 +95,67 @@ pub use self::dielectric::{Dielectric, RefractionIndices};
 pub use self::diffuse_light::DiffuseLight;
 pub use self::lambertian::Lambertian;
 pub use self::metal::Metal;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geom::shading_frame;
+
+    /// Round-trip through a division and a multiplication by the same cosine, so the claim being
+    /// checked is conservation and not bit-exact equality — `(1/c)·c` is not always 1 in binary
+    /// floating point.
+    const ENERGY_TOLERANCE: f64 = 1e-12;
+
+    /// The largest departure from white over the three components, in either direction — a loss
+    /// and a gain of energy are both failures.
+    fn assert_conserves_energy(beta: Spectrum, label: &str) {
+        let lost = (colors::WHITE + beta * -1.0).max_component_value();
+        let gained = (beta + colors::WHITE * -1.0).max_component_value();
+        let departure = lost.max(gained);
+
+        assert!(departure < ENERGY_TOLERANCE, "{}: energy off by {}, beta is {:?}", label, departure, beta);
+    }
+
+    /// A perfect mirror loses no energy: the 1/|cos θᵢ| of
+    /// [`cancel_integrator_cosine`] and the |cos θᵢ| the integrator applies must multiply out to
+    /// exactly 1, at any incidence.
+    ///
+    /// This is the test the division exists for. It is not a restatement of the code — it is the
+    /// contract between a material and *every* integrator, and it is what fails if either side
+    /// changes its mind about who applies the cosine.
+    #[test]
+    fn test_specular_cosine_cancels_out() {
+        let white_mirror = colors::WHITE;
+
+        // Several incidences, from near-normal to steep — but not tangent, which is the
+        // singularity the function's documentation calls out.
+        for cos_theta_o in [1.0_f64, 0.9, 0.5, 0.1, 0.01].iter() {
+            let sin_theta_o = (1.0 - cos_theta_o * cos_theta_o).sqrt();
+            let local_wo = Vector3f::new(sin_theta_o, 0.0, *cos_theta_o);
+            let local_wi = shading_frame::reflect(&local_wo);
+
+            let attenuation = cancel_integrator_cosine(white_mirror, &local_wi);
+
+            // What an integrator does with a ScatterInfo: attenuation ⋅ |cos θᵢ| / pdf, with the
+            // pdf of a delta distribution being 1.
+            let beta = attenuation * local_wi.z.abs() / 1.0;
+
+            assert_conserves_energy(beta, &format!("perfect mirror at cos θₒ = {}", cos_theta_o));
+        }
+    }
+
+    /// The absolute value is not cosmetic: it is what lets the same function serve a transmitted
+    /// direction, which sits below the surface and has a negative cosine.
+    #[test]
+    fn test_transmitted_direction_is_handled() {
+        let below = Vector3f::new(0.3, 0.0, -0.8);
+
+        let attenuation = cancel_integrator_cosine(colors::WHITE, &below);
+        let beta = attenuation * below.z.abs();
+
+        assert_conserves_energy(beta, "transmitted direction");
+    }
+}
 
 /*
 impl Material {

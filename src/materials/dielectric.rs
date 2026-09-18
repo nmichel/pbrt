@@ -100,10 +100,7 @@ impl Material for Dielectric {
                 let scatter_direction = frame.local_to_world(&local_scatter_direction);
                 let scattered_ray = Ray::new(&scattered_ray_origin, &scatter_direction);
 
-                // see https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#SpecularReflection
-                // Handling of extra cosine because of delta distribution
-                let abs_cos_theta = local_scatter_direction.z.abs();
-                attenuation = attenuation / abs_cos_theta;
+                attenuation = super::cancel_integrator_cosine(attenuation, &local_scatter_direction);
 
                 Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
             }
@@ -113,10 +110,7 @@ impl Material for Dielectric {
                 let shift_avoid_acne = world_outward_normal * 0.001;
                 let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
 
-                // see https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#SpecularReflection
-                // Handling of extra cosine because of delta distribution
-                let abs_cos_theta = local_reflected.z.abs();
-                attenuation = attenuation / abs_cos_theta;
+                attenuation = super::cancel_integrator_cosine(attenuation, &local_reflected);
 
                 Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
             }
