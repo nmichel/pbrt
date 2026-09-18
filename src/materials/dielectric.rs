@@ -1,6 +1,7 @@
 use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
+use crate::geom::shading_frame::ShadingFrame;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
@@ -35,7 +36,8 @@ impl Material for Dielectric {
         let Interaction { ref intersection, .. } = interaction;
         let Intersection { ref p, ref n, ref wo, .. } = intersection;
 
-        let mut local_wo = intersection.world_to_local(&wo);
+        let frame = ShadingFrame::from(intersection);
+        let mut local_wo = frame.world_to_local(&wo);
         local_wo.normalize();
 
         // Always compute the reflected vector (in local frame), as it is likely to be used (though not
@@ -95,7 +97,7 @@ impl Material for Dielectric {
                     let shift_avoid_acne = world_outward_normal * -0.001;
                     scattered_ray_origin = p + &shift_avoid_acne;
                 };
-                let scatter_direction = intersection.local_to_world(&local_scatter_direction);
+                let scatter_direction = frame.local_to_world(&local_scatter_direction);
                 let scattered_ray = Ray::new(&scattered_ray_origin, &scatter_direction);
 
                 // see https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#SpecularReflection
@@ -107,7 +109,7 @@ impl Material for Dielectric {
             }
             None => {
                 // Total reflection
-                let target = intersection.local_to_world(&local_reflected);
+                let target = frame.local_to_world(&local_reflected);
                 let shift_avoid_acne = world_outward_normal * 0.001;
                 let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
 

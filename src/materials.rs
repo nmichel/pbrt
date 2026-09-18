@@ -17,6 +17,16 @@ impl ScatterInfo {
     }
 }
 
+/// A bsdf: it samples a scattered direction, evaluates its own density over directions, and emits.
+///
+/// # Frame
+///
+/// **Every direction this trait exchanges is in world coordinates** — the `wo` and `wi` of `f`, the
+/// `scattered` ray of a [`ScatterInfo`]. An implementation that needs the shading frame builds a
+/// [`ShadingFrame`](crate::geom::shading_frame::ShadingFrame) from the interaction and converts, and
+/// that frame's module is where the convention is stated. Keeping the trait in world coordinates is
+/// what lets an integrator compose materials and lights without knowing which of them happens to
+/// work in a local frame.
 pub trait Material: Send + Sync {
     /// Samples an outgoing direction, drawing whatever numbers the bsdf needs from `sampler`.
     ///

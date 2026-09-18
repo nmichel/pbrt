@@ -1,6 +1,7 @@
 use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
+use crate::geom::shading_frame::ShadingFrame;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::pdfs::sphere::SpherePdf;
@@ -35,7 +36,8 @@ impl Material for Metal {
         let Interaction { ref intersection, .. } = interaction;
         let Intersection { ref p, ref n, ref wo, .. } = intersection;
 
-        let mut local_wo = intersection.world_to_local(&wo);
+        let frame = ShadingFrame::from(intersection);
+        let mut local_wo = frame.world_to_local(&wo);
         local_wo.normalize();
 
         let local_reflected = Vector3f::new(-local_wo.x, -local_wo.y, local_wo.z); // (1)
@@ -58,9 +60,11 @@ impl Material for Metal {
         let mut local_target = local_reflected + fuzz_offset;
         local_target.normalize();
 
+        // Above the horizon: in the shading frame the z component *is* cos θ, so this is the test
+        // `dot(local_target, n) > 0` without the dot product. A blurred direction that fell below
+        // the surface is absorbed rather than reflected into the geometry.
         if local_target.z > 0.0 {
-            // <=> dot(local_target, n)
-            let target = intersection.local_to_world(&local_target);
+            let target = frame.local_to_world(&local_target);
             let shift_avoid_acne = n * 0.001;
             let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
 

@@ -6,8 +6,10 @@ use crate::geom::vector3::Vector3f;
 /// Reference: PBR Book, 3ed, §13.6 — *2D Sampling with Multidimensional Transformations*.
 /// <https://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/2D_Sampling_with_Multidimensional_Transformations>
 ///
-/// **Frame**: directions are unit vectors of the local shading frame, where `z` is the surface
-/// normal. `value` takes a direction of that frame and returns a density **per unit solid angle**.
+/// **Frame**: directions are unit vectors of the shading frame — see
+/// [`ShadingFrame`](crate::geom::shading_frame::ShadingFrame), which states the convention and holds
+/// the change of basis. `value` takes a direction of that frame and returns a density **per unit
+/// solid angle**.
 ///
 /// # The two methods, and the contract between them
 ///
