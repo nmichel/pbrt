@@ -40,9 +40,12 @@ Avant eux, `chore/revamp_bvh_for_trimesh` : ses mesures et ses arbitrages sont d
 comparer une mesure fraîche.
 
 La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Y
-vient d'abord [`AreaLight`](ideas/area_light.md) — le plus grand écart au modèle physique du projet,
-les surfaces émissives ne contribuant à aucun éclairage indirect —, et trois entrées en dépendent :
-la production `light` de la grammaire, MIS, puis la roulette russe.
+vient d'abord la **production `light` de la grammaire `.stage`**, puis
+[`AreaLight`](ideas/area_light.md) — le plus grand écart au modèle physique du projet, les surfaces
+émissives ne contribuant à aucun éclairage indirect. Cet ordre surprend et il est délibéré : tant que
+le loader câble une `PointLight` que `NaiveIntegrator` ne peut pas voir, la comparaison `naive` /
+`path` est impossible, et c'est la seule preuve qu'`AreaLight` ait. Viennent ensuite MIS, qui emporte
+le cosinus de [ideas/cosinus_dirac.md](ideas/cosinus_dirac.md), puis la roulette russe.
 
 Trois chantiers restent *voisins* du BVH et n'en font délibérément pas partie :
 [les feuilles de maillage à un seul triangle](ideas/cout_traversee_bvh.md), débloquées mais

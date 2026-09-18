@@ -1,7 +1,8 @@
 # `AreaLight` — une surface émissive qui éclaire
 
 Indexé depuis [IDEAS.md](../IDEAS.md). Non commencé. **C'est le plus grand écart au modèle physique
-du projet**, et le chantier désigné comme suivant.
+du projet.** Il vient néanmoins en second, derrière la production `light` de la grammaire `.stage` :
+non par ordre d'importance, mais parce que sa vérification en dépend — voir le prérequis du §7.
 
 ## 1. Le défaut
 
@@ -19,7 +20,8 @@ trois chemins indépendants mènent au noir :
 
 **Effet net : une surface émissive ne contribue à aucun éclairage indirect.** Elle est visible, elle
 n'éclaire rien. C'est pourquoi [loader.rs](../src/loader.rs) câble en dur une `PointLight` et une
-lumière de fond pour que les scènes soient éclairées du tout — béquille que ce chantier retire.
+lumière de fond pour que les scènes soient éclairées du tout — béquille que retire le prérequis du
+§7, et dont le départ conditionne la vérification du §6.
 
 Et cela bloque la suite : MIS demande un `Light::pdf_li` à pondérer contre l'échantillonnage de BSDF,
 donc MIS attend ce fichier.
@@ -134,18 +136,24 @@ précisément le cas que MIS répare.
   vers la même image**. Un facteur `d²` en trop, un cosinus manquant ou une mesure non convertie
   changent la luminosité sans changer la forme de l'image — donc seule une comparaison à un autre
   estimateur les attrape.
+
+  **Elle exige que les lumières câblées soient parties**, et c'est ce qui décide de l'ordre des
+  chantiers : `NaiveIntegrator` ne consulte jamais `Scene::lights`, et une `PointLight` a une
+  probabilité nulle d'être touchée par un rayon. `path` la voit donc par NEE, `naive` ne la verra
+  jamais, et les deux ne peuvent pas être d'accord tant que le loader en ajoute une.
 - **Le témoin visuel** est `test_files/cornell_box.stage`, aujourd'hui éclairé par les lumières
   câblées dans le loader. Le rendre éclairé par son seul panneau *est* la démonstration du chantier.
 
 ## 7. Ordre d'attaque
 
-Les deux premières lignes ne parlent pas d'`AreaLight` mais sont ce qui rend la suite mesurable.
+**Prérequis, et il n'est pas dans ce fichier** : la production `light` de la grammaire `.stage`, qui
+retire les lumières câblées du loader. Sans elle, la comparaison `naive` / `path` du §6 — la seule
+preuve de ce chantier — est impossible, parce que `NaiveIntegrator` ne consulte jamais
+`Scene::lights` et ne verra donc jamais la `PointLight` que le loader ajoute à toute scène. Voir
+l'entrée correspondante de [IDEAS.md](../IDEAS.md), qui dit pourquoi elle passe devant.
 
-- [ ] Cacher boîte + centroïde de chaque primitive à `Scene::commit`, construire le BVH sur ce cache
-      — indépendant, ~20 lignes, et prérequis de tout ce qui relit des bornes.
 - [x] RNG graine, graine dans `Config` — deux rendus sont comparables
       ([docs/rendu_reproductible.md](../docs/rendu_reproductible.md)).
-- [ ] Sampler stratifié, indépendant de ce chantier : [sampler_stratifie.md](sampler_stratifie.md).
 - [ ] `AreaSampleable` + `ShapeSample`, implémentés sur `Rectangle` d'abord — c'est le panneau du
       Cornell box, et son échantillonnage uniforme est deux nombres.
 - [ ] Test de conservation d'aire sur cette implémentation, avant tout usage.
@@ -153,7 +161,8 @@ Les deux premières lignes ne parlent pas d'`AreaLight` mais sont ce qui rend la
       dans le doc-comment, radiance nulle du mauvais côté si l'émission est unilatérale.
 - [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme.
 - [ ] Ne **pas** toucher au garde `is_last_bounce_specular`.
-- [ ] Retirer les lumières câblées de `Loader::load_scene` ; témoin `cornell_box.stage`.
+- [ ] `cornell_box.stage` ne déclare plus que son panneau — les lumières câblées étant déjà parties
+      avec le prérequis, c'est ici que le témoin devient une scène éclairée par ce qu'elle dit.
 - [ ] Comparer `naive` et `path` sur ce témoin, et le dire dans le commit.
 - [ ] Étendre à `Sphere` et `Triangle`, puis au maillage — tirage d'un triangle proportionnel à son
       aire, ce qui demande une somme cumulée des aires construite une fois.

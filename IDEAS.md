@@ -15,12 +15,20 @@ dit en une incise ; quand elle contraint l'ordre, c'est l'ordre qui s'adapte. Le
 plus bas portent le détail de chaque entrée — elles servent à retrouver un sujet, pas à savoir quoi
 faire ensuite.
 
-- [ ] **`AreaLight`** — surfaces émissives enregistrées comme sources échantillonnables. Le plus grand
-      écart au modèle physique du projet ; plan détaillé dans
-      [ideas/area_light.md](ideas/area_light.md).
-- [ ] **Production `light` dans la grammaire `.stage`** — dépend d'`AreaLight`, qui décide de ce que la
-      production doit *ne pas* couvrir, et atterrit dans le même visiteur. Retire les lumières câblées
-      du loader. Détail sous *Renderer & infrastructure*.
+- [ ] **Production `light` dans la grammaire `.stage`** — passe devant `AreaLight`, et c'est ce qui
+      rend celui-ci démontrable. [`NaiveIntegrator`](src/integrators/naive.rs) ne consulte **jamais**
+      `Scene::lights` ; tant que [`Loader::load_scene`](src/loader.rs#L36) câble une `PointLight` que
+      `path` voit par NEE et qu'un rayon tiré au hasard ne touchera jamais, les deux estimateurs ne
+      peuvent pas converger vers la même image — or cette comparaison est la meilleure preuve dont
+      `AreaLight` dispose ([ideas/area_light.md](ideas/area_light.md) §6), la seule qui attrape un `d²`
+      en trop ou un cosinus manquant. Et la béquille ne peut pas partir avant que la grammaire sache
+      déclarer une lumière, sinon tout `.stage` sans surface émissive rend du noir. La dépendance que
+      cette entrée portait vers `AreaLight` est par ailleurs déjà acquittée : les quatre décisions de
+      conception sont tranchées, dont celle qui dit ce que la production ne couvre pas. Détail sous
+      *Renderer & infrastructure*.
+- [ ] **`AreaLight`** — surfaces émissives enregistrées comme sources échantillonnables. **Le plus
+      grand écart au modèle physique du projet** ; il n'est second ici que parce que sa preuve dépend
+      de l'entrée ci-dessus. Plan détaillé dans [ideas/area_light.md](ideas/area_light.md).
 - [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
       `is_last_bounce_specular` de l'intégrateur, et emporte avec lui
       [le cosinus qu'un bsdf spéculaire divise](ideas/cosinus_dirac.md), qui se règle dans le même
