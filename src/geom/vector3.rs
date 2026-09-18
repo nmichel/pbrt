@@ -295,6 +295,29 @@ where
     u.x * v.x + u.y * v.y + u.z * v.z
 }
 
+/// The magnitude of the dot product — for two unit vectors, |cos θ| between them.
+///
+/// This is the form a cosine takes when the side of the surface does not matter: the |cos θᵢ| an
+/// integrator applies to a sampled direction is this, taken against the surface normal. The
+/// absolute value is what lets a transmitted direction, which sits below the surface and has a
+/// negative cosine, contribute as much as a reflected one.
+///
+/// Assumes nothing about a frame: both vectors are in whatever coordinates the caller works in.
+/// The counterpart inside the shading frame is
+/// [`ShadingFrame`](crate::geom::shading_frame::ShadingFrame)'s convention, where the cosine
+/// against the normal is a single component and needs no dot product at all.
+///
+/// # Example
+/// ```
+/// use pbrt::geom::vector3::{abs_dot, Vector3f};
+/// let n = Vector3f::new(0.0, 1.0, 0.0);
+/// let below = Vector3f::new(0.0, -1.0, 0.0);
+/// assert_eq!(1.0, abs_dot(&n, &below));
+/// ```
+pub fn abs_dot(u: &Vector3f, v: &Vector3f) -> f64 {
+    dot(u, v).abs()
+}
+
 pub fn cross<T>(u: &Vector3<T>, v: &Vector3<T>) -> Vector3<T>
 where
     T: Mul<Output = T> + Sub<Output = T> + Copy,

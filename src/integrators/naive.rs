@@ -41,7 +41,7 @@ impl Integrator for NaiveIntegrator {
                 };
                 match material.scatter(ray, &interaction, sampler) {
                     Some(ScatterInfo { attenuation, scattered, pdf }) => {
-                        let abs_cos = vector3::dot(&scattered.direction, &interaction.intersection.n).abs();
+                        let abs_cos = vector3::abs_dot(&scattered.direction, &interaction.intersection.n);
                         emitted + attenuation * &self.li(&scattered, scene, depth - 1, near, far, sampler) * abs_cos / pdf
                     }
                     None => emitted,

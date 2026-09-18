@@ -70,7 +70,7 @@ impl Integrator for PathIntegrator {
                 if let Some(ref sampled_light) = self.sample_light(scene, sampler) {
                     if let Some((ref sample_li, ref visibility_tester)) = sampled_light.light.sample_li(&interaction.intersection, sampler) {
                         let wi = &sample_li.wi;
-                        let f = material.f(&-current_ray.direction, wi, &interaction) * vector3::dot(wi, &interaction.intersection.n).abs();
+                        let f = material.f(&-current_ray.direction, wi, &interaction) * vector3::abs_dot(wi, &interaction.intersection.n);
                         if visibility_tester.unoccluded(scene) {
                             let light_contribution = &sample_li.spectrum * &f * &beta / (sampled_light.p * sample_li.pdf);
                             accumulated_radiance += light_contribution;
@@ -80,7 +80,7 @@ impl Integrator for PathIntegrator {
 
                 if let Some(ref scatter_info) = material.scatter(&current_ray, &interaction, sampler) {
                     // Sample outgoing direction to continue the path
-                    let abs_cos_theta = vector3::dot(&scatter_info.scattered.direction, &interaction.intersection.n).abs();
+                    let abs_cos_theta = vector3::abs_dot(&scatter_info.scattered.direction, &interaction.intersection.n);
                     beta *= scatter_info.attenuation * abs_cos_theta / scatter_info.pdf;
                     current_ray = scatter_info.scattered.clone();
                     is_last_bounce_specular = material.is_specular();
