@@ -49,12 +49,6 @@ pub trait Material: Send + Sync {
     }
 }
 
-/// Check if two vectors are in the same hemisphere.
-/// Vectors v1 and v2 must be in the shading coordinate system (where z is the up direction).
-pub fn same_hemisphere(v1: &Vector3f, v2: &Vector3f) -> bool {
-    v1.z * v2.z > 0.0
-}
-
 mod dielectric;
 mod diffuse_light;
 mod lambertian;

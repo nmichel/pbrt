@@ -105,6 +105,51 @@ impl ShadingFrame {
     }
 }
 
+/// The mirror direction of `wo` about the normal.
+///
+/// # Frame
+///
+/// `wo` is **already in the shading frame** — nothing here checks that, and nothing can: the
+/// frame is a convention about what the components mean, not a property of the type. Passing a
+/// world-space direction returns a mirror about the world z axis, silently.
+///
+/// # Derivation
+///
+/// `wo` points *away* from the intersection point, so the incident direction is wi = −wo. The
+/// general reflection of wi about a normal n is
+///
+/// ```text
+/// [1]   wi − 2(wi⋅n)n
+/// ```
+///
+/// In this frame n = (0, 0, 1), so wi⋅n = wi_z and `[1]` only touches the third component:
+///
+/// ```text
+/// [2]   (wi_x, wi_y, wi_z) − 2·wi_z·(0, 0, 1) = (wi_x, wi_y, −wi_z)
+/// ```
+///
+/// Substituting wi = −wo gives (−wo_x, −wo_y, wo_z): the tangential components flip and the
+/// normal component is kept. `test_reflect_agrees_with_the_general_formula` is `[1]` and this
+/// result checked against each other.
+pub fn reflect(wo: &Vector3f) -> Vector3f {
+    Vector3f::new(-wo.x, -wo.y, wo.z)
+}
+
+/// Whether two directions lie on the same side of the surface.
+///
+/// # Frame
+///
+/// Both directions are **already in the shading frame**, where cos θ is the z component, so this
+/// is the sign of cos θ₁·cos θ₂. Same caveat as [`reflect`]: the precondition is a convention, not
+/// a checked property.
+///
+/// A direction exactly in the tangent plane (`z == 0`) belongs to *no* hemisphere and answers
+/// `false` against everything, itself included — hence the strict `>`. That is the useful answer
+/// for a BRDF: a grazing direction carries no energy, and `>=` would have it reflect.
+pub fn same_hemisphere(w1: &Vector3f, w2: &Vector3f) -> bool {
+    w1.z * w2.z > 0.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,5 +255,76 @@ mod tests {
             cos_theta_in_frame,
             cos_theta_in_world
         );
+    }
+
+    /// The derivation of [`reflect`], made executable: the three-component form in the frame and
+    /// the general `wi − 2(wi⋅n)n` in world coordinates must be the same direction. A frame
+    /// aligned with no axis is what gives the test teeth — on an axis-aligned one, a mistake in
+    /// the basis would cancel out.
+    #[test]
+    fn test_reflect_agrees_with_the_general_formula() {
+        let intersection = skewed_intersection();
+        let frame = ShadingFrame::from(&intersection);
+        let n = intersection.n;
+
+        for wo in [
+            Vector3f::new(0.3, -0.5, 0.81).normalized(),
+            n,
+            (n + Vector3f::new(0.4, 0.1, -0.2)).normalized(),
+        ]
+        .iter()
+        {
+            // The incident direction points at the surface, where `wo` points away from it.
+            let wi = wo * -1.0;
+            let in_world = wi - n * (2.0 * vector3::dot(&wi, &n));
+
+            let in_frame = frame.local_to_world(&reflect(&frame.world_to_local(wo)));
+
+            assert_close(&in_frame, &in_world, "reflected direction");
+        }
+    }
+
+    /// Reflecting twice returns the original direction, and reflection is an isometry — the two
+    /// properties any mirror must have, and the cheapest guard against a sign slip.
+    #[test]
+    fn test_reflect_is_an_involution_and_an_isometry() {
+        let wo = Vector3f::new(0.3, -0.5, 0.81).normalized();
+
+        assert_close(&reflect(&reflect(&wo)), &wo, "reflected twice");
+        assert!((reflect(&wo).length() - 1.0).abs() < EPSILON, "reflection changed the length");
+    }
+
+    /// A mirror direction stays on the side it came from: `wo` and its reflection share an
+    /// hemisphere, which is why [`reflect`] needs no horizon test of its own.
+    #[test]
+    fn test_reflect_keeps_the_hemisphere() {
+        let above = Vector3f::new(0.3, -0.5, 0.81).normalized();
+        let below = Vector3f::new(0.3, -0.5, -0.81).normalized();
+
+        assert!(same_hemisphere(&above, &reflect(&above)));
+        assert!(same_hemisphere(&below, &reflect(&below)));
+    }
+
+    /// The convention `same_hemisphere` encodes: only the sign of `z` matters, and a grazing
+    /// direction is in no hemisphere at all.
+    #[test]
+    fn test_same_hemisphere() {
+        let up = Vector3f::new(0.1, 0.2, 1.0);
+        let also_up = Vector3f::new(-0.9, 0.7, 0.3);
+        let down = Vector3f::new(0.1, 0.2, -1.0);
+        let grazing = Vector3f::new(0.6, -0.8, 0.0);
+
+        assert!(same_hemisphere(&up, &also_up), "two directions above the surface");
+        assert!(same_hemisphere(&down, &(down * 2.0)), "two directions below the surface");
+        assert!(!same_hemisphere(&up, &down), "opposite sides");
+
+        // The tangent plane belongs to neither side — including against itself.
+        assert!(!same_hemisphere(&grazing, &up), "grazing against up");
+        assert!(!same_hemisphere(&grazing, &down), "grazing against down");
+        assert!(!same_hemisphere(&grazing, &grazing), "grazing against itself");
+
+        // x and y carry no information: only z decides.
+        let up_elsewhere = Vector3f::new(-5.0, 3.0, up.z);
+        assert!(same_hemisphere(&up, &up_elsewhere), "tangential components are irrelevant");
     }
 }

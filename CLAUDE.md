@@ -179,10 +179,10 @@ Exemples de référence à imiter, déjà dans le projet :
   vers l'article source et le renvoi à ses équations numérotées ; explicite le raisonnement
   « entre-t-on ou sort-on du volume » avant de l'implémenter.
 - [geom/shading_frame.rs](src/geom/shading_frame.rs) — pose la matrice de changement de repère et
-  justifie `inv(M) == transpose(M)` avant de l'exploiter ; ses tests vérifient que l'aller-retour
-  est bien l'identité et que la base est orthonormée, ce sur quoi cette justification repose.
-- [materials/metal.rs](src/materials/metal.rs) — dérive la réflexion dans le repère local
-  jusqu'à `[-wox, -woy, woz]` au lieu de livrer le résultat brut.
+  justifie `inv(M) == transpose(M)` avant de l'exploiter ; dérive la réflexion dans le repère local
+  jusqu'à `[-wox, -woy, woz]` au lieu de livrer le résultat brut ; et ses tests recoupent cette
+  dérivation avec la formule générale en espace monde, ce qui est la forme la plus aboutie de
+  l'exigence « les tests font partie de la documentation ».
 - [integrators/path.rs](src/integrators/path.rs) — justifie le traitement de la radiance de
   fond après un rebond spéculaire par un renvoi au PBR Book.
 

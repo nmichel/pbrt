@@ -1,8 +1,7 @@
 use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
-use crate::geom::shading_frame::ShadingFrame;
-use crate::geom::vector3::Vector3f;
+use crate::geom::shading_frame::{self, ShadingFrame};
 use crate::interaction::Interaction;
 use crate::pdfs::sphere::SpherePdf;
 use crate::pdfs::Pdf;
@@ -23,16 +22,6 @@ impl Metal {
 
 impl Material for Metal {
     fn scatter(&self, _ray: &Ray, interaction: &Interaction, sampler: &mut dyn Sampler) -> Option<ScatterInfo> {
-        // (1) wo is the opposite of incoming ray (i.e. wo "goes away" from the intersection point),
-        // so, wi = -wo.
-        //
-        // local_wo is expressed in a space where the up vector is 'z' and is also the normal vector to
-        // the surface at the intersection point.
-        //
-        // So, computing the reflection of the wi vector (wi - 2*dot(wi, n)*n) where n is [0, 0, 1]
-        // leads to [wix, wiy, -wiz]
-        // with wi = -wo the end result is [-wox, -woy, woz]
-
         let Interaction { ref intersection, .. } = interaction;
         let Intersection { ref p, ref n, ref wo, .. } = intersection;
 
@@ -40,7 +29,7 @@ impl Material for Metal {
         let mut local_wo = frame.world_to_local(&wo);
         local_wo.normalize();
 
-        let local_reflected = Vector3f::new(-local_wo.x, -local_wo.y, local_wo.z); // (1)
+        let local_reflected = shading_frame::reflect(&local_wo);
 
         // `fuzz` blurs the mirror direction by displacing it before renormalising. The offset is
         // drawn on the *surface* of the sphere of radius `fuzz`, so its magnitude is exactly

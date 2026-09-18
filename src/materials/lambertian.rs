@@ -1,8 +1,8 @@
-use super::{same_hemisphere, Material, ScatterInfo};
+use super::{Material, ScatterInfo};
 use crate::colors;
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
-use crate::geom::shading_frame::ShadingFrame;
+use crate::geom::shading_frame::{self, ShadingFrame};
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::pdfs::cosine::CosinePdf;
@@ -46,7 +46,7 @@ impl Material for Lambertian {
         let wi = frame.world_to_local(world_wi);
         let wo = frame.world_to_local(world_wo);
 
-        if same_hemisphere(&wo, &wi) {
+        if shading_frame::same_hemisphere(&wo, &wi) {
             self.albedo.shade(intersection) / std::f64::consts::PI
         }
         else {
