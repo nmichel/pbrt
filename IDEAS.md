@@ -15,6 +15,17 @@ dit en une incise ; quand elle contraint l'ordre, c'est l'ordre qui s'adapte. Le
 plus bas portent le détail de chaque entrée — elles servent à retrouver un sujet, pas à savoir quoi
 faire ensuite.
 
+- [ ] **La CTM — placer une forme plutôt qu'envelopper un objet.** *CTM* est l'abréviation de
+      *current transformation matrix*, la **matrice de transformation courante** : la transformation
+      composée que le chargeur tient à tout instant pour aller du repère courant de la description à
+      l'espace monde, de sorte que toute géométrie déclarée sorte **déjà placée**. Aujourd'hui
+      l'inverse est vrai — [`objects::Transformed`](src/objects/transformed.rs) enveloppe un objet
+      déjà bâti, et un même type y fait deux métiers que rien ne distingue, *placer* et *instancier*.
+      Passe en tête parce que trois entrées de cette liste butent dessus : la forme partagée en
+      espace monde qu'`AreaLight` réclame, le lien d'identité que MIS estampille à la feuille, et la
+      table de noms d'AST des éléments nommés. **Refactor pur, image identique au bit près** ; aucun
+      gain par rayon à en attendre, et un piège d'allocation à éviter en chemin.
+      [ideas/ctm.md](ideas/ctm.md)
 - [ ] **Production `light` dans la grammaire `.stage`** — passe devant `AreaLight`, et c'est ce qui
       rend celui-ci démontrable. [`NaiveIntegrator`](src/integrators/naive.rs) ne consulte **jamais**
       `Scene::lights` ; tant que [`Loader::load_scene`](src/loader.rs#L36) câble une `PointLight` que
@@ -34,6 +45,13 @@ faire ensuite.
       [le cosinus qu'un bsdf spéculaire divise](ideas/cosinus_dirac.md), qui se règle dans le même
       geste et pas avant.
 - [ ] **Roulette russe** — dépend de MIS, et corrige au passage la coupe prématurée de `path.rs:65`.
+- [ ] **Éléments nommés dans la grammaire `.stage`** — déclarer une forme, un matériau, une texture
+      ou un objet sous un nom, et le réutiliser plutôt que le recopier. **Indépendant du transport
+      de lumière** : c'est un confort d'écriture des scènes, et c'est pourquoi il passe après MIS et
+      sa roulette plutôt qu'avant. Sa seule dépendance est le chantier de la CTM, en tête de cette
+      liste : sous une CTM, construire cuit le placement, donc la table des noms doit stocker des
+      nœuds d'AST et non des objets bâtis — et c'est ce choix qui décide de tout le reste.
+      [ideas/elements_nommes.md](ideas/elements_nommes.md)
 - [ ] **Sampler stratifié** — indépendant, et débloqué : le chantier du RNG graine en a livré tous
       les prérequis, et de quoi le mesurer. **Rien n'en dépend**, d'où sa place ici plutôt qu'en
       tête. Principe, prérequis acquis et travail restant dans

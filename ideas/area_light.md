@@ -39,29 +39,79 @@ soit une direction `wi`, la radiance reçue, une densité, et de quoi tester l'o
 là : `Intersection` porte le point `p` et la normale `n` du point ombré, et
 `VisibilityTester::between` sait déjà borner la recherche à la distance de la lumière.
 
-Ce qui manque est en amont : **une forme ne sait pas s'échantillonner**. `Shape` est
-`Intersectable + AABound` — la géométrie répond « où le rayon te touche » et « quelle est ta boîte »,
-jamais « donne-moi un point de ta surface, et avec quelle densité ». Il faut donc un troisième trait.
+Ce qui manque est en amont, et à deux endroits.
+
+**Une forme ne sait pas s'échantillonner.** `Shape` est `Intersectable + AABound` — la géométrie
+répond « où le rayon te touche » et « quelle est ta boîte », jamais « donne-moi un point de ta
+surface, et avec quelle densité ». Il faut donc un troisième trait.
 
 **Pourquoi un trait à part et non une méthode de `Shape` :** `Plane` a une aire infinie et
-`Cylinder` un bord dont l'échantillonnage n'a rien d'évident. Si `Shape` l'exigeait, chaque forme
-devrait fournir une implémentation, y compris celles qui n'en ont pas. Un trait séparé fait de
-« être échantillonnable par aire » une propriété qu'une forme a ou n'a pas, ce qu'elle est.
+`csg::Union` une aire qui n'est pas calculable. Si `Shape` l'exigeait, chaque forme devrait fournir
+une implémentation, y compris celles qui n'en ont pas. Un trait séparé fait de « être
+échantillonnable par aire » une propriété qu'une forme a ou n'a pas, ce qu'elle est.
 
-Forme proposée, à placer dans `src/geom/` ou `src/shapes.rs` selon où le concept se lit le mieux :
+À placer dans `src/shapes.rs`, à côté de `Shape` : c'est une face de la géométrie, pas de l'objet.
 
 ```rust
+/// A point drawn on a surface, with the density it was drawn with.
 pub struct ShapeSample {
-    pub p: Vector3f,   // un point de la surface
-    pub n: Vector3f,   // la normale en ce point
-    pub pdf: f64,      // densité en mesure d'aire, soit 1/aire pour un tirage uniforme
+    pub p: Vector3f,
+    pub n: Vector3f,
+
+    /// Surface parameters at `p`, so the emitted radiance is read from the very texture the
+    /// visible surface shows. Without them a textured emitter would light the scene with one
+    /// colour and be seen with another.
+    pub u: f64,
+    pub v: f64,
+
+    /// Density **in area measure** — 1/area for a uniform draw. The conversion to solid angle
+    /// belongs to the light: it needs the shaded point, which a shape knows nothing about.
+    pub pdf: f64,
 }
 
-pub trait AreaSampleable {
+pub trait AreaSampleable: Send + Sync {
     fn area(&self) -> f64;
-    fn sample_area(&self) -> ShapeSample;
+
+    /// Draws a point, consuming `u` rather than drawing from a sampler — the contract
+    /// `Pdf::generate` already holds, and the one that keeps a render reproducible.
+    fn sample_area(&self, u: &Vector2f) -> ShapeSample;
 }
 ```
+
+**Et le visiteur ne peut pas savoir qu'une forme le sait.** Sa pile tient des `Arc<dyn Shape>` : le
+type concret est perdu au moment précis où la question se pose. Rust n'a pas d'upcast de trait
+objet, et `Any` suivi d'un downcast serait le bricolage à éviter. La sortie est une méthode par
+défaut sur `Shape` qui rend l'autre face de la forme, avec un receveur `Arc<Self>` pour qu'elle
+rende un handle possédé :
+
+```rust
+pub trait Shape: Intersectable + AABound {
+    /// The area-sampling face of this shape, when it has one.
+    ///
+    /// Rust has no trait upcast, and the scene builder holds shapes as `Arc<dyn Shape>` by the
+    /// time it needs the answer. Asking the shape keeps "can I be sampled by area" a property the
+    /// shape states, rather than one the caller infers from a type it no longer has.
+    fn area_sampler(self: Arc<Self>) -> Option<Arc<dyn AreaSampleable>> {
+        None
+    }
+}
+
+impl Shape for Rectangle {
+    fn area_sampler(self: Arc<Self>) -> Option<Arc<dyn AreaSampleable>> {
+        Some(self)
+    }
+}
+```
+
+`self: Arc<Self>` est un receveur compatible avec les traits objets, le corps par défaut passe, et
+`Plane`, `csg::*` et `TriangleMesh` répondent `None` sans une ligne. C'est le prix, en Rust, d'une
+propriété qu'un objet a ou n'a pas ; les deux autres routes cassent l'une l'invariant « les deux
+méthodes vont ensemble » — poser `area()` et `sample_area()` sur `Shape` en `Option` —, l'autre la
+lisibilité.
+
+**Corollaire, et il n'est pas facultatif : un matériau émissif posé sur une forme qui ne sait pas
+s'échantillonner est une erreur de chargement**, nommant la forme fautive. Rendre l'objet visible
+mais non échantillonné reconduirait en silence le défaut même que ce chantier répare.
 
 ## 3. Le changement de mesure, qui est le cœur du sujet
 
@@ -96,18 +146,46 @@ sur une face invisible, ou sous un angle rasant. Échantillonner directement l'a
 fait depuis un point de référence) est l'étape suivante, pas la première. À documenter comme
 départure, avec sa conséquence : de la variance, pas un biais.
 
-## 4. Qui construit l'`AreaLight`
+## 4. Qui construit l'`AreaLight`, et comment elle et l'objet regardent la même surface
 
 Une `AreaLight` est une forme *plus* une radiance émise, et il faut qu'elle apparaisse à la fois dans
-`Scene::lights` (pour NEE) et dans la scène comme objet visible (pour être vue). Deux routes :
+`Scene::lights` (pour NEE) et dans la scène comme objet visible (pour être vue). Deux routes ont été
+pesées ; la seconde est retenue.
 
 - **`Scene::commit` parcourt les primitives** et enregistre une lumière pour chaque objet à matériau
-  émissif. Mais `Object` marie forme et matériau et n'expose ni l'une ni l'autre ; il faudrait lui
-  ajouter de quoi rendre sa forme, ce qui perce une couture que CLAUDE.md §2 tient fermée.
-- **Le visiteur de chargement la construit**, ce qui est *recommandé* : `SceneBuilderVisitor` a la
-  forme et le matériau en main au moment où il les assemble, donc il peut créer l'objet et la lumière
-  qui partagent la même `Arc<dyn Shape>` sans qu'aucun trait ne s'élargisse. C'est aussi là
-  qu'atterrit la production `light` de la grammaire `.stage`, donc les deux travaux se rencontrent.
+  émissif. Écartée : `Object` marie forme et matériau et n'expose ni l'une ni l'autre ; il faudrait
+  lui ajouter de quoi rendre sa forme, ce qui perce une couture que CLAUDE.md §2 tient fermée.
+- **Le visiteur de chargement la construit**, et c'est la route retenue : `SceneBuilderVisitor` a la
+  forme et le matériau en main au moment où il les assemble, donc il crée l'objet et la lumière qui
+  partagent le même `Arc` sans qu'aucun trait ne s'élargisse. C'est aussi là qu'atterrit la
+  production `light` de la grammaire `.stage`, donc les deux travaux se rencontrent.
+
+**Ce qui est partagé est la forme, et elle doit être en espace monde.** C'est le point qui décide de
+tout le reste : aucun type ne porte les deux rôles, ce sont deux participants distincts qui regardent
+la même géométrie.
+
+```rust
+// dans `visit_object_simple`, une fois la CTM repliée dans la forme
+let shape: Arc<dyn Shape> = Arc::new(shapes::Transformed::new(local_shape, self.ctm()));
+
+self.objects.push(Arc::new(Simple::new(Arc::clone(&shape), material)));          // visible
+
+if let Some(sampler) = Arc::clone(&shape).area_sampler() {                       // échantillonnable
+    self.scene.add_light(Arc::new(AreaLight::new(sampler, emitted, two_sided)));
+}
+```
+
+**D'où le prérequis du §7 sur la CTM** : sans elle, le placement vit dans un `objects::Transformed`
+*au-dessus* du point de partage, et la lumière échantillonnerait la forme en espace local pendant que
+l'objet est rendu ailleurs. L'erreur serait silencieuse, l'ombre portée en étant le seul indice. Voir
+[ctm.md](ctm.md).
+
+**Reste une décision à prendre ici, et elle n'est pas cosmétique** : `DiffuseLight` tient sa radiance
+sous forme de `Texture`, et `Texture::shade` demande une `Intersection` entière quand un
+`ShapeSample` n'en est pas une — `d` et `wo` n'ont aucun sens pour un point tiré. Deux issues, et il
+faut choisir avant d'écrire `sample_li` : porter (u, v) dans `ShapeSample` et donner à `Texture` un
+point d'entrée qui s'en contente, ou restreindre la première version à une émission uniforme et le
+dire. Ce qu'il ne faut pas, c'est que NEE lise une radiance différente de celle que l'œil voit.
 
 ## 5. Le double comptage, et pourquoi ne pas toucher au garde spéculaire
 
@@ -130,8 +208,11 @@ précisément le cas que MIS répare.
   attrape un `pdf` faux d'un facteur constant, ce que l'œil ne voit pas.
 - **Un test du changement de mesure** : pour une source plane vue de face à distance `d`, la densité
   en angle solide rendue doit valoir `d²/aire`, calculable à la main.
-- **La comparaison `naive` / `path`**, qui est le meilleur test disponible et ne demande pas de
-  sampler graine. Sur une scène éclairée par le seul panneau émissif, `NaiveIntegrator` accumule
+- **Ce qui n'a pas besoin d'être testé**, et c'est l'intérêt du dessin du §4 : que la lumière et
+  l'objet visible soient au même endroit. Ils tiennent le même `Arc`, déjà placé ; il n'y a pas deux
+  placements qui pourraient diverger, donc pas de propriété à vérifier.
+- **La comparaison `naive` / `path`**, qui est le meilleur test disponible. Sur une scène éclairée
+  par le seul panneau émissif, `NaiveIntegrator` accumule
   l'émission à chaque touche sans NEE, `PathIntegrator` passe par NEE : **les deux doivent converger
   vers la même image**. Un facteur `d²` en trop, un cosinus manquant ou une mesure non convertie
   changent la luminosité sans changer la forme de l'image — donc seule une comparaison à un autre
@@ -146,20 +227,33 @@ précisément le cas que MIS répare.
 
 ## 7. Ordre d'attaque
 
-**Prérequis, et il n'est pas dans ce fichier** : la production `light` de la grammaire `.stage`, qui
-retire les lumières câblées du loader. Sans elle, la comparaison `naive` / `path` du §6 — la seule
-preuve de ce chantier — est impossible, parce que `NaiveIntegrator` ne consulte jamais
-`Scene::lights` et ne verra donc jamais la `PointLight` que le loader ajoute à toute scène. Voir
-l'entrée correspondante de [IDEAS.md](../IDEAS.md), qui dit pourquoi elle passe devant.
+**Deux prérequis, et aucun des deux n'est dans ce fichier.**
 
-- [x] RNG graine, graine dans `Config` — deux rendus sont comparables
+1. **La CTM** ([ctm.md](ctm.md)), qui fait descendre le placement sur la forme. C'est elle qui rend
+   possible la seule chose que ce chantier demande vraiment : une géométrie en espace monde que
+   l'objet visible et la source échantillonnable puissent tenir tous les deux (§4). Sans elle, il
+   faudrait donner à l'`AreaLight` une transformation à elle, donc énoncer deux fois le même
+   placement et vivre avec leur dérive possible.
+2. **La production `light` de la grammaire `.stage`**, qui retire les lumières câblées du chargeur.
+   Sans elle, la comparaison `naive` / `path` du §6 — la seule preuve de ce chantier — est
+   impossible, parce que `NaiveIntegrator` ne consulte jamais `Scene::lights` et ne verra donc
+   jamais la `PointLight` que le chargeur ajoute à toute scène. Voir l'entrée correspondante de
+   [IDEAS.md](../IDEAS.md), qui dit pourquoi elle passe devant.
+
+- [x] RNG à graine fixe, graine dans `Config` — deux rendus sont comparables
       ([docs/rendu_reproductible.md](../docs/rendu_reproductible.md)).
+- [ ] Trancher les deux décisions ouvertes **avant** d'écrire : l'émission est-elle unilatérale, et
+      comment `sample_li` lit la radiance d'une `Texture` (§4). Toutes deux se voient sur l'image, et
+      la première vaut un facteur deux.
 - [ ] `AreaSampleable` + `ShapeSample`, implémentés sur `Rectangle` d'abord — c'est le panneau du
       Cornell box, et son échantillonnage uniforme est deux nombres.
 - [ ] Test de conservation d'aire sur cette implémentation, avant tout usage.
+- [ ] `Shape::area_sampler`, sa valeur par défaut, et le diagnostic de chargement qui va avec : un
+      matériau émissif sur une forme non échantillonnable est une erreur nommant la forme (§2).
 - [ ] `lights/area_light.rs` : `sample_li` par `sample_area`, conversion aire → angle solide dérivée
       dans le doc-comment, radiance nulle du mauvais côté si l'émission est unilatérale.
-- [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme.
+- [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme, déjà
+      placée par la CTM (§4).
 - [ ] Ne **pas** toucher au garde `is_last_bounce_specular`.
 - [ ] `cornell_box.stage` ne déclare plus que son panneau — les lumières câblées étant déjà parties
       avec le prérequis, c'est ici que le témoin devient une scène éclairée par ce qu'elle dit.
