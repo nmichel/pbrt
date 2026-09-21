@@ -9,7 +9,7 @@ use crate::geom::matrix4::Matrix4;
 use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::materials::*;
-use crate::objects::*;
+use crate::objects::{self, *};
 use crate::scene::Scene;
 use crate::shapes::*;
 use crate::textures::*;
@@ -107,7 +107,9 @@ impl Visitor for SceneBuilderVisitor<'_> {
     fn visit_object_transformed(self: &mut Self, _node: &ObjectTransformedNode) {
         let object = self.objects.pop().unwrap();
         let transform = self.transforms.pop().unwrap();
-        self.objects.push(Arc::new(Transformed::new(object, transform)));
+        // Qualified: `shapes::Transformed` places a shape, `objects::Transformed` wraps a built
+        // object. Two decorators of the same name, and this one is the object-level one.
+        self.objects.push(Arc::new(objects::Transformed::new(object, transform)));
     }
 
     fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode) {

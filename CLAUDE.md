@@ -20,8 +20,18 @@ fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a ap
 `docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
 une entrée cochée y garde une ligne, pas son corps.
 
-**Chantier en cours** — aucun. Le sujet de la branche `chore/shading_frame` est clos : le repère de
-shading est un type, [`ShadingFrame`](src/geom/shading_frame.rs), qui porte la base, la convention
+**Chantier en cours** — **la CTM**, branche `chore/ctm`, préfixe `[ctm]`. Le chargeur doit tenir la
+matrice de transformation courante et livrer une géométrie **déjà placée**, là où une transformation
+enveloppe aujourd'hui un objet déjà bâti. Plan, ordre d'attaque et preuve dans
+[ideas/ctm.md](ideas/ctm.md), à cocher au fur et à mesure. Premier geste posé :
+[`shapes::Transformed`](src/shapes/transformed.rs), le décorateur de placement à l'étage forme, que
+rien n'utilise encore — le commit risqué est le suivant, celui qui réordonne la visite et met la CTM
+dans `SceneBuilderVisitor`. **C'est un refactor : l'image doit rester identique au bit près à chaque
+commit**, et les compteurs de `bvh_stats` ne doivent pas bouger non plus, les deux décorateurs
+calculant leur boîte de la même façon. Aucun gain par rayon à en attendre, et un piège d'allocation
+à éviter en chemin (§5 du même fichier).
+
+Avant lui, `chore/shading_frame` : le repère de shading est un type, [`ShadingFrame`](src/geom/shading_frame.rs), qui porte la base, la convention
 « z est la normale » et la dérivation du changement de repère, là où elle était énoncée trois fois et
 la base reconstruite à chaque conversion. `reflect` et `same_hemisphere` y vivent, le cosinus
 surnuméraire d'une distribution de Dirac est devenu `materials::cancel_integrator_cosine`, et
@@ -30,17 +40,17 @@ l'image est restée identique au bit près à chaque commit. Ce qu'il a trouvé 
 `IDEAS.md`, et la sortie de `cancel_integrator_cosine` — qui, elle, ne sera pas neutre sur l'image —
 dans [ideas/cosinus_dirac.md](ideas/cosinus_dirac.md).
 
-Avant lui, `feat/rework_sampling` : un rendu répète son image, indépendamment du nombre de threads et
+Avant eux, `feat/rework_sampling` : un rendu répète son image, indépendamment du nombre de threads et
 du renderer choisi, `utils::random_double` a cédé la place au trait `Sampler`, et `--seed` choisit
 lequel des rendus possibles on veut. Contrat et clé de flux dans
 [docs/rendu_reproductible.md](docs/rendu_reproductible.md).
 
-Avant eux, `chore/revamp_bvh_for_trimesh` : ses mesures et ses arbitrages sont dans
+Plus tôt encore, `chore/revamp_bvh_for_trimesh` : ses mesures et ses arbitrages sont dans
 [docs/mesures_bvh.md](docs/mesures_bvh.md), dont le §4 tient les chiffres de référence auxquels
 comparer une mesure fraîche.
 
 La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Y
-vient d'abord la **production `light` de la grammaire `.stage`**, puis
+vient, après la CTM, la **production `light` de la grammaire `.stage`**, puis
 [`AreaLight`](ideas/area_light.md) — le plus grand écart au modèle physique du projet, les surfaces
 émissives ne contribuant à aucun éclairage indirect. Cet ordre surprend et il est délibéré : tant que
 le loader câble une `PointLight` que `NaiveIntegrator` ne peut pas voir, la comparaison `naive` /
@@ -56,7 +66,7 @@ d'une exécution ([docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3, qui porte au
 réouverture). **Un gain de construction se rapporte à une exécution entière, jamais au chargement
 seul** ; c'est la leçon de ce dernier, et elle vaut pour le prochain.
 
-**Lancer les tests** — `cargo test` est vert en entier : 144 tests de bibliothèque, 2 tests
+**Lancer les tests** — `cargo test` est vert en entier : 152 tests de bibliothèque, 2 tests
 d'intégration, 11 doc-tests, et les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour
 tout changement de construction ou de traversée d'un accélérateur,
 `cargo run --release --bin bvh_stats -- <scène>`

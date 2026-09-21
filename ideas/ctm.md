@@ -1,9 +1,9 @@
 # La CTM — placer une forme plutôt qu'envelopper un objet
 
-Indexé depuis [IDEAS.md](../IDEAS.md). Non commencé, et **en tête de la liste** : la production
-`light`, [`AreaLight`](area_light.md), MIS et les [éléments nommés](elements_nommes.md) en dépendent
-tous, chacun pour une raison différente, et aucune de ces raisons ne se voit avant d'avoir posé
-celle-ci.
+Indexé depuis [IDEAS.md](../IDEAS.md). Le premier geste du §7 est posé, et le sujet est **en tête de
+la liste** : la production `light`, [`AreaLight`](area_light.md), MIS et les
+[éléments nommés](elements_nommes.md) en dépendent tous, chacun pour une raison différente, et
+aucune de ces raisons ne se voit avant d'avoir posé celle-ci.
 
 ## 1. Ce que « CTM » veut dire
 
@@ -176,8 +176,15 @@ liste entière que rend `Intersectable::intersect` — et la rapatrier dans un s
 `IntersectionResult` ajouterait une allocation par touche, qui est l'entrée ouverte d'`IDEAS.md`
 sous *Accélérateurs*.
 
-Le remède est d'une ligne, et il vaut aussi pour le code actuel : l'enfant rend un vecteur
-**possédé**, donc les copies en espace monde remplacent les locales sur place.
+Le remède est d'une ligne : l'enfant rend un vecteur **possédé**, donc les copies en espace monde
+remplacent les locales sur place.
+
+La même ligne irait à `objects::Transformed`, qui construit encore un second vecteur — mais elle n'y
+gagnerait rien : **personne n'appelle `Intersectable::intersect` à l'étage objet**, les rayons
+d'ombre passant par `intersect_p` et le chemin chaud par `Object::intersect`. Ce n'est donc pas une
+mesure, c'est une symétrie de lecture, et elle voyage avec l'item de documentation du §7. Ce que la
+couture `Object: Intersectable` devient est une question à elle seule, ouverte dans `IDEAS.md` sous
+*Renderer & infrastructure*.
 
 ```rust
 fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
@@ -212,7 +219,7 @@ signale que quelque chose d'autre a changé en chemin.
 
 ## 7. Ordre d'attaque
 
-- [ ] `shapes::Transformed`, avec la transformation sur place du §5, et ses tests — dont un qui
+- [x] `shapes::Transformed`, avec la transformation sur place du §5, et ses tests — dont un qui
       recoupe le placement d'un point échantillonné avec celui d'un point touché par un rayon.
 - [ ] `ObjectTransformedNode::visit` réordonné, CTM dans `SceneBuilderVisitor`, `visit_object_simple`
       qui construit placé. Image identique au bit près à ce commit : c'est le commit risqué.
@@ -222,7 +229,8 @@ signale que quelque chose d'autre a changé en chemin.
       un test qui vérifie qu'une CSG placée par la CTM n'applique pas deux fois le même déplacement —
       c'est le piège que le tableau des deux transformations décrit.
 - [ ] Documentation d'`objects::Transformed` : placement programmatique pour `examples/`,
-      instanciation pour le chargeur (§4).
+      instanciation pour le chargeur (§4). La transformation sur place du §5 y passe aussi, par
+      symétrie avec le décorateur de forme et sans gain à en attendre — le dire dans le message.
 - [ ] Chronomètre d'un rendu complet avant / après, pour clore la question du §5.
 
 ## 8. Ce que ça débloque, et qui est toute la raison de le faire

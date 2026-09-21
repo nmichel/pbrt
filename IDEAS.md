@@ -113,12 +113,17 @@ tient toujours.
       bloqué depuis que les rayons secondaires sont reproductibles.
 - [ ] **Le SAH binné n'est pas porté sur le BVH de scène**, étudié et garé :
       [ideas/sah_bvh_scene.md](ideas/sah_bvh_scene.md).
-- [ ] **Chaque `intersect` de forme rend un `Vec<Intersection>` frais** (`IntersectionResult`), et
-      `Transformed::intersect` en construit un second pour tenir les copies transformées. Une touche
-      coûte donc une ou deux allocations tas lues une fois puis jetées. Les ratés sont gratuits —
-      `Vec::new()` n'alloue pas avant le premier push. Pas dans la revue d'origine ; remarqué en
-      prenant la référence de scène. C'est le coût par test que les compteurs ne peuvent pas voir, et
-      la raison pour laquelle `intersect_p` vaut plus que son effet sur `object_tests` ne le suggère.
+- [ ] **Chaque `intersect` de forme rend un `Vec<Intersection>` frais** (`IntersectionResult`). Une
+      touche coûte donc une allocation tas lue une fois puis jetée : `Simple` demande la liste à sa
+      forme, y lit la plus proche et jette le reste. Les ratés sont gratuits — `Vec::new()` n'alloue
+      pas avant le premier push. Les décorateurs de placement n'en ajoutent pas de second :
+      [`shapes::Transformed`](src/shapes/transformed.rs) remplace chaque touche sur place dans le
+      vecteur possédé de l'enfant, et le second vecteur d'
+      [`objects::Transformed`](src/objects/transformed.rs) est sur une méthode que personne
+      n'appelle (entrée sous *Renderer & infrastructure*). Restent les opérateurs CSG, qui
+      reconstruisent une liste filtrée — inhérent à une opération ensembliste, non au placement. Pas
+      dans la revue d'origine ; c'est le coût par test que les compteurs ne peuvent pas voir, et la
+      raison pour laquelle `intersect_p` vaut plus que son effet sur `object_tests` ne le suggère.
 
 Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
 
@@ -289,6 +294,19 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       accepter les deux graphies le temps d'une transition. Le renommage traverse aussi
       [editors/vscode/](editors/vscode/) — coloration et entrée de survol —, et
       [tests/vscode_grammar_sync.rs](tests/vscode_grammar_sync.rs) échoue tant que ce n'est pas fait.
+- [ ] **Deux des trois méthodes d'`Intersectable` sont inatteignables à l'étage objet.** Seul
+      `intersect_p` y a une racine : [scene.rs:166](src/scene.rs#L166) et
+      [scene.rs:182](src/scene.rs#L182) le posent aux primitives pour les rayons d'ombre. La liste
+      de touches d'un objet n'en a aucune — `Compound` l'appelle sur ses enfants,
+      `objects::Transformed` sur le sien, le `Wrapper` de [scene.rs](src/scene.rs#L21) la relaie, et
+      aucun intégrateur ne descend là : le chemin chaud est `Scene::find_nearest` →
+      `Object::intersect` → `Simple` → la forme. `contain_point` non plus, dont le doc-comment
+      d'[`Intersectable`](src/geom/intersectable.rs#L51) dit que les opérateurs CSG sont les seuls
+      usages — et ceux-là travaillent sur des formes. Seule la borne `Object: Intersectable`
+      maintient les deux en vie, et fait écrire `intersect` trois fois. La question n'est donc pas le
+      coût de ces implémentations mais la couture : un `Object` a besoin d'une AABB, d'une
+      `Interaction` la plus proche et d'un test d'occultation, pas d'une liste de touches ni d'un
+      prédicat d'intérieur. `BVH<T>` ne contraint rien ici, il n'exige que `T: AABound`.
 - [ ] Poids mort : `src/_keep.rs` et `src/shapes/triangle.cpp` ne sont pas compilés ;
       `integrators/whitted.rs` ne compile plus et est commenté hors du module ; `crossbeam` est
       toujours déclaré dans `Cargo.toml` sans être utilisé (`thread::scope` l'a remplacé) ; le build
