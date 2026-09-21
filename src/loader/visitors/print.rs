@@ -14,6 +14,17 @@ impl PrintVisitor {
     pub fn visit(self: &mut Self, node: &SceneNode) {
         node.visit(self);
     }
+
+    /// What the visited description prints as.
+    ///
+    /// Every `visit_*` leaves its own text on the stack and consumes its children's, so a finished
+    /// traversal leaves exactly one entry: the whole description. `visit_stage` prints it; a test
+    /// reads it here, which is the only way to hold this visitor to its promise — that the order
+    /// in which the traversal hands it its pieces is its own business, and the text does not move
+    /// with it.
+    pub fn rendered(&self) -> &str {
+        self.stack.last().map_or("", String::as_str)
+    }
 }
 
 impl Visitor for PrintVisitor {
@@ -60,9 +71,17 @@ impl Visitor for PrintVisitor {
         self.stack.push(format!("object simple {} {}", shape, material));
     }
 
-    fn visit_object_transformed(self: &mut Self, _node: &ObjectTransformedNode) {
-        let transform = self.stack.pop().unwrap();
+    /// Nothing to do on the way in: this visitor carries no context, only a stack of strings, and
+    /// the transformation is already on it — it is read on the way out.
+    fn enter_object_transformed(self: &mut Self, _node: &ObjectTransformedNode) {}
+
+    /// The object sits on top of the transformation, the transformation having been printed first.
+    ///
+    /// The two pops are therefore in the opposite order to the printed text, which is unchanged:
+    /// `.stage` in, the same `.stage` out.
+    fn leave_object_transformed(self: &mut Self, _node: &ObjectTransformedNode) {
         let object = self.stack.pop().unwrap();
+        let transform = self.stack.pop().unwrap();
         self.stack.push(format!("object transformed {} {}", object, transform));
     }
 
@@ -219,5 +238,33 @@ mod test {
         let scene_node = parser.parse_scene();
         let mut visitor = super::PrintVisitor::new();
         visitor.visit(&scene_node);
+    }
+
+    /// A placement is visited *before* the object it places, so the two are popped in the opposite
+    /// order to the text they are printed in. This is what says the text stayed put.
+    #[test]
+    fn test_a_placement_prints_after_the_object_it_places() {
+        let input = "
+    scene
+      object transformed
+        object simple
+          sphere 1.0
+          lambertian color 0.2 0.8 0.1
+        transform {
+            translate 0.0 0.0 2.0
+            rotate_x 1.5708
+        }
+    ";
+
+        let mut parser = Parser::new(input);
+        let scene_node = parser.parse_scene();
+        let mut visitor = super::PrintVisitor::new();
+        visitor.visit(&scene_node);
+
+        assert_eq!(
+            visitor.rendered(),
+            "scene object transformed object simple sphere 1 lambertian color Spectrum { spectrum: [0.2, 0.8, 0.1] } transform {  translate [0 0 \
+             2]rotate X 1.5708 }"
+        );
     }
 }

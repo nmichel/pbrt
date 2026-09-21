@@ -23,10 +23,12 @@ une entrée cochée y garde une ligne, pas son corps.
 **Chantier en cours** — **la CTM**, branche `chore/ctm`, préfixe `[ctm]`. Le chargeur doit tenir la
 matrice de transformation courante et livrer une géométrie **déjà placée**, là où une transformation
 enveloppe aujourd'hui un objet déjà bâti. Plan, ordre d'attaque et preuve dans
-[ideas/ctm.md](ideas/ctm.md), à cocher au fur et à mesure. Premier geste posé :
-[`shapes::Transformed`](src/shapes/transformed.rs), le décorateur de placement à l'étage forme, que
-rien n'utilise encore — le commit risqué est le suivant, celui qui réordonne la visite et met la CTM
-dans `SceneBuilderVisitor`. **C'est un refactor : l'image doit rester identique au bit près à chaque
+[ideas/ctm.md](ideas/ctm.md), à cocher au fur et à mesure. Le chargeur tient désormais la CTM :
+`ObjectTransformedNode` visite son placement avant son enfant, `SceneBuilderVisitor` compose la
+matrice sur une pile, et `visit_object_simple` livre une forme déjà placée par
+[`shapes::Transformed`](src/shapes/transformed.rs) — le chargeur ne construit plus
+d'`objects::Transformed`. Restent la CSG et la documentation de ce dernier, items 4 et 5 du §7.
+**C'est un refactor : l'image doit rester identique au bit près à chaque
 commit**, et les compteurs de `bvh_stats` ne doivent pas bouger non plus, les deux décorateurs
 calculant leur boîte de la même façon. Aucun gain par rayon à en attendre, et un piège d'allocation
 à éviter en chemin (§5 du même fichier).
@@ -66,7 +68,7 @@ d'une exécution ([docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3, qui porte au
 réouverture). **Un gain de construction se rapporte à une exécution entière, jamais au chargement
 seul** ; c'est la leçon de ce dernier, et elle vaut pour le prochain.
 
-**Lancer les tests** — `cargo test` est vert en entier : 152 tests de bibliothèque, 2 tests
+**Lancer les tests** — `cargo test` est vert en entier : 153 tests de bibliothèque, 2 tests
 d'intégration, 11 doc-tests, et les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour
 tout changement de construction ou de traversée d'un accélérateur,
 `cargo run --release --bin bvh_stats -- <scène>`

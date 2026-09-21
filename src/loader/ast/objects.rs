@@ -33,10 +33,20 @@ pub struct ObjectTransformedNode {
 impl ObjectNode for ObjectTransformedNode {}
 
 impl Node for ObjectTransformedNode {
+    /// The transformation is visited **before** the object it places.
+    ///
+    /// This order is what makes a current transformation matrix possible: a visitor building a
+    /// scene learns the placement first, so the geometry underneath can be constructed already
+    /// placed. Visited the other way round, the placement would only be known once the thing to
+    /// place was finished and closed, which is the shape of the problem rather than its solution.
+    ///
+    /// The pair of calls around the child is the block's scope: `enter_object_transformed` opens
+    /// it, `leave_object_transformed` closes it.
     fn visit(self: &Self, visitor: &mut dyn Visitor) {
-        self.object.visit(visitor);
         self.transform.visit(visitor);
-        visitor.visit_object_transformed(self);
+        visitor.enter_object_transformed(self);
+        self.object.visit(visitor);
+        visitor.leave_object_transformed(self);
     }
 }
 

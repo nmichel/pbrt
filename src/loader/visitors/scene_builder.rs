@@ -9,9 +9,9 @@ use crate::geom::matrix4::Matrix4;
 use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
 use crate::materials::*;
-use crate::objects::{self, *};
+use crate::objects::*;
 use crate::scene::Scene;
-use crate::shapes::*;
+use crate::shapes::{self, *};
 use crate::textures::*;
 
 pub struct SceneBuilderVisitor<'a> {
@@ -23,6 +23,14 @@ pub struct SceneBuilderVisitor<'a> {
     materials: Vec<Arc<dyn Material>>,
     textures: Vec<Arc<dyn Texture>>,
     transforms: Vec<Box<Transform>>,
+
+    /// The current transformation matrix: where the frame being described sits in the world.
+    ///
+    /// One entry per enclosing `object transformed` block, each already composed with the one
+    /// below it, so that the top is the whole placement and `place` needs no fold. Pushed when a
+    /// block opens, dropped when it closes; empty means the description is in world coordinates
+    /// already.
+    ctm: Vec<Box<Transform>>,
     config: &'a Config,
 }
 
@@ -37,12 +45,29 @@ impl<'a> SceneBuilderVisitor<'a> {
             materials: Vec::new(),
             textures: Vec::new(),
             transforms: Vec::new(),
+            ctm: Vec::new(),
             config,
         }
     }
 
     pub fn visit(self: &mut Self, node: &StageNode) {
         node.visit(self);
+    }
+
+    /// `shape` in world space: the current transformation matrix, folded into the geometry.
+    ///
+    /// Outside any `transform` block the shape is handed back **untouched** rather than wrapped in
+    /// an identity placement. That is not a micro-optimisation: `Transform::transform_ray_to_local`
+    /// builds its ray through `Ray::new`, which renormalises, and dividing a unit vector by its own
+    /// computed length is not the identity in floating point. An object nobody placed must not
+    /// move, so it gets no placement at all.
+    fn place(&self, shape: Arc<dyn Shape>) -> Arc<dyn Shape> {
+        match self.ctm.last() {
+            None => shape,
+            // Each placed shape owns its copy of the matrix: a `Transform` is a value, and the
+            // siblings of a compound need the same one after this leaf has taken it.
+            Some(ctm) => Arc::new(shapes::Transformed::new(shape, Box::new((**ctm).clone()))),
+        }
     }
 }
 
@@ -98,18 +123,44 @@ impl Visitor for SceneBuilderVisitor<'_> {
         self.objects.push(compound);
     }
 
+    /// The leaf of the description, and the one place a placement is now paid for.
+    ///
+    /// The shape comes out in world space, so the object holds geometry that needs nothing done to
+    /// it afterwards — and an area light sampling the same surface will read the same points from
+    /// the same `Arc<dyn Shape>`.
     fn visit_object_simple(self: &mut Self, _node: &ObjectSimpleNode) {
         let material = self.materials.pop().unwrap();
         let shape = self.shapes.pop().unwrap();
-        self.objects.push(Arc::new(Simple::new(shape, material)));
+        self.objects.push(Arc::new(Simple::new(self.place(shape), material)));
     }
 
-    fn visit_object_transformed(self: &mut Self, _node: &ObjectTransformedNode) {
-        let object = self.objects.pop().unwrap();
-        let transform = self.transforms.pop().unwrap();
-        // Qualified: `shapes::Transformed` places a shape, `objects::Transformed` wraps a built
-        // object. Two decorators of the same name, and this one is the object-level one.
-        self.objects.push(Arc::new(objects::Transformed::new(object, transform)));
+    /// Composes the block's transformation into the current transformation matrix.
+    ///
+    /// Taking the transformation off `transforms` here, rather than reading it at the end, is also
+    /// what keeps it out of reach of the geometry below: a `csg elem` pops that same stack, and
+    /// would otherwise find an object's placement sitting where its own belongs.
+    fn enter_object_transformed(self: &mut Self, _node: &ObjectTransformedNode) {
+        let to_world = self.transforms.pop().unwrap();
+
+        // p_world = enclosing ⋅ (this block ⋅ p_local), so the composition is in that order. With
+        // nothing enclosing, the block's own transformation *is* the matrix, and is taken as it
+        // stands: multiplying by an identity would be exact, but there is nothing to multiply.
+        let composed = match self.ctm.last() {
+            None => to_world,
+            Some(enclosing) => Box::new(&**enclosing * &*to_world),
+        };
+        self.ctm.push(composed);
+    }
+
+    /// Drops the block's placement, the geometry underneath having been built with it.
+    ///
+    /// Nothing is wrapped around the object: it is already where the description put it. This is
+    /// the whole difference the current transformation matrix makes, and the reason
+    /// [`objects::Transformed`](crate::objects::Transformed) is no longer built here — in the
+    /// loader that type is the *instancing* mechanism, waiting for a caller that can name a
+    /// structure and repeat it.
+    fn leave_object_transformed(self: &mut Self, _node: &ObjectTransformedNode) {
+        self.ctm.pop();
     }
 
     fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode) {

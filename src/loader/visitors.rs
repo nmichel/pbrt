@@ -10,7 +10,23 @@ pub trait Visitor {
 
     fn visit_object_compound(self: &mut Self, node: &ObjectCompoundNode);
     fn visit_object_simple(self: &mut Self, node: &ObjectSimpleNode);
-    fn visit_object_transformed(self: &mut Self, node: &ObjectTransformedNode);
+
+    /// Called when a `transform` block opens, its transformation already visited and the object it
+    /// places not yet.
+    ///
+    /// The only pair of hooks in this trait, and the only node that needs one: every other node is
+    /// told about its children once they are done, where this one has something to say *before*
+    /// them — the placement under which they are to be built. A visitor that carries a current
+    /// transformation matrix composes it here and drops it in `leave_object_transformed`.
+    ///
+    /// **A `csg elem`'s transformation deliberately does not come through here.** It places a piece
+    /// *inside* an assembly, in the assembly's own frame, where this one places a whole object in
+    /// the world; composing the two would place the assembly twice. That is why the entry hook
+    /// belongs to this node rather than to `visit_transform`, which both of them go through.
+    fn enter_object_transformed(self: &mut Self, node: &ObjectTransformedNode);
+
+    /// Called when the block closes, the object it places being built.
+    fn leave_object_transformed(self: &mut Self, node: &ObjectTransformedNode);
 
     fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode);
     fn visit_shape_csg_elem(self: &mut Self, node: &CSGShapeElemNode);

@@ -221,10 +221,11 @@ signale que quelque chose d'autre a changé en chemin.
 
 - [x] `shapes::Transformed`, avec la transformation sur place du §5, et ses tests — dont un qui
       recoupe le placement d'un point échantillonné avec celui d'un point touché par un rayon.
-- [ ] `ObjectTransformedNode::visit` réordonné, CTM dans `SceneBuilderVisitor`, `visit_object_simple`
+- [x] `ObjectTransformedNode::visit` réordonné, CTM dans `SceneBuilderVisitor`, `visit_object_simple`
       qui construit placé. Image identique au bit près à ce commit : c'est le commit risqué.
-- [ ] `PrintVisitor` suit le nouvel ordre de visite sans changer sa sortie — l'aller-retour reste un
-      aller-retour.
+- [x] `PrintVisitor` suit le nouvel ordre de visite sans changer sa sortie — l'aller-retour reste un
+      aller-retour. Sa sortie de scène n'était imprimée par personne et affirmée par aucun test :
+      `PrintVisitor::rendered` et une assertion la tiennent désormais.
 - [ ] `csg::Elem` réduit à un `Arc<dyn Shape>` (§3), l'exclusion de `is_inside` passée à un indice, et
       un test qui vérifie qu'une CSG placée par la CTM n'applique pas deux fois le même déplacement —
       c'est le piège que le tableau des deux transformations décrit.

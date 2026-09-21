@@ -4,6 +4,9 @@ use super::ray::Ray;
 use super::vector3::Vector3f;
 use std::ops::Mul;
 
+/// A transformation is a **value**, so it is cloneable: the loader hands the current
+/// transformation matrix to every shape it places, and each of them owns its copy.
+#[derive(Clone)]
 pub struct Transform {
     mat: Matrix4,
     inv_mat: Matrix4,

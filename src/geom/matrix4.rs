@@ -5,7 +5,7 @@ use std::{f64, fmt};
 
 /// A 3D vector generic type.
 ///
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Matrix4 {
     m: [[f64; 4]; 4],
 }
