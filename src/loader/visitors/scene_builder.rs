@@ -17,7 +17,7 @@ use crate::textures::*;
 pub struct SceneBuilderVisitor<'a> {
     pub scene: Scene,
     pub camera: Option<Box<dyn Camera>>,
-    csg_elems: Vec<Box<csg::Elem>>,
+    csg_elems: Vec<Arc<dyn Shape>>,
     objects: Vec<Arc<dyn Object>>,
     shapes: Vec<Arc<dyn Shape>>,
     materials: Vec<Arc<dyn Material>>,
@@ -68,6 +68,22 @@ impl<'a> SceneBuilderVisitor<'a> {
             // siblings of a compound need the same one after this leaf has taken it.
             Some(ctm) => Arc::new(shapes::Transformed::new(shape, Box::new((**ctm).clone()))),
         }
+    }
+
+    /// The `count` elements of an assembly, taken off the stack.
+    ///
+    /// They come back **in reverse order of declaration**, a stack handing back the last one
+    /// first. A union and an intersection are commutative, so the order is theirs to ignore; a
+    /// substraction is not, its first element being the base the others are removed from. So
+    /// `csg substraction { elem A … elem B … }` removes A from B, while the programmatic
+    /// constructions in `examples/` pass their elements in reading order and remove B from A. The
+    /// two disagree, and `IDEAS.md` holds the question under *Renderer & infrastructure*.
+    fn pop_csg_elems(&mut self, count: usize) -> Vec<Arc<dyn Shape>> {
+        let mut elems: Vec<Arc<dyn Shape>> = Vec::new();
+        for _ in 1..=count {
+            elems.push(self.csg_elems.pop().unwrap());
+        }
+        elems
     }
 }
 
@@ -167,33 +183,30 @@ impl Visitor for SceneBuilderVisitor<'_> {
         self.shapes.push(Arc::new(AABox::new(&node.extend)));
     }
 
+    /// A piece of an assembly: a shape placed in the assembly's own frame.
+    ///
+    /// This transformation does **not** go through the current transformation matrix, and the entry
+    /// hook of `object transformed` is what keeps the two apart. It positions a piece inside the
+    /// assembly, where the matrix positions the whole assembly in the world; composing them would
+    /// place the assembly twice ([`csg`](crate::shapes::csg) header).
     fn visit_shape_csg_elem(self: &mut Self, _node: &CSGShapeElemNode) {
-        let transform = self.transforms.pop().unwrap();
-        let shape: Arc<dyn Shape> = self.shapes.pop().unwrap();
-        self.csg_elems.push(Box::new(csg::Elem { shape, transform }));
+        let to_world = self.transforms.pop().unwrap();
+        let shape = self.shapes.pop().unwrap();
+        self.csg_elems.push(Arc::new(shapes::Transformed::new(shape, to_world)));
     }
 
     fn visit_shape_csg_intersection(self: &mut Self, node: &CSGShapeIntersectionNode) {
-        let mut elems: Vec<Box<csg::Elem>> = Vec::new();
-        for _ in 1..=node.elems.len() {
-            elems.push(self.csg_elems.pop().unwrap());
-        }
+        let elems = self.pop_csg_elems(node.elems.len());
         self.shapes.push(Arc::new(csg::Intersection::new(elems)));
     }
 
     fn visit_shape_csg_substraction(self: &mut Self, node: &CSGShapeSubstractionNode) {
-        let mut elems: Vec<Box<csg::Elem>> = Vec::new();
-        for _ in 1..=node.elems.len() {
-            elems.push(self.csg_elems.pop().unwrap());
-        }
+        let elems = self.pop_csg_elems(node.elems.len());
         self.shapes.push(Arc::new(csg::Substraction::new(elems)));
     }
 
     fn visit_shape_csg_union(self: &mut Self, node: &CSGShapeUnionNode) {
-        let mut elems: Vec<Box<csg::Elem>> = Vec::new();
-        for _ in 1..=node.elems.len() {
-            elems.push(self.csg_elems.pop().unwrap());
-        }
+        let elems = self.pop_csg_elems(node.elems.len());
         self.shapes.push(Arc::new(csg::Union::new(elems)));
     }
 

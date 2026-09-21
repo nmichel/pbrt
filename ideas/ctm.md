@@ -87,66 +87,23 @@ Quatre gestes, dont le troisième est le seul qui demande de réfléchir :
    ```
 
 4. **`csg::Elem` devient un `Arc<dyn Shape>`**, la paire forme + transformation étant désormais un
-   type. Un concept de moins, et le même code de placement pour tout le monde. C'est le geste qui
-   rapporte le plus de lignes, et celui qui demande le plus d'attention : la suite lui est consacrée.
+   type. Un concept de moins, et le même code de placement pour tout le monde.
 
-### La CSG : rien ne change pour qui écrit une scène, et le code se simplifie
+### La CSG
 
-`csg union { elem <forme> transform { … } … }` reste mot pour mot ce qu'il est, et
-`CSGShapeElemNode { shape, transform }` reste tel quel dans l'AST. Seul change ce que le visiteur en
-construit.
+Pour qui écrit une scène, `csg union { elem <forme> transform { … } … }` reste mot pour mot ce qu'il
+est, et `CSGShapeElemNode { shape, transform }` reste tel quel dans l'AST : seul change ce que le
+visiteur en construit. Les trois opérations ne connaissent plus que des formes, et la règle des deux
+repères — celui de l'assemblage et celui du monde, qui **ne se composent pas** sous peine de double
+placement silencieux — vit dans l'en-tête de [shapes/csg.rs](../src/shapes/csg.rs), avec le test qui
+la tient dans [union.rs](../src/shapes/csg/union.rs).
 
-Et la simplification est substantielle, parce que **`csg::Elem` *est* déjà un `shapes::Transformed`
-écrit à la main**. [`Union::intersect`](../src/shapes/csg/union.rs) fait exactement ce que ferait le
-décorateur : rayon vers le local, intersection de l'enfant, chaque touche rapatriée en monde. Idem
-pour `contain_point` (point vers le local), `get_bounding_box` (boîte de l'enfant transformée) et
-`is_inside`. Le mot `transform` apparaît 8 fois dans `union.rs`, 12 dans `substraction.rs` et 17 dans
-`intersection.rs` — **un concept que les trois opérations ré-implémentent chacune pour son compte**.
-
-Avec `elements: Vec<Arc<dyn Shape>>` à la place de `Vec<Box<Elem>>`, elles deviennent de la pure
-logique ensembliste :
-
-```rust
-// avant — l'opération connaît les repères
-let local_ray = e.transform.transform_ray_to_local(&ray);
-let element_collisions = e.shape.intersect(&local_ray, near, far);
-for collision in element_collisions.iter() {
-    let collision_in_world_space = e.transform.transform_interaction_to_world(&collision);
-    if !self.is_inside(&collision_in_world_space, e.as_ref()) { … }
-}
-
-// après — l'opération ne connaît que des formes
-for collision in element.intersect(&ray, near, far).iter() {
-    if !self.is_inside(collision, index) { … }
-}
-```
-
-`csg::Elem` disparaît comme type, et avec lui la comparaison de pointeurs bruts `*const Elem` par
-laquelle `is_inside` exclut l'élément qui a produit la touche : elle devient un saut d'indice, plus
-clair et sans pointeur.
-
-### Les deux transformations d'une CSG, et pourquoi elles ne se composent pas
-
-C'est le seul point de vigilance du geste, et il doit être écrit dans le visiteur : les confondre
-donnerait un double placement, silencieux.
-
-| | Ce qu'elle positionne | Quand elle s'applique |
-|---|---|---|
-| la transformation d'un `elem` | une pièce **à l'intérieur** de l'assemblage, dans le repère propre de la CSG | à la construction de l'élément |
-| la CTM | la CSG **entière** dans le monde | à `visit_object_simple`, une fois la forme complète |
-
-Donc **un bloc `transform` d'`elem` n'empile pas la CTM**. Une CSG se construit dans son repère à
-elle et se place une fois, comme n'importe quelle forme. On obtient des décorateurs imbriqués —
-`Transformed(Union(Transformed(sphère), Transformed(sphère)), ctm)` — qui sont exactement les deux
-niveaux d'aller-retour de rayon d'aujourd'hui, ni plus ni moins.
-
-C'est aussi ce qui garde une CSG **nommable** : une forme déclarée dans son propre repère se replace
-où l'on veut, ce qui est la règle « les `define` vivent hors du bloc `scene` » d'
-[elements_nommes.md](elements_nommes.md) §8. Les deux chantiers tirent dans le même sens.
-
-Dernier point, qui ferme la boucle avec [`AreaLight`](area_light.md) : une CSG ne sait pas
-s'échantillonner par aire, donc son `area_sampler` rend `None`, donc `diffuse_light` posé sur une CSG
-est une erreur de chargement nommant la forme — et non un objet lumineux qui n'éclaire rien.
+Ce qui reste à venir de ce côté ferme la boucle avec [`AreaLight`](area_light.md) : une CSG ne sait
+pas s'échantillonner par aire, donc son `area_sampler` rendra `None`, donc `diffuse_light` posé sur
+une CSG est une erreur de chargement nommant la forme — et non un objet lumineux qui n'éclaire rien.
+Et une CSG construite dans son propre repère se replace où l'on veut, ce qui est la règle « les
+`define` vivent hors du bloc `scene` » d'[elements_nommes.md](elements_nommes.md) §8 : les deux
+chantiers tirent dans le même sens.
 
 ## 4. Ce que devient `objects::Transformed` — il ne disparaît pas
 
@@ -226,9 +183,12 @@ signale que quelque chose d'autre a changé en chemin.
 - [x] `PrintVisitor` suit le nouvel ordre de visite sans changer sa sortie — l'aller-retour reste un
       aller-retour. Sa sortie de scène n'était imprimée par personne et affirmée par aucun test :
       `PrintVisitor::rendered` et une assertion la tiennent désormais.
-- [ ] `csg::Elem` réduit à un `Arc<dyn Shape>` (§3), l'exclusion de `is_inside` passée à un indice, et
+- [x] `csg::Elem` réduit à un `Arc<dyn Shape>` (§3), l'exclusion de `is_inside` passée à un indice, et
       un test qui vérifie qu'une CSG placée par la CTM n'applique pas deux fois le même déplacement —
-      c'est le piège que le tableau des deux transformations décrit.
+      c'est le piège que le tableau des deux transformations décrit. Les huit exemples CSG rendent
+      une image identique au bit près, ce qui est la seule preuve que la soustraction ait : aucune
+      scène de `test_files/` ne l'emploie. L'ordre inversé des éléments, trouvé en chemin, est une
+      entrée d'`IDEAS.md`.
 - [ ] Documentation d'`objects::Transformed` : placement programmatique pour `examples/`,
       instanciation pour le chargeur (§4). La transformation sur place du §5 y passe aussi, par
       symétrie avec le décorateur de forme et sans gain à en attendre — le dire dans le message.

@@ -1,25 +1,32 @@
+use std::sync::Arc;
+
 use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::intersectable::{Intersectable, IntersectionResult};
 use crate::geom::ray::Ray;
-use crate::geom::transform::Transformable;
 use crate::geom::vector3::Vector3f;
 use crate::shapes::Shape;
 
-use super::Elem;
-
 pub struct Substraction {
-    elements: Vec<Box<Elem>>,
+    elements: Vec<Arc<dyn Shape>>,
 }
 
 impl Shape for Substraction {}
 
 impl Substraction {
-    pub fn new(elements: Vec<Box<Elem>>) -> Self {
+    pub fn new(elements: Vec<Arc<dyn Shape>>) -> Self {
         Self { elements }
     }
 }
 
 impl Intersectable for Substraction {
+    /// The boundary of A ∖ (B ∪ C ∖ …): the first element's skin outside every other, plus the
+    /// others' skin where it lies inside the first.
+    ///
+    /// The only operation whose elements are not interchangeable — the first is the base, the rest
+    /// are removed from it — and the only one whose result carries a surface that belongs to no
+    /// element as such: where B bites into A, the visible skin is B's, seen **from inside** B. Hence
+    /// the flipped normal, the one place an operation touches an interaction rather than just
+    /// keeping or dropping it.
     fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
         match &self.elements[..] {
             &[] => IntersectionResult::new(),
@@ -27,39 +34,24 @@ impl Intersectable for Substraction {
             &[ref base_element, ref substracted_elements @ ..] => {
                 let mut res = IntersectionResult::new();
 
-                // transform ray in the base elem frame
-                let local_ray = base_element.transform.transform_ray_to_local(&ray);
-
-                // Search intersections with this base element
-                let base_element_collisions = base_element.shape.intersect(&local_ray, near, far);
-
-                for collision in base_element_collisions.iter() {
-                    // Transform collision back in world frame
-                    let collision_in_world_space = base_element.transform.transform_interaction_to_world(&collision);
-
+                for collision in base_element.intersect(ray, near, far) {
                     // Keep collision only it doesn't belong to a substracted volume.
-                    if !self.is_point_in_substracted(&collision_in_world_space.p, base_element) {
-                        res.push(collision_in_world_space)
+                    if !self.is_point_in_substracted(&collision.p, 0) {
+                        res.push(collision)
                     }
                 }
 
-                for elem in substracted_elements {
-                    // transform ray in the current elem frame
-                    let local_ray = elem.transform.transform_ray_to_local(&ray);
+                for (index, element) in substracted_elements.iter().enumerate() {
+                    // The elements being the tail of the list, the position in `self.elements` is
+                    // one further along — which is what `is_point_in_substracted` excludes.
+                    let position = index + 1;
 
-                    // Search intersections with this element
-                    let local_collision = elem.shape.intersect(&local_ray, near, far);
-
-                    for collision in local_collision.iter() {
-                        // Transform collision back in world frame
-                        let mut collision_in_world_space = elem.transform.transform_interaction_to_world(&collision);
-
-                        let local_point = base_element.transform.transform_point_to_local(&collision_in_world_space.p);
-                        if base_element.shape.contain_point(&local_point) {
+                    for mut collision in element.intersect(ray, near, far) {
+                        if base_element.contain_point(&collision.p) {
                             // Keep collision only it doesn't belong to a substracted volume.
-                            if !self.is_point_in_substracted(&collision_in_world_space.p, elem.as_ref()) {
-                                collision_in_world_space.n.mul_to_me(-1.0);
-                                res.push(collision_in_world_space)
+                            if !self.is_point_in_substracted(&collision.p, position) {
+                                collision.n.mul_to_me(-1.0);
+                                res.push(collision)
                             }
                         }
                     }
@@ -76,14 +68,12 @@ impl Intersectable for Substraction {
             &[] => false,
 
             &[ref base_element, ref substracted_elements @ ..] => {
-                let local_point = base_element.transform.transform_point_to_local(&point);
-                if !base_element.shape.contain_point(&local_point) {
+                if !base_element.contain_point(point) {
                     return false;
                 }
 
-                for elem in substracted_elements {
-                    let local_point = elem.transform.transform_point_to_local(&point);
-                    if elem.shape.contain_point(&local_point) {
+                for element in substracted_elements {
+                    if element.contain_point(point) {
                         return false;
                     }
                 }
@@ -104,34 +94,22 @@ impl AABound for Substraction {
         match &self.elements[..] {
             &[] => AABoundingBox::new(&Vector3f::zero(), &Vector3f::zero()),
 
-            &[ref first_element, ref _other_elements @ ..] => {
-                let res_bbox = first_element.shape.get_bounding_box().transform(&first_element.transform);
-                res_bbox
-            }
+            &[ref first_element, ref _other_elements @ ..] => first_element.get_bounding_box(),
         }
     }
 }
 
 impl Substraction {
-    fn is_point_in_substracted(&self, point: &Vector3f, exclude: &Elem) -> bool {
-        match &self.elements[..] {
-            &[] => false,
-
-            &[_, ref substracted_elements @ ..] => {
-                for elem in substracted_elements {
-                    let current = elem.as_ref() as *const Elem;
-                    if current == exclude {
-                        continue;
-                    }
-
-                    let local_point = elem.transform.transform_point_to_local(&point);
-                    if elem.shape.contain_point(&local_point) {
-                        return true;
-                    }
-                }
-
-                false
-            }
-        }
+    /// Whether `point` has been carved away by an element other than the one at `from`.
+    ///
+    /// The base element is never consulted: it is what the others are removed *from*, so being
+    /// inside it is the very condition for a point to be kept. Passing `0` as `from` therefore
+    /// excludes nothing, the base not being among the elements this walks.
+    fn is_point_in_substracted(&self, point: &Vector3f, from: usize) -> bool {
+        self.elements
+            .iter()
+            .enumerate()
+            .skip(1)
+            .any(|(index, element)| index != from && element.contain_point(point))
     }
 }

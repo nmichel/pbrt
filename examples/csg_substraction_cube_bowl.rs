@@ -9,7 +9,7 @@ use pbrt::lights::BackgroundInfiniteLight;
 use pbrt::materials::*;
 use pbrt::objects::{Simple, Transformed};
 use pbrt::scene::Scene;
-use pbrt::shapes::{csg, AABox, Rectangle, Sphere};
+use pbrt::shapes::{self as shapes, csg, AABox, Rectangle, Sphere};
 use pbrt::spectrum::Spectrum;
 use pbrt::textures::{CheckerBoard, PlainColor};
 use pbrt::{colors, renderers};
@@ -41,42 +41,42 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     let mut scene = Scene::new();
 
     let bowl = csg::Substraction::new(vec![
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.5)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.4)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(AABox::new(&Vector3f::new(1.0, 0.5, 1.0))),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.25, 0.0))),
-        }),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.4)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(AABox::new(&Vector3f::new(1.0, 0.5, 1.0))),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.25, 0.0))),
+        )),
     ]);
 
     let substraction_box_bowl = csg::Substraction::new(vec![
-        Box::new(csg::Elem {
-            shape: Arc::new(AABox::new(&Vector3f::new(1.1, 0.6, 1.1))),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, -0.31, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(csg::Substraction::new(vec![
-                Box::new(csg::Elem {
-                    shape: Arc::new(Sphere::new(0.5)),
-                    transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-                }),
-                Box::new(csg::Elem {
-                    shape: Arc::new(Sphere::new(0.4)),
-                    transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-                }),
-                Box::new(csg::Elem {
-                    shape: Arc::new(AABox::new(&Vector3f::new(1.0, 0.5, 1.0))),
-                    transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.25, 0.0))),
-                }),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(AABox::new(&Vector3f::new(1.1, 0.6, 1.1))),
+            Box::new(Transform::translation(Vector3f::new(0.0, -0.31, 0.0))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(csg::Substraction::new(vec![
+                Arc::new(shapes::Transformed::new(
+                    Arc::new(Sphere::new(0.5)),
+                    Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+                )),
+                Arc::new(shapes::Transformed::new(
+                    Arc::new(Sphere::new(0.4)),
+                    Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+                )),
+                Arc::new(shapes::Transformed::new(
+                    Arc::new(AABox::new(&Vector3f::new(1.0, 0.5, 1.0))),
+                    Box::new(Transform::translation(Vector3f::new(0.0, 0.25, 0.0))),
+                )),
             ])),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-        }),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+        )),
     ]);
 
     scene.add_object(Arc::new(Transformed::new(

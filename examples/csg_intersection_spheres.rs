@@ -9,7 +9,7 @@ use pbrt::lights::BackgroundInfiniteLight;
 use pbrt::materials::*;
 use pbrt::objects::{Simple, Transformed};
 use pbrt::scene::Scene;
-use pbrt::shapes::{csg, Rectangle, Sphere};
+use pbrt::shapes::{self as shapes, csg, Rectangle, Shape, Sphere};
 use pbrt::spectrum::Spectrum;
 use pbrt::textures::{CheckerBoard, PlainColor};
 use pbrt::{colors, renderers};
@@ -39,23 +39,23 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     // Scene
     //
     let mut scene = Scene::new();
-    let elements = vec![
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.5)),
-            transform: Box::new(Transform::translation(Vector3f::new(-0.25, -0.25, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.5)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.25, -0.25, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.5)),
-            transform: Box::new(Transform::translation(Vector3f::new(-0.25, 0.25, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.5)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.25, 0.25, 0.0))),
-        }),
+    let elements: Vec<Arc<dyn Shape>> = vec![
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(-0.25, -0.25, 0.0))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(0.25, -0.25, 0.0))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(-0.25, 0.25, 0.0))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.5)),
+            Box::new(Transform::translation(Vector3f::new(0.25, 0.25, 0.0))),
+        )),
     ];
 
     scene

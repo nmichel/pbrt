@@ -27,13 +27,16 @@ enveloppe aujourd'hui un objet déjà bâti. Plan, ordre d'attaque et preuve dan
 `ObjectTransformedNode` visite son placement avant son enfant, `SceneBuilderVisitor` compose la
 matrice sur une pile, et `visit_object_simple` livre une forme déjà placée par
 [`shapes::Transformed`](src/shapes/transformed.rs) — le chargeur ne construit plus
-d'`objects::Transformed`. Restent la CSG et la documentation de ce dernier, items 4 et 5 du §7.
-**C'est un refactor : l'image doit rester identique au bit près à chaque
-commit**, et les compteurs de `bvh_stats` ne doivent pas bouger non plus, les deux décorateurs
-calculant leur boîte de la même façon. Aucun gain par rayon à en attendre, et un piège d'allocation
-à éviter en chemin (§5 du même fichier).
+d'`objects::Transformed`. La CSG en a fini avec `csg::Elem` : ses trois opérations ne connaissent
+plus que des formes, et l'en-tête de [shapes/csg.rs](src/shapes/csg.rs) porte la règle des deux
+repères. Restent la documentation d'`objects::Transformed` et le chronomètre, items 5 et 6 du §7.
+**C'est un refactor : l'image doit rester identique au bit près à chaque commit**, et les compteurs
+de `bvh_stats` ne doivent pas bouger non plus, les deux décorateurs calculant leur boîte de la même
+façon. Aucun gain par rayon à en attendre, et un piège d'allocation à éviter en chemin (§5 du même
+fichier).
 
-Avant lui, `chore/shading_frame` : le repère de shading est un type, [`ShadingFrame`](src/geom/shading_frame.rs), qui porte la base, la convention
+Avant lui, `chore/shading_frame` : le repère de shading est un type,
+[`ShadingFrame`](src/geom/shading_frame.rs), qui porte la base, la convention
 « z est la normale » et la dérivation du changement de repère, là où elle était énoncée trois fois et
 la base reconstruite à chaque conversion. `reflect` et `same_hemisphere` y vivent, le cosinus
 surnuméraire d'une distribution de Dirac est devenu `materials::cancel_integrator_cosine`, et
@@ -68,7 +71,7 @@ d'une exécution ([docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3, qui porte au
 réouverture). **Un gain de construction se rapporte à une exécution entière, jamais au chargement
 seul** ; c'est la leçon de ce dernier, et elle vaut pour le prochain.
 
-**Lancer les tests** — `cargo test` est vert en entier : 153 tests de bibliothèque, 2 tests
+**Lancer les tests** — `cargo test` est vert en entier : 155 tests de bibliothèque, 2 tests
 d'intégration, 11 doc-tests, et les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour
 tout changement de construction ou de traversée d'un accélérateur,
 `cargo run --release --bin bvh_stats -- <scène>`

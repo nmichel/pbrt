@@ -9,7 +9,7 @@ use pbrt::lights::BackgroundInfiniteLight;
 use pbrt::materials::*;
 use pbrt::objects::{Simple, Transformed};
 use pbrt::scene::Scene;
-use pbrt::shapes::{csg, AABox, Rectangle};
+use pbrt::shapes::{self as shapes, csg, AABox, Rectangle};
 use pbrt::spectrum::Spectrum;
 use pbrt::textures::{CheckerBoard, PlainColor};
 use pbrt::{colors, renderers};
@@ -44,14 +44,14 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
     let mut scene = Scene::new();
 
     let union_cube_cube = csg::Union::new(vec![
-        Box::new(csg::Elem {
-            shape: Arc::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
-            transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
-        }),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(AABox::new(&Vector3f::new(1.0, 1.0, 1.0))),
+            Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
+        )),
     ]);
 
     scene.add_object(Arc::new(Transformed::new(

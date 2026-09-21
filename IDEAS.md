@@ -58,6 +58,15 @@ faire ensuite.
       [ideas/sampler_stratifie.md](ideas/sampler_stratifie.md).
 - [ ] **Abstraction `Film` + ordonnancement par tuiles** — indépendant, et déduplique les deux
       renderers. Détail sous *Renderer & infrastructure*.
+- [ ] **`--print` — charger une scène, l'imprimer, sortir sans rendre.** Donne un appelant au
+      [`PrintVisitor`](src/loader/visitors/print.rs), qui n'en a aucun : `visit_stage` est
+      inatteignable et ses tests d'origine impriment sans rien affirmer. **Rien n'en dépend**, mais
+      son prérequis est partagé — une option sans valeur, comme `--no-progress`, ce que `config.rs`
+      ne sait pas encore porter dans `OPTIONS`. Trois défauts du visiteur à régler avant, dont un
+      `.ply` relu et vidé ligne à ligne — 249 186 lignes pour une scène portant `bun_zipper.ply` —,
+      et un gain qui dépasse l'option : l'idempotence de
+      `print ∘ parse` comme test de toute la chaîne du langage.
+      [ideas/print_stage.md](ideas/print_stage.md)
 - [ ] **Balayage de `t_trav`, et feuilles de maillage plus grosses** — **débloqué** : les rayons
       secondaires sont désormais reproductibles, donc l'arbitrage peut être mesuré sur eux et pas
       sur le seul cinquième primaire ([ideas/cout_traversee_bvh.md](ideas/cout_traversee_bvh.md)).
@@ -246,7 +255,9 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       option `--no-progress`, qui dit ce que l'utilisateur veut, plutôt qu'une détection par
       `std::io::IsTerminal`, qui devine ce qu'il voudrait. Elle ne prend pas de valeur, donc elle
       pose la même question que `--help` : celle de l'option qui n'est pas une paire
-      `--nom valeur`, aujourd'hui traitée hors de `OPTIONS` ([config.rs](src/config.rs)).
+      `--nom valeur`, aujourd'hui traitée hors de `OPTIONS` ([config.rs](src/config.rs)). Cette
+      question est le prérequis commun de deux entrées — celle-ci et `--print`
+      ([ideas/print_stage.md](ideas/print_stage.md) §4) —, donc elle se paie une fois pour les deux.
 - [x] **Les rendus sont reproductibles.** Même scène, mêmes options, même image — et indépendamment
       du nombre de threads comme du renderer choisi. `utils::random_double` n'existe plus.
       [docs/rendu_reproductible.md](docs/rendu_reproductible.md).
@@ -288,6 +299,16 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       rien, tout `.stage` sans bloc `light` rend du noir — ce qui est honnête, et demande de reprendre
       les fichiers de `test_files/` un par un. C'est aussi ce qui rend le témoin d'`AreaLight`
       démontrable : une scène éclairée par ce qu'elle déclare, et rien d'autre.
+- [ ] **Les éléments d'une CSG arrivent dans l'ordre inverse de leur déclaration.**
+      `SceneBuilderVisitor::pop_csg_elems` les dépile, donc le dernier `elem` écrit devient
+      `elements[0]`. Sans effet sur une union ou une intersection, qui sont commutatives ; décisif
+      pour `csg substraction`, dont le premier élément est la base dont les autres sont retirés :
+      `csg substraction { elem A … elem B … }` retire donc **A de B**. Les constructions
+      programmatiques d'`examples/` passent leurs éléments dans l'ordre de lecture et retirent B de
+      A : la grammaire et les exemples ne disent pas la même chose. Aucun fichier de `test_files/`
+      n'emploie `substraction`, ce qui explique que rien ne l'ait révélé — et le jour où l'un en
+      emploiera, il obtiendra l'inverse de ce qu'il écrit. Correctif d'une ligne, mais c'est une
+      rupture de comportement : à faire avec le renommage ci-dessous, qui casse déjà ces fichiers.
 - [ ] **Le mot-clé CSG `substraction` est orthographié à la française** — la forme anglaise est
       `subtraction`, et le reste de la grammaire est en anglais. C'est dans la surface publique du
       langage de scène, donc le renommer casse les `.stage` existants : accepter la rupture, ou

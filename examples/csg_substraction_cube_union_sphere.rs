@@ -9,7 +9,7 @@ use pbrt::lights::BackgroundInfiniteLight;
 use pbrt::materials::*;
 use pbrt::objects::{Simple, Transformed};
 use pbrt::scene::Scene;
-use pbrt::shapes::{csg, AABox, Rectangle, Sphere};
+use pbrt::shapes::{self as shapes, csg, AABox, Rectangle, Sphere};
 use pbrt::spectrum::Spectrum;
 use pbrt::textures::{CheckerBoard, PlainColor};
 use pbrt::{colors, renderers};
@@ -42,55 +42,55 @@ pub fn build_scene(config: &Config) -> (Scene, Box<dyn Camera>) {
 
     // Union of 9 balls
     let nine_balls = Arc::new(csg::Union::new(vec![
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.35)),
-            transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, -0.5))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.35)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -0.5))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.35)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, -0.5))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.35)),
-            transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.35)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.35)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.35)),
-            transform: Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.5))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.35)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.5))),
-        }),
-        Box::new(csg::Elem {
-            shape: Arc::new(Sphere::new(0.35)),
-            transform: Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.5))),
-        }),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.35)),
+            Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, -0.5))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.35)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, -0.5))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.35)),
+            Box::new(Transform::translation(Vector3f::new(0.5, 0.0, -0.5))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.35)),
+            Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.0))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.35)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.35)),
+            Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.0))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.35)),
+            Box::new(Transform::translation(Vector3f::new(-0.5, 0.0, 0.5))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.35)),
+            Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.5))),
+        )),
+        Arc::new(shapes::Transformed::new(
+            Arc::new(Sphere::new(0.35)),
+            Box::new(Transform::translation(Vector3f::new(0.5, 0.0, 0.5))),
+        )),
     ]));
 
     scene.add_object(Arc::new(Transformed::new(
         Arc::new(Simple::new(
             Arc::new(csg::Substraction::new(vec![
-                Box::new(csg::Elem {
-                    shape: Arc::new(AABox::new(&Vector3f::new(2.0, 1.0, 2.0))),
-                    transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-                }),
-                Box::new(csg::Elem {
-                    shape: nine_balls,
-                    transform: Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
-                }),
+                Arc::new(shapes::Transformed::new(
+                    Arc::new(AABox::new(&Vector3f::new(2.0, 1.0, 2.0))),
+                    Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+                )),
+                Arc::new(shapes::Transformed::new(
+                    nine_balls,
+                    Box::new(Transform::translation(Vector3f::new(0.0, 0.0, 0.0))),
+                )),
             ])),
             Arc::new(Dielectric::new(RefractionIndices::WATER, Arc::new(PlainColor::new(colors::ALICE_BLUE)))),
         )),
