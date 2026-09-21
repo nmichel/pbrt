@@ -20,22 +20,21 @@ fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a ap
 `docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
 une entrée cochée y garde une ligne, pas son corps.
 
-**Chantier en cours** — **la CTM**, branche `chore/ctm`, préfixe `[ctm]`. Le chargeur doit tenir la
-matrice de transformation courante et livrer une géométrie **déjà placée**, là où une transformation
-enveloppe aujourd'hui un objet déjà bâti. Plan, ordre d'attaque et preuve dans
-[ideas/ctm.md](ideas/ctm.md), à cocher au fur et à mesure. Le chargeur tient désormais la CTM :
-`ObjectTransformedNode` visite son placement avant son enfant, `SceneBuilderVisitor` compose la
-matrice sur une pile, et `visit_object_simple` livre une forme déjà placée par
-[`shapes::Transformed`](src/shapes/transformed.rs) — le chargeur ne construit plus
-d'`objects::Transformed`. La CSG en a fini avec `csg::Elem` : ses trois opérations ne connaissent
-plus que des formes, et l'en-tête de [shapes/csg.rs](src/shapes/csg.rs) porte la règle des deux
-repères. Restent la documentation d'`objects::Transformed` et le chronomètre, items 5 et 6 du §7.
-**C'est un refactor : l'image doit rester identique au bit près à chaque commit**, et les compteurs
-de `bvh_stats` ne doivent pas bouger non plus, les deux décorateurs calculant leur boîte de la même
-façon. Aucun gain par rayon à en attendre, et un piège d'allocation à éviter en chemin (§5 du même
-fichier).
+**Chantier en cours** — aucun. Le sujet de la branche `chore/ctm` est clos : le chargeur tient la
+**matrice de transformation courante** et livre une géométrie *déjà placée*. `ObjectTransformedNode`
+visite son placement avant son enfant, une paire `enter`/`leave` du `Visitor` délimite la portée du
+bloc, `SceneBuilderVisitor` compose la matrice sur une pile, et
+[`shapes::Transformed`](src/shapes/transformed.rs) la replie dans la forme — donc l'objet visible et,
+demain, la lumière qui échantillonne la même surface lisent les mêmes points d'un seul
+`Arc<dyn Shape>`. `csg::Elem` a disparu au profit de ce décorateur, `objects::Transformed` est
+recentré sur l'instanciation, et l'en-tête de [shapes/csg.rs](src/shapes/csg.rs) porte la règle des
+deux repères qui ne se composent pas. C'était un refactor : l'image est restée identique au bit près
+à chaque commit, compteurs de `bvh_stats` compris. **Ce qu'il a démenti** : le placement descendu
+d'un étage n'est pas neutre mais plus rapide, de 1 à 16 % selon la scène, un clone d'`Arc` par touche
+étant tombé avec lui — mesure, attribution et coût inverse dans
+[docs/mesures_placement.md](docs/mesures_placement.md).
 
-Avant lui, `chore/shading_frame` : le repère de shading est un type,
+Avant lui, `chore/shading_frame` : le repère de shading est devenu un type,
 [`ShadingFrame`](src/geom/shading_frame.rs), qui porte la base, la convention
 « z est la normale » et la dérivation du changement de repère, là où elle était énoncée trois fois et
 la base reconstruite à chaque conversion. `reflect` et `same_hemisphere` y vivent, le cosinus
@@ -55,7 +54,7 @@ Plus tôt encore, `chore/revamp_bvh_for_trimesh` : ses mesures et ses arbitrages
 comparer une mesure fraîche.
 
 La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Y
-vient, après la CTM, la **production `light` de la grammaire `.stage`**, puis
+vient d'abord la **production `light` de la grammaire `.stage`**, puis
 [`AreaLight`](ideas/area_light.md) — le plus grand écart au modèle physique du projet, les surfaces
 émissives ne contribuant à aucun éclairage indirect. Cet ordre surprend et il est délibéré : tant que
 le loader câble une `PointLight` que `NaiveIntegrator` ne peut pas voir, la comparaison `naive` /

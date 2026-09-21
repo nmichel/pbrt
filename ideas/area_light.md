@@ -175,10 +175,11 @@ if let Some(sampler) = Arc::clone(&shape).area_sampler() {                      
 }
 ```
 
-**D'où le prérequis du §7 sur la CTM** : sans elle, le placement vit dans un `objects::Transformed`
-*au-dessus* du point de partage, et la lumière échantillonnerait la forme en espace local pendant que
-l'objet est rendu ailleurs. L'erreur serait silencieuse, l'ombre portée en étant le seul indice. Voir
-[ctm.md](ctm.md).
+**C'est ce que la CTM a rendu possible**, et ce prérequis est acquis : la forme sort du chargeur en
+espace monde, [`shapes::Transformed`](../src/shapes/transformed.rs) ayant replié le placement dans la
+géométrie. Le placement vivant *au-dessus* du point de partage, la lumière échantillonnerait la forme
+en espace local pendant que l'objet est rendu ailleurs — erreur silencieuse dont l'ombre portée
+serait le seul indice.
 
 **Reste une décision à prendre ici, et elle n'est pas cosmétique** : `DiffuseLight` tient sa radiance
 sous forme de `Texture`, et `Texture::shade` demande une `Intersection` entière quand un
@@ -227,14 +228,13 @@ précisément le cas que MIS répare.
 
 ## 7. Ordre d'attaque
 
-**Deux prérequis, et aucun des deux n'est dans ce fichier.**
+**Un seul prérequis reste, et il n'est pas dans ce fichier.** L'autre est acquis : la CTM fait
+descendre le placement sur la forme, donc la géométrie que l'objet visible et la source
+échantillonnable doivent tenir tous les deux existe en espace monde (§4) — sans quoi il faudrait
+donner à l'`AreaLight` une transformation à elle, donc énoncer deux fois le même placement et vivre
+avec leur dérive possible. Reste :
 
-1. **La CTM** ([ctm.md](ctm.md)), qui fait descendre le placement sur la forme. C'est elle qui rend
-   possible la seule chose que ce chantier demande vraiment : une géométrie en espace monde que
-   l'objet visible et la source échantillonnable puissent tenir tous les deux (§4). Sans elle, il
-   faudrait donner à l'`AreaLight` une transformation à elle, donc énoncer deux fois le même
-   placement et vivre avec leur dérive possible.
-2. **La production `light` de la grammaire `.stage`**, qui retire les lumières câblées du chargeur.
+1. **La production `light` de la grammaire `.stage`**, qui retire les lumières câblées du chargeur.
    Sans elle, la comparaison `naive` / `path` du §6 — la seule preuve de ce chantier — est
    impossible, parce que `NaiveIntegrator` ne consulte jamais `Scene::lights` et ne verra donc
    jamais la `PointLight` que le chargeur ajoute à toute scène. Voir l'entrée correspondante de

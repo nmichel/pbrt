@@ -1,9 +1,9 @@
 # Éléments nommés dans la grammaire `.stage`
 
 Indexé depuis [IDEAS.md](../IDEAS.md). Non commencé, et délibérément placé **après MIS** : c'est un
-confort d'écriture des scènes, rien du transport de lumière n'en dépend. Ce fichier suppose le
-chantier de la CTM déjà fait — celui qui fait descendre le placement sur la forme et recentre
-`objects::Transformed` sur l'instanciation —, puisqu'il précède la production `light`.
+confort d'écriture des scènes, rien du transport de lumière n'en dépend. Sa seule dépendance est
+acquise : la CTM fait descendre le placement sur la forme et recentre `objects::Transformed` sur
+l'instanciation ([docs/mesures_placement.md](../docs/mesures_placement.md)).
 
 ## 1. Le besoin
 
@@ -30,19 +30,18 @@ n'ajouter (B) que le jour où une scène réelle le réclame, sous un mot-clé d
 sont pas interchangeables, et laisser croire qu'elles le sont produirait des écarts de performance
 inexplicables pour qui écrit la scène.
 
-## 3. Ce que le chantier de la CTM change, et ce qu'il ne change pas
+## 3. Ce que la CTM impose à ce chantier, et ce qu'elle lui laisse
 
-**Il ne rend pas (A) possible** — ré-élaborer un sous-arbre d'AST marche avec ou sans lui.
+**Elle ne rend pas (A) possible** — ré-élaborer un sous-arbre d'AST marche avec ou sans elle.
 
-**Il rend (A) obligatoire pour qui veut replacer.** Sous une CTM, construire cuit le placement :
+**Elle rend (A) obligatoire pour qui veut replacer.** Sous une CTM, construire cuit le placement :
 l'objet bâti est en espace monde, et aucune transformation ne le ramène ailleurs sans défaire ce qui
 a déjà été replié dans ses feuilles. Donc la table des noms stocke des **nœuds d'AST**, pas des
 `Arc<dyn Object>`. C'est le point de dessin dont tout le reste découle.
 
-**Il n'autorise (B) que si `objects::Transformed` survit**, ce qui est précisément son métier après
-le chantier : placer devient l'affaire de la CTM, instancier reste la sienne. Les deux mécanismes
-sont complémentaires, comme chez pbrt, où la CTM et `TransformedPrimitive` coexistent depuis
-toujours.
+**Elle n'autorise (B) que par `objects::Transformed`**, dont c'est précisément le métier : placer est
+l'affaire de la CTM, instancier reste la sienne. Les deux mécanismes sont complémentaires, comme chez
+pbrt, où la CTM et `TransformedPrimitive` coexistent depuis toujours.
 
 ## 4. La syntaxe
 
