@@ -2,6 +2,7 @@ use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::shading_frame::{self, ShadingFrame};
+use crate::geom::surface_point::SurfacePoint;
 use crate::interaction::Interaction;
 use crate::pdfs::sphere::SpherePdf;
 use crate::pdfs::Pdf;
@@ -57,7 +58,7 @@ impl Material for Metal {
             let shift_avoid_acne = n * 0.001;
             let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
 
-            let attenuation = super::cancel_integrator_cosine(self.albedo.shade(intersection), &local_target);
+            let attenuation = super::cancel_integrator_cosine(self.albedo.shade(&SurfacePoint::from(intersection)), &local_target);
 
             Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
         }

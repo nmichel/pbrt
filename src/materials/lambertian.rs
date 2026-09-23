@@ -3,6 +3,7 @@ use crate::colors;
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::shading_frame::{self, ShadingFrame};
+use crate::geom::surface_point::SurfacePoint;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::pdfs::cosine::CosinePdf;
@@ -33,7 +34,7 @@ impl Material for Lambertian {
 
         let shift_avoid_acne = n * 0.001;
         let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &wi);
-        let attenuation = self.albedo.shade(intersection) / std::f64::consts::PI;
+        let attenuation = self.albedo.shade(&SurfacePoint::from(intersection)) / std::f64::consts::PI;
         let scattering_pdf = pdf.value(&local_wi);
 
         return Some(ScatterInfo::new(attenuation, scattered_ray, scattering_pdf));
@@ -47,7 +48,7 @@ impl Material for Lambertian {
         let wo = frame.world_to_local(world_wo);
 
         if shading_frame::same_hemisphere(&wo, &wi) {
-            self.albedo.shade(intersection) / std::f64::consts::PI
+            self.albedo.shade(&SurfacePoint::from(intersection)) / std::f64::consts::PI
         }
         else {
             colors::BLACK

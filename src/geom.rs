@@ -4,6 +4,7 @@ pub mod intersectable;
 pub mod matrix4;
 pub mod ray;
 pub mod shading_frame;
+pub mod surface_point;
 pub mod transform;
 pub mod vector2;
 pub mod vector3;

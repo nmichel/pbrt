@@ -2,6 +2,7 @@ use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::shading_frame::{self, ShadingFrame};
+use crate::geom::surface_point::SurfacePoint;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
@@ -44,7 +45,7 @@ impl Material for Dielectric {
         // certain)
         let local_reflected = shading_frame::reflect(&local_wo);
 
-        let mut attenuation = self.albedo.shade(intersection);
+        let mut attenuation = self.albedo.shade(&SurfacePoint::from(intersection));
         let local_outward_normal: Vector3f;
         let world_outward_normal: Vector3f;
         let ni: f64;

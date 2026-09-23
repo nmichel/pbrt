@@ -1,5 +1,5 @@
 use super::Texture;
-use crate::geom::intersectable::Intersection;
+use crate::geom::surface_point::SurfacePoint;
 use crate::spectrum::Spectrum;
 
 pub struct PlainColor {
@@ -13,7 +13,7 @@ impl PlainColor {
 }
 
 impl Texture for PlainColor {
-    fn shade(&self, _interaction: &Intersection) -> Spectrum {
+    fn shade(&self, _surface_point: &SurfacePoint) -> Spectrum {
         self.c
     }
 }

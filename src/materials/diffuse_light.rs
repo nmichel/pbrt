@@ -1,5 +1,6 @@
 use super::Material;
 use crate::geom::ray::Ray;
+use crate::geom::surface_point::SurfacePoint;
 use crate::interaction::Interaction;
 use crate::spectrum::Spectrum;
 use crate::textures::*;
@@ -17,6 +18,6 @@ impl DiffuseLight {
 
 impl Material for DiffuseLight {
     fn emit(&self, _ray: &Ray, interaction: &Interaction) -> Option<Spectrum> {
-        Some(self.emitted.shade(&interaction.intersection))
+        Some(self.emitted.shade(&SurfacePoint::from(&interaction.intersection)))
     }
 }

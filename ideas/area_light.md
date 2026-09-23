@@ -55,14 +55,10 @@ une implémentation, y compris celles qui n'en ont pas. Un trait séparé fait d
 ```rust
 /// A point drawn on a surface, with the density it was drawn with.
 pub struct ShapeSample {
-    pub p: Vector3f,
-    pub n: Vector3f,
-
-    /// Surface parameters at `p`, so the emitted radiance is read from the very texture the
-    /// visible surface shows. Without them a textured emitter would light the scene with one
-    /// colour and be seen with another.
-    pub u: f64,
-    pub v: f64,
+    /// Where the point is, and its surface parameters, so the emitted radiance is read from the
+    /// very texture the visible surface shows. A `SurfacePoint` is built without a ray, which is
+    /// exactly what a drawn point can supply.
+    pub sp: SurfacePoint,
 
     /// Density **in area measure** — 1/area for a uniform draw. The conversion to solid angle
     /// belongs to the light: it needs the shaded point, which a shape knows nothing about.
@@ -108,6 +104,14 @@ impl Shape for Rectangle {
 propriété qu'un objet a ou n'a pas ; les deux autres routes cassent l'une l'invariant « les deux
 méthodes vont ensemble » — poser `area()` et `sample_area()` sur `Shape` en `Option` —, l'autre la
 lisibilité.
+
+**`shapes::Transformed` est la seule forme pour qui le corps par défaut est un piège.** Le chargeur
+enveloppe toute forme dans ce décorateur, donc c'est lui, et non la `Rectangle` qu'il contient, à qui
+la question est posée : sans un relais explicite, il répond `None` et **tout objet émissif tombe sur
+l'erreur de chargement du corollaire ci-dessous**. Il relaie donc à son enfant et place le point
+tiré, comme il place déjà une touche. La densité, elle, traverse inchangée — `Transform` n'offre que
+translations et rotations, donc l'aire est préservée, et c'est la précondition d'isométrie déjà
+écrite dans l'en-tête de [shapes/transformed.rs](../src/shapes/transformed.rs) qui le garantit.
 
 **Corollaire, et il n'est pas facultatif : un matériau émissif posé sur une forme qui ne sait pas
 s'échantillonner est une erreur de chargement**, nommant la forme fautive. Rendre l'objet visible
@@ -168,10 +172,12 @@ la même géométrie.
 // dans `visit_object_simple`, une fois la CTM repliée dans la forme
 let shape: Arc<dyn Shape> = Arc::new(shapes::Transformed::new(local_shape, self.ctm()));
 
-self.objects.push(Arc::new(Simple::new(Arc::clone(&shape), material)));          // visible
+self.objects.push(Arc::new(Simple::new(Arc::clone(&shape), Arc::clone(&material))));   // visible
 
-if let Some(sampler) = Arc::clone(&shape).area_sampler() {                       // échantillonnable
-    self.scene.add_light(Arc::new(AreaLight::new(sampler, emitted, two_sided)));
+match (Arc::clone(&material).emitter(), Arc::clone(&shape).area_sampler()) {
+    (Some(emitter), Some(sampler)) => self.scene.add_light(Arc::new(AreaLight::new(sampler, emitter))),
+    (Some(_), None) => return Err(/* nommant la forme */),
+    (None, _) => {}
 }
 ```
 
@@ -181,12 +187,68 @@ géométrie. Le placement vivant *au-dessus* du point de partage, la lumière é
 en espace local pendant que l'objet est rendu ailleurs — erreur silencieuse dont l'ombre portée
 serait le seul indice.
 
-**Reste une décision à prendre ici, et elle n'est pas cosmétique** : `DiffuseLight` tient sa radiance
-sous forme de `Texture`, et `Texture::shade` demande une `Intersection` entière quand un
-`ShapeSample` n'en est pas une — `d` et `wo` n'ont aucun sens pour un point tiré. Deux issues, et il
-faut choisir avant d'écrire `sample_li` : porter (u, v) dans `ShapeSample` et donner à `Texture` un
-point d'entrée qui s'en contente, ou restreindre la première version à une émission uniforme et le
-dire. Ce qu'il ne faut pas, c'est que NEE lise une radiance différente de celle que l'œil voit.
+### L'émission appartient au matériau, et c'est un écart délibéré à pbrt
+
+Une question se cache sous le `emitter` du bloc ci-dessus : **qui répond à « que cette surface
+émet-elle ? »** Aujourd'hui c'est le matériau, par `Material::emit`, et les deux intégrateurs
+l'appellent. Dans pbrt c'est la lumière : le matériau n'émet pas du tout, la primitive porte
+optionnellement une `AreaLight`, et l'interaction la lui demande — le stub mort
+[`Intersection::le`](../src/geom/intersectable.rs) est cette conception-là, recopiée puis commentée.
+
+**L'émission reste au matériau**, pour deux raisons qui ne sont pas de goût. Le tableau du §2 de
+CLAUDE.md énonce déjà `Material` comme « échantillonner (`scatter`) et évaluer (`f`) une BSDF,
+**émettre (`emit`)** » : suivre pbrt demanderait de réécrire cette ligne. Et un `get_area_light` sur
+la primitive percerait exactement la couture au nom de laquelle la route `Scene::commit` est écartée
+en tête de section — dans l'autre sens, mais c'est la même.
+
+La forme concrète est la **symétrique** de `Shape::area_sampler` (§2), et pour la même raison : le
+visiteur tient un `Arc<dyn Material>` au moment où la question se pose, donc le même problème
+d'upcast appelle la même sortie.
+
+```rust
+// dans src/materials.rs, à côté de Material — comme AreaSampleable est à côté de Shape
+pub trait Emitter: Send + Sync {
+    /// Emitted radiance leaving `sp` towards `w`.
+    fn l(&self, sp: &SurfacePoint, w: &Vector3f) -> Spectrum;
+}
+
+pub trait Material: Send + Sync {
+    /// The emitting face of this material, when it has one.
+    fn emitter(self: Arc<Self>) -> Option<Arc<dyn Emitter>> {
+        None
+    }
+}
+```
+
+`DiffuseLight` implémente `Emitter::l` — la lecture de la texture et la règle d'unilatéralité y
+vivent **une seule fois** — et son `Material::emit` y délègue. `AreaLight` tient un
+`Arc<dyn Emitter>` et non un `Arc<dyn Material>` : elle ne reçoit pas un objet capable de `scatter`
+dont elle ignorerait les trois quarts. Deux points d'entrée et non un seul parce que leurs appelants
+diffèrent : `emit` est sur le chemin chaud, appelé par `&self` à chaque touche ; `emitter` n'est
+appelée qu'une fois par objet, au chargement, d'où son receveur possédé.
+
+Sur le nom : pbrt distingue `Light::Le(ray)` — ce que `Light` a déjà ici pour les lumières
+infinies — de `DiffuseAreaLight::L(p, n, uv, w)`, la radiance émise depuis un point de surface. D'où
+`l`, la distinction étant portée par le doc-comment.
+
+**Le prix, et il se paie au chantier suivant : MIS.** Quand un rayon échantillonné par la BSDF touche
+une surface émissive, l'intégrateur doit pondérer par `power_heuristic(pdf_bsdf, pdf_li)`, donc
+connaître *l'identité de la lumière touchée* — son aire, et la probabilité discrète `1/N` de l'avoir
+tirée. Le `get_area_light` de pbrt n'est pas de la décoration, c'est ce chaînon ; ici l'intégrateur
+tient le matériau, pas la lumière, et ne l'a donc pas. La sortie n'est pas forcément celle de pbrt :
+la plus naturelle est qu'`Interaction` porte l'`Option<&dyn Light>` à côté du matériau — le même
+chaînon, posé sur le type dont le rôle *est* de marier géométrie et matériau. Elle a un coût,
+[`Simple::intersect`](../src/objects/simple.rs) clonant déjà un `Arc` par touche. **À trancher avec
+MIS, pas ici.**
+
+**Ce que `sample_li` donne à lire à la `Texture` est tranché**, et il n'y a plus rien à décider ici :
+`Texture::shade` prend un [`SurfacePoint`](../src/geom/surface_point.rs) — `p`, `n`, `u`, `v` —, qui
+se construit sans rayon. Un `ShapeSample` en porte un, donc NEE lit la radiance sur la texture même
+que l'œil voit, au même point, sans qu'un point tiré ait à inventer une distance ni une direction
+d'observation. L'écueil que ce choix écarte est qu'une source texturée éclaire d'une couleur et se
+voie d'une autre.
+
+Reste la décision de l'émission unilatérale, qui, elle, vaut un facteur deux sur l'image.
 
 ## 5. Le double comptage, et pourquoi ne pas toucher au garde spéculaire
 
@@ -255,14 +317,30 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       ([docs/rendu_reproductible.md](../docs/rendu_reproductible.md)).
 - [x] Production `light` de la grammaire `.stage`, et lumières câblées retirées du chargeur
       ([docs/eclairage_declare.md](../docs/eclairage_declare.md)).
-- [ ] Trancher les deux décisions ouvertes **avant** d'écrire : l'émission est-elle unilatérale, et
-      comment `sample_li` lit la radiance d'une `Texture` (§4). Toutes deux se voient sur l'image, et
-      la première vaut un facteur deux.
+- [x] Comment `sample_li` lit la radiance d'une `Texture` (§4) : `Texture::shade` prend un
+      [`SurfacePoint`](../src/geom/surface_point.rs), qui se construit sans rayon.
+- [ ] Trancher l'émission unilatérale **avant** d'écrire (§3) : elle se voit sur l'image, et elle
+      vaut un facteur deux. La normale du panneau de `cornell_box.stage` regarde aujourd'hui le
+      plafond — `rotate_y π` laisse `(0, 1, 0)` inchangé —, donc le témoin visuel est à retourner
+      dans le même geste.
+- [ ] `Emitter` + `Material::emitter`, et `DiffuseLight::emit` qui délègue à `Emitter::l` — la règle
+      d'unilatéralité et la lecture de la texture n'ont alors qu'une seule implémentation (§4).
 - [ ] `AreaSampleable` + `ShapeSample`, implémentés sur `Rectangle` d'abord — c'est le panneau du
       Cornell box, et son échantillonnage uniforme est deux nombres.
 - [ ] Test de conservation d'aire sur cette implémentation, avant tout usage.
 - [ ] `Shape::area_sampler`, sa valeur par défaut, et le diagnostic de chargement qui va avec : un
-      matériau émissif sur une forme non échantillonnable est une erreur nommant la forme (§2).
+      matériau émissif sur une forme non échantillonnable est une erreur nommant la forme (§2). Ce
+      diagnostic ne s'ajoute pas, il tombe de la conjonction des deux questions — le matériau
+      émet-il, la forme s'échantillonne-t-elle (§4).
+- [ ] `shapes::Transformed` relaie `area_sampler` et place le point tiré. Le chargeur enveloppe
+      toute forme dans ce décorateur, donc sans ce relais **tout objet émissif devient une erreur de
+      chargement**. La densité en mesure d'aire, elle, traverse inchangée : `Transform` n'offre que
+      translations et rotations, et sa précondition d'isométrie est déjà écrite dans l'en-tête de
+      [shapes/transformed.rs](../src/shapes/transformed.rs).
+- [ ] Test que les (u, v) d'un point *tiré* sont ceux d'un point *touché* au même endroit — pendant
+      de `test_a_placed_point_and_a_hit_point_agree`. `Rectangle` rend `u = p.x, v = p.z`, non
+      normalisés ; un `sample_area` qui normaliserait en [0, 1] ferait éclairer une source texturée
+      d'une couleur et se voir d'une autre, ce que le §4 interdit.
 - [ ] `lights/area_light.rs` : `sample_li` par `sample_area`, conversion aire → angle solide dérivée
       dans le doc-comment, radiance nulle du mauvais côté si l'émission est unilatérale.
 - [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme, déjà
