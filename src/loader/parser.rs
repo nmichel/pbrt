@@ -92,11 +92,53 @@ impl<'a> Parser<'a> {
         let mut scene_node = SceneNode::new();
         while let Some(token) = self.tokenizer.next_token() {
             match token {
+                Token::KWLight => scene_node.add_light(self.parse_light()),
                 Token::KWObject => scene_node.add_object(self.parse_object()),
-                _ => panic!("Expected object"),
+                _ => panic!("Expected light or object"),
             }
         }
         scene_node
+    }
+
+    // Light parsing
+
+    fn parse_light(self: &mut Self) -> Box<dyn LightNode> {
+        match self.tokenizer.next_token() {
+            Some(Token::KWPoint) => self.parse_light_point(),
+            Some(Token::KWUniformInfinite) => self.parse_light_uniform_infinite(),
+            Some(Token::KWBackgroundInfinite) => self.parse_light_background_infinite(),
+            _ => panic!("Expected point, uniform_infinite or background_infinite"),
+        }
+    }
+
+    fn parse_light_point(self: &mut Self) -> Box<dyn LightNode> {
+        let intensity = self.parse_light_spectrum();
+        let transform = self.parse_transform();
+        Box::new(PointLightNode::new(intensity, transform))
+    }
+
+    /// No `transform` block, and that is the point: a light at infinity has a direction to offer
+    /// and no position to place. Giving it one would be a placement nothing reads.
+    fn parse_light_uniform_infinite(self: &mut Self) -> Box<dyn LightNode> {
+        Box::new(UniformInfiniteLightNode::new(self.parse_light_spectrum()))
+    }
+
+    fn parse_light_background_infinite(self: &mut Self) -> Box<dyn LightNode> {
+        let bottom = self.parse_light_spectrum();
+        let top = self.parse_light_spectrum();
+        Box::new(BackgroundInfiniteLightNode::new(bottom, top))
+    }
+
+    /// A `color r g b` giving the radiance a source emits.
+    ///
+    /// It reads the keyword itself rather than going through `parse_texture`: what a light emits
+    /// is a spectrum, not a `Texture`, and the texture production would let a `checkerboard`
+    /// through — a pattern on a source that has no surface to carry it.
+    fn parse_light_spectrum(self: &mut Self) -> Spectrum {
+        match self.tokenizer.next_token() {
+            Some(Token::KWColor) => self.parse_spectrum(),
+            _ => panic!("Expected color"),
+        }
     }
 
     // Object parsing

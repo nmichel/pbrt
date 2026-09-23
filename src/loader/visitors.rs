@@ -28,6 +28,10 @@ pub trait Visitor {
     /// Called when the block closes, the object it places being built.
     fn leave_object_transformed(self: &mut Self, node: &ObjectTransformedNode);
 
+    fn visit_light_point(self: &mut Self, node: &PointLightNode);
+    fn visit_light_uniform_infinite(self: &mut Self, node: &UniformInfiniteLightNode);
+    fn visit_light_background_infinite(self: &mut Self, node: &BackgroundInfiniteLightNode);
+
     fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode);
     fn visit_shape_csg_elem(self: &mut Self, node: &CSGShapeElemNode);
     fn visit_shape_csg_intersection(self: &mut Self, node: &CSGShapeIntersectionNode);

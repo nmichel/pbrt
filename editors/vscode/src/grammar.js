@@ -26,13 +26,16 @@ const PRODUCTIONS = {
 
   "scene": {
     group: "structure",
-    signature: "scene <object>…",
+    signature: "scene <light|object>…",
     summary:
-      "Ouvre la liste des objets. Le bloc n'a **pas de délimiteur de fin** : il court jusqu'à " +
-      "la fin du fichier, et tout jeton qui n'est pas `object` y est une erreur.",
+      "Ouvre la liste de ce que la scène contient : ses lumières et ses objets, dans l'ordre " +
+      "qu'on veut. Le bloc n'a **pas de délimiteur de fin** : il court jusqu'à la fin du " +
+      "fichier, et tout jeton qui n'est ni `light` ni `object` y est une erreur.",
     params: [],
     next: "object",
-    example: "scene\n  object simple\n    sphere 1.0\n    lambertian color 0.8 0.3 0.3",
+    example:
+      "scene\n  light background_infinite\n    color 1.0 1.0 1.0\n    color 0.5 0.7 1.0\n\n" +
+      "  object simple\n    sphere 1.0\n    lambertian color 0.8 0.3 0.3",
     source: "src/loader/parser.rs:84",
   },
 
@@ -219,6 +222,70 @@ const PRODUCTIONS = {
     example: "object compound {\n  object simple\n    sphere 1.0\n    lambertian color 1 1 1\n}",
     source: "src/loader/parser.rs:104",
     snippet: "compound {\n  object $0\n}",
+  },
+
+  // ----------------------------------------------------------------- lumières
+
+  "light": {
+    group: "structure",
+    signature: "light <point|uniform_infinite|background_infinite>",
+    summary:
+      "Déclare une source **sans géométrie**, membre de la scène au même titre qu'un objet et " +
+      "écrite directement sous `scene`. Une surface émissive ne passe pas par ici : elle se dit " +
+      "en posant le matériau `diffuse_light` sur un objet.\n\n" +
+      "Une scène qui ne déclare aucune lumière est noire, à l'exception de l'émission qu'on voit " +
+      "directement.",
+    params: [{ name: "type", type: "point | uniform_infinite | background_infinite", doc: "sorte de source" }],
+    next: "light_type",
+    example: "light point\n  color 15.0 15.0 15.0\n  transform {\n    translate 0.0 2.0 1.0\n  }",
+    source: "src/loader/parser.rs:104",
+    snippet: "light point\n  color ${1:15.0} ${2:15.0} ${3:15.0}\n  transform {\n    translate ${4:0.0} ${5:2.0} ${6:1.0}\n  }",
+  },
+
+  "point": {
+    group: "light_type",
+    signature: "point color <r> <g> <b> <transform>",
+    summary:
+      "Source ponctuelle. Sa radiance décroît en 1/d², donc `color 15 15 15` est faible à dix " +
+      "unités et aveuglante à une. Le bloc `transform` est **obligatoire** : c'est lui qui la " +
+      "place, et `transform { }` la laisse à l'origine.\n\n" +
+      "Elle n'a aucune étendue, donc aucun rayon ne peut la toucher : `--integrator naive`, qui " +
+      "ne consulte pas les lumières déclarées, ne la verra jamais.",
+    params: [
+      { name: "color", type: "spectre", doc: "intensité émise" },
+      { name: "transform", type: "bloc", doc: "position de la source" },
+    ],
+    next: "color",
+    example: "light point\n  color 15.0 15.0 15.0\n  transform {\n    translate 0.0 2.0 1.0\n  }",
+    source: "src/lights/point_light.rs",
+  },
+
+  "uniform_infinite": {
+    group: "light_type",
+    signature: "uniform_infinite color <r> <g> <b>",
+    summary:
+      "Éclairage ambiant : la même radiance depuis toutes les directions. **Pas de bloc " +
+      "`transform`** — une source à l'infini offre une direction, pas une position.",
+    params: [{ name: "color", type: "spectre", doc: "radiance, identique dans toutes les directions" }],
+    next: "color",
+    example: "light uniform_infinite\n  color 0.5 0.5 0.5",
+    source: "src/lights/uniform_infinite_light.rs",
+  },
+
+  "background_infinite": {
+    group: "light_type",
+    signature: "background_infinite color <r> <g> <b> color <r> <g> <b>",
+    summary:
+      "Ciel dégradé entre deux couleurs, **du bas vers le haut** selon y. Le ciel de *Ray " +
+      "Tracing in One Weekend* s'écrit `color 1 1 1` puis `color 0.5 0.7 1`. **Pas de bloc " +
+      "`transform`**.",
+    params: [
+      { name: "bas", type: "spectre", doc: "couleur sous l'horizon" },
+      { name: "haut", type: "spectre", doc: "couleur au zénith" },
+    ],
+    next: "color",
+    example: "light background_infinite\n  color 1.0 1.0 1.0\n  color 0.5 0.7 1.0",
+    source: "src/lights/background_infinite_light.rs",
   },
 
   // ------------------------------------------------------------------- formes
@@ -434,9 +501,9 @@ const PRODUCTIONS = {
     group: "material",
     signature: "diffuse_light <texture>",
     summary:
-      "Surface émissive, et **seule** façon de déclarer de la lumière dans le langage — il n'y a " +
-      "pas de production `light`. La texture est une radiance, non bornée à 1 : une source " +
-      "s'écrit `color 15 15 15`.\n\n" +
+      "Surface émissive, et la façon de déclarer une source **qui a une géométrie** — les autres " +
+      "passent par `light`. La texture est une radiance, non bornée à 1 : une source s'écrit " +
+      "`color 15 15 15`.\n\n" +
       "Attention : une telle surface n'est pas encore une source échantillonnable, donc elle " +
       "n'éclaire rien par voie indirecte (`ideas/area_light.md`).",
     params: [{ name: "texture", type: "texture", doc: "radiance émise" }],

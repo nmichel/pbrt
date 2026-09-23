@@ -34,11 +34,19 @@ impl Visitor for PrintVisitor {
         println!("stage {} {}", scene, camera);
     }
 
+    /// Lights first, then objects — the order the scene node holds them in, not the order they
+    /// were written in. A description mixing the two therefore comes back with its lights
+    /// gathered in front ([`SceneNode`]).
     fn visit_scene(self: &mut Self, node: &SceneNode) {
         let mut r = String::new();
         for _ in 1..=node.objects.len() {
             let object = self.stack.pop().unwrap();
             r = object + &r;
+        }
+
+        for _ in 1..=node.lights.len() {
+            let light = self.stack.pop().unwrap();
+            r = light + &r;
         }
 
         self.stack.push(format!("scene {}", r));
@@ -83,6 +91,22 @@ impl Visitor for PrintVisitor {
         let object = self.stack.pop().unwrap();
         let transform = self.stack.pop().unwrap();
         self.stack.push(format!("object transformed {} {}", object, transform));
+    }
+
+    /// The placement was visited first, so it is already on the stack when the light is
+    /// announced — the same shape as a `csg elem`.
+    fn visit_light_point(self: &mut Self, node: &PointLightNode) {
+        let transform = self.stack.pop().unwrap();
+        self.stack.push(format!("light point color {:?} {}", node.intensity, transform));
+    }
+
+    fn visit_light_uniform_infinite(self: &mut Self, node: &UniformInfiniteLightNode) {
+        self.stack.push(format!("light uniform_infinite color {:?}", node.radiance));
+    }
+
+    fn visit_light_background_infinite(self: &mut Self, node: &BackgroundInfiniteLightNode) {
+        self.stack
+            .push(format!("light background_infinite color {:?} color {:?}", node.bottom, node.top));
     }
 
     fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode) {
@@ -265,6 +289,67 @@ mod test {
             visitor.rendered(),
             "scene object transformed object simple sphere 1 lambertian color Spectrum { spectrum: [0.2, 0.8, 0.1] } transform {  translate [0 0 \
              2]rotate X 1.5708 }"
+        );
+    }
+
+    /// The three lights with no geometry, each with the numbers it takes and no others.
+    ///
+    /// A point light carries a placement and the two infinite ones do not, which is what this
+    /// text says: there is no position to give something that is nowhere in particular.
+    #[test]
+    fn test_the_three_lights_print_what_they_were_given() {
+        let input = "
+    scene
+      light point
+        color 15.0 15.0 15.0
+        transform {
+            translate 0.0 2.0 1.0
+        }
+
+      light uniform_infinite
+        color 0.5 0.5 0.5
+
+      light background_infinite
+        color 1.0 1.0 1.0
+        color 0.5 0.7 1.0
+    ";
+
+        let mut parser = Parser::new(input);
+        let scene_node = parser.parse_scene();
+        let mut visitor = super::PrintVisitor::new();
+        visitor.visit(&scene_node);
+
+        assert_eq!(
+            visitor.rendered(),
+            "scene light point color Spectrum { spectrum: [15.0, 15.0, 15.0] } transform {  translate [0 2 1] }light uniform_infinite color \
+             Spectrum { spectrum: [0.5, 0.5, 0.5] }light background_infinite color Spectrum { spectrum: [1.0, 1.0, 1.0] } color Spectrum { \
+             spectrum: [0.5, 0.7, 1.0] }"
+        );
+    }
+
+    /// Lights come out in front of objects whatever order the file mixed them in — the normal
+    /// form the two sibling lists of [`SceneNode`](crate::loader::ast::SceneNode) impose.
+    #[test]
+    fn test_a_light_prints_ahead_of_the_objects_it_was_written_among() {
+        let input = "
+    scene
+      object simple
+        sphere 1.0
+        lambertian color 0.2 0.8 0.1
+
+      light uniform_infinite
+        color 0.5 0.5 0.5
+    ";
+
+        let mut parser = Parser::new(input);
+        let scene_node = parser.parse_scene();
+        let mut visitor = super::PrintVisitor::new();
+        visitor.visit(&scene_node);
+
+        assert_eq!(
+            visitor.rendered(),
+            "scene light uniform_infinite color Spectrum { spectrum: [0.5, 0.5, 0.5] }object simple sphere 1 lambertian color Spectrum { spectrum: \
+             [0.2, 0.8, 0.1] }"
         );
     }
 }

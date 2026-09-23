@@ -1,4 +1,5 @@
 mod cameras;
+mod lights;
 mod materials;
 mod objects;
 mod scene;
@@ -8,6 +9,7 @@ mod textures;
 mod transform;
 
 pub use self::cameras::*;
+pub use self::lights::*;
 pub use self::materials::*;
 pub use self::objects::*;
 pub use self::scene::*;

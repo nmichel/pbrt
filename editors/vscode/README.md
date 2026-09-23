@@ -23,8 +23,8 @@ Sur un nombre qui suit un `rotate_*`, le survol le convertit en degrés — les 
 en radians.
 
 **La complétion** propose ce que la grammaire attend à cet endroit : les sept formes après `simple`,
-les quatre matériaux une fois la forme complète, les quatre étapes dans un bloc `transform`. Les
-constructions à blocs s'insèrent comme squelettes.
+les quatre matériaux une fois la forme complète, les trois sortes de source après `light`, les
+quatre étapes dans un bloc `transform`. Les constructions à blocs s'insèrent comme squelettes.
 
 ## Installation
 

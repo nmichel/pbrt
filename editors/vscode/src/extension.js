@@ -70,6 +70,17 @@ function openBlocks(tokens) {
   return stack;
 }
 
+// The keyword a colour belongs to: walk back over the colours already typed and their numbers.
+// A light takes one or two `color`s and nothing else before its placement, so whatever stands in
+// front of them names the production being written.
+function colourOwner(tokens, anchor) {
+  let i = anchor - 1;
+  while (i >= 0 && (tokens[i].kind === "number" || tokens[i].value === "color")) {
+    i -= 1;
+  }
+  return i >= 0 ? tokens[i].value : "";
+}
+
 // What the grammar expects at the cursor.
 //
 // Returns a list of keywords, `[]` when a number or a string is expected — saying
@@ -118,7 +129,7 @@ function expectation(tokens) {
       return ["object"];
     }
     else if (block === "root") {
-      return ["object"];
+      return ["light", "object"];
     }
     return null;
   }
@@ -147,9 +158,19 @@ function expectation(tokens) {
       return literals >= 1 ? ["scene"] : [];
 
     case "scene":
-      return ["object"];
+      return ["light", "object"];
     case "object":
       return group("object_kind");
+    case "light":
+      return group("light_type");
+
+    // The three of them start with a `color`, and only `point` goes on to a `transform`. The
+    // count of literals cannot tell a finished `background_infinite` from one still owed its
+    // second colour, so both are offered.
+    case "point":
+    case "uniform_infinite":
+    case "background_infinite":
+      return ["color"];
     case "simple":
     case "elem":
       return group("shape");
@@ -179,8 +200,23 @@ function expectation(tokens) {
       return literals >= 1 ? group("texture") : [];
 
     case "color":
-    case "checkerboard":
-      return literals >= production.arity ? ["transform", "object"] : [];
+    case "checkerboard": {
+      if (literals < production.arity) {
+        return [];
+      }
+      switch (colourOwner(tokens, anchor)) {
+        // Its placement is the only thing still owed.
+        case "point":
+          return ["transform"];
+        case "uniform_infinite":
+          return ["light", "object"];
+        // A second colour is due after the first, and nothing distinguishes the two here.
+        case "background_infinite":
+          return ["color", "light", "object"];
+        default:
+          return ["transform", "light", "object"];
+      }
+    }
 
     case "translate":
     case "rotate_x":

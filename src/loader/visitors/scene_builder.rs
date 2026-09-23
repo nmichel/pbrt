@@ -8,6 +8,7 @@ use crate::config::Config;
 use crate::geom::matrix4::Matrix4;
 use crate::geom::transform::Transform;
 use crate::geom::vector2::Vector2u;
+use crate::lights::{BackgroundInfiniteLight, Light, PointLight, UniformInfiniteLight};
 use crate::materials::*;
 use crate::objects::*;
 use crate::scene::Scene;
@@ -18,6 +19,7 @@ pub struct SceneBuilderVisitor<'a> {
     pub scene: Scene,
     pub camera: Option<Box<dyn Camera>>,
     csg_elems: Vec<Arc<dyn Shape>>,
+    lights: Vec<Arc<dyn Light>>,
     objects: Vec<Arc<dyn Object>>,
     shapes: Vec<Arc<dyn Shape>>,
     materials: Vec<Arc<dyn Material>>,
@@ -40,6 +42,7 @@ impl<'a> SceneBuilderVisitor<'a> {
             scene: Scene::new(),
             camera: None,
             csg_elems: Vec::new(),
+            lights: Vec::new(),
             objects: Vec::new(),
             shapes: Vec::new(),
             materials: Vec::new(),
@@ -92,7 +95,20 @@ impl Visitor for SceneBuilderVisitor<'_> {
         // Nothing special for now
     }
 
+    /// Lights enter the scene **in declaration order**, objects in the reverse of it.
+    ///
+    /// The asymmetry is not an oversight. A light's index is a coordinate:
+    /// [`PathIntegrator`](crate::integrators::PathIntegrator) picks one by drawing a number and
+    /// scaling it to the count, so reversing the list hands the same draw a different source and
+    /// the same seed a different image. An object's index is read by nothing — the accelerator
+    /// sorts the primitives itself.
     fn visit_scene(self: &mut Self, node: &SceneNode) {
+        let first_declared = self.lights.len() - node.lights.len();
+        let lights: Vec<Arc<dyn Light>> = self.lights.drain(first_declared..).collect();
+        for light in lights {
+            self.scene.add_light(light);
+        }
+
         for _ in 1..=node.objects.len() {
             let object = self.objects.pop().unwrap();
             self.scene.add_object(object);
@@ -177,6 +193,25 @@ impl Visitor for SceneBuilderVisitor<'_> {
     /// structure and repeat it.
     fn leave_object_transformed(self: &mut Self, _node: &ObjectTransformedNode) {
         self.ctm.pop();
+    }
+
+    /// A light placed by its own `transform` block, and by nothing else.
+    ///
+    /// The transformation is taken from the same stack a `csg elem` reads, and **not** composed
+    /// with the current transformation matrix: the grammar only accepts a light directly inside
+    /// `scene`, so there is never an enclosing `object transformed` whose placement could apply.
+    /// The position a light writes is the position it gets.
+    fn visit_light_point(self: &mut Self, node: &PointLightNode) {
+        let to_world = self.transforms.pop().unwrap();
+        self.lights.push(Arc::new(PointLight::new(to_world, node.intensity)));
+    }
+
+    fn visit_light_uniform_infinite(self: &mut Self, node: &UniformInfiniteLightNode) {
+        self.lights.push(Arc::new(UniformInfiniteLight::new(node.radiance)));
+    }
+
+    fn visit_light_background_infinite(self: &mut Self, node: &BackgroundInfiniteLightNode) {
+        self.lights.push(Arc::new(BackgroundInfiniteLight::new(node.bottom, node.top)));
     }
 
     fn visit_shape_aabox(self: &mut Self, node: &AABoxShapeNode) {
@@ -282,5 +317,93 @@ impl Visitor for SceneBuilderVisitor<'_> {
 
     fn visit_transform_translate(self: &mut Self, node: &TransformTranslateNode) {
         self.transforms.push(Box::new(Transform::translation(node.offset)));
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::config::default_config;
+    use crate::geom::intersectable::Intersection;
+    use crate::geom::vector2::Vector2u;
+    use crate::geom::vector3::Vector3f;
+    use crate::lights::LightType;
+    use crate::loader::parser::Parser;
+    use crate::samplers::IndependentSampler;
+
+    /// A shaded point at the world origin, with only the fields a light reads filled in.
+    fn shaded_origin() -> Intersection {
+        Intersection {
+            p: Vector3f::new(0.0, 0.0, 0.0),
+            d: 0.0,
+            n: Vector3f::new(0.0, 1.0, 0.0),
+            wo: Vector3f::new(0.0, 1.0, 0.0),
+            u: 0.0,
+            v: 0.0,
+            dpdu: Vector3f::new(1.0, 0.0, 0.0),
+            dpdv: Vector3f::new(0.0, 0.0, 1.0),
+        }
+    }
+
+    /// What a description declares is what the scene holds, in the order it was written.
+    ///
+    /// Every visitor method here pops from a stack, so a light built from the wrong entry — or
+    /// one left behind on it — is the mistake to catch. Printing cannot see it: the text is
+    /// produced from the node, the scene from the stack.
+    #[test]
+    fn test_a_scene_holds_the_lights_its_description_declares() {
+        let input = "
+    scene
+      light point
+        color 15.0 15.0 15.0
+        transform {
+            translate 0.0 2.0 1.0
+        }
+
+      light uniform_infinite
+        color 0.5 0.5 0.5
+
+      light background_infinite
+        color 1.0 1.0 1.0
+        color 0.5 0.7 1.0
+    ";
+
+        let config = default_config();
+        let mut visitor = SceneBuilderVisitor::new(&config);
+        Parser::new(input).parse_scene().visit(&mut visitor);
+
+        assert_eq!(visitor.scene.get_light_count(), 3);
+        assert_eq!(visitor.scene.get_light_at(0).unwrap().light_type(), LightType::Point);
+        assert_eq!(visitor.scene.get_light_at(1).unwrap().light_type(), LightType::Infinite);
+        assert_eq!(visitor.scene.get_light_at(2).unwrap().light_type(), LightType::Infinite);
+    }
+
+    /// A point light is placed by its own block, and the placement reaches the light itself.
+    ///
+    /// `sample_li` from the origin must aim at the declared position: the transformation stack a
+    /// `csg elem` also reads is shared, so a light taking the wrong entry would sit somewhere
+    /// else entirely — and nothing in the printed text would say so.
+    #[test]
+    fn test_a_point_light_sits_where_its_transform_puts_it() {
+        let input = "
+    scene
+      light point
+        color 15.0 15.0 15.0
+        transform {
+            translate 0.0 2.0 1.0
+        }
+    ";
+
+        let config = default_config();
+        let mut visitor = SceneBuilderVisitor::new(&config);
+        Parser::new(input).parse_scene().visit(&mut visitor);
+
+        let mut sampler = IndependentSampler::new(0, &Vector2u::new(0, 0), 0);
+        let light = visitor.scene.get_light_at(0).unwrap();
+        let (sample, _) = light.sample_li(&shaded_origin(), &mut sampler).unwrap();
+
+        // The direction to (0, 2, 1) seen from the origin, normalised.
+        let expected = Vector3f::new(0.0, 2.0, 1.0).normalized();
+        assert!((sample.wi - expected).length() < 1e-12);
     }
 }

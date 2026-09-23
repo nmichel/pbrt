@@ -29,7 +29,11 @@
     },
     {
       "name": "keyword.control.stage",
-      "match": "\\b(?:camera|scene|object|transform|elem)\\b"
+      "match": "\\b(?:camera|scene|object|light|transform|elem)\\b"
+    },
+    {
+      "name": "support.type.light.stage",
+      "match": "\\b(?:point|uniform_infinite|background_infinite)\\b"
     },
     {
       "name": "support.type.camera.stage",
