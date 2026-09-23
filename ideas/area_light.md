@@ -1,8 +1,7 @@
 # `AreaLight` — une surface émissive qui éclaire
 
-Indexé depuis [IDEAS.md](../IDEAS.md). Non commencé. **C'est le plus grand écart au modèle physique
-du projet.** Il vient néanmoins en second, derrière la production `light` de la grammaire `.stage` :
-non par ordre d'importance, mais parce que sa vérification en dépend — voir le prérequis du §7.
+Indexé depuis [IDEAS.md](../IDEAS.md). Non commencé, et en tête de la liste. **C'est le plus grand
+écart au modèle physique du projet**, et tous ses prérequis sont acquis (§7).
 
 ## 1. Le défaut
 
@@ -19,9 +18,8 @@ trois chemins indépendants mènent au noir :
 - `background_radiance` somme `le` sur les lumières `Infinite` ; une lumière d'aire n'en est pas.
 
 **Effet net : une surface émissive ne contribue à aucun éclairage indirect.** Elle est visible, elle
-n'éclaire rien. C'est pourquoi [loader.rs](../src/loader.rs) câble en dur une `PointLight` et une
-lumière de fond pour que les scènes soient éclairées du tout — béquille que retire le prérequis du
-§7, et dont le départ conditionne la vérification du §6.
+n'éclaire rien. C'est pourquoi toute scène de `test_files/` déclare un `light` en plus de son panneau
+émissif : sans lui elle serait noire partout où la caméra ne vise pas directement le panneau.
 
 Et cela bloque la suite : MIS demande un `Light::pdf_li` à pondérer contre l'échantillonnage de BSDF,
 donc MIS attend ce fichier.
@@ -219,29 +217,32 @@ précisément le cas que MIS répare.
   changent la luminosité sans changer la forme de l'image — donc seule une comparaison à un autre
   estimateur les attrape.
 
-  **Elle exige que les lumières câblées soient parties**, et c'est ce qui décide de l'ordre des
-  chantiers : `NaiveIntegrator` ne consulte jamais `Scene::lights`, et une `PointLight` a une
-  probabilité nulle d'être touchée par un rayon. `path` la voit donc par NEE, `naive` ne la verra
-  jamais, et les deux ne peuvent pas être d'accord tant que le loader en ajoute une.
-- **Le témoin visuel** est `test_files/cornell_box.stage`, aujourd'hui éclairé par les lumières
-  câblées dans le loader. Le rendre éclairé par son seul panneau *est* la démonstration du chantier.
+  **Elle est disponible**, et vérifiée sur un cas où elle doit déjà tenir : une scène éclairée par un
+  seul `background_infinite`, où les deux estimateurs s'accordent à cinq centièmes d'un niveau sur
+  255 ([docs/eclairage_declare.md](../docs/eclairage_declare.md) §4). Elle ne l'était pas tant que le
+  chargeur ajoutait une `PointLight` à toute scène : `NaiveIntegrator` ne consulte jamais
+  `Scene::lights`, et une source ponctuelle a une probabilité nulle d'être touchée par un rayon.
+
+  **Ce qu'elle exige de la scène de test**, en revanche, est que son éclairage soit entièrement
+  atteignable par un rayon — donc un panneau émissif et rien d'autre.
+- **Le témoin visuel** est `test_files/cornell_box.stage`, qui déclare aujourd'hui un `light point`
+  et un ciel en plus de son panneau. Le rendre éclairé par son seul panneau *est* la démonstration
+  du chantier, et c'est le dernier `light` à retirer.
 
 ## 7. Ordre d'attaque
 
-**Un seul prérequis reste, et il n'est pas dans ce fichier.** L'autre est acquis : la CTM fait
-descendre le placement sur la forme, donc la géométrie que l'objet visible et la source
-échantillonnable doivent tenir tous les deux existe en espace monde (§4) — sans quoi il faudrait
-donner à l'`AreaLight` une transformation à elle, donc énoncer deux fois le même placement et vivre
-avec leur dérive possible. Reste :
-
-1. **La production `light` de la grammaire `.stage`**, qui retire les lumières câblées du chargeur.
-   Sans elle, la comparaison `naive` / `path` du §6 — la seule preuve de ce chantier — est
-   impossible, parce que `NaiveIntegrator` ne consulte jamais `Scene::lights` et ne verra donc
-   jamais la `PointLight` que le chargeur ajoute à toute scène. Voir l'entrée correspondante de
-   [IDEAS.md](../IDEAS.md), qui dit pourquoi elle passe devant.
+**Tous les prérequis sont acquis.** La CTM fait descendre le placement sur la forme, donc la
+géométrie que l'objet visible et la source échantillonnable doivent tenir tous les deux existe en
+espace monde (§4) — sans quoi il faudrait donner à l'`AreaLight` une transformation à elle, donc
+énoncer deux fois le même placement et vivre avec leur dérive possible. Et la scène déclare son
+éclairage, le chargeur n'ajoutant plus rien : la comparaison `naive` / `path` du §6 est possible, et
+mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect compte
+([docs/eclairage_declare.md](../docs/eclairage_declare.md) §4).
 
 - [x] RNG à graine fixe, graine dans `Config` — deux rendus sont comparables
       ([docs/rendu_reproductible.md](../docs/rendu_reproductible.md)).
+- [x] Production `light` de la grammaire `.stage`, et lumières câblées retirées du chargeur
+      ([docs/eclairage_declare.md](../docs/eclairage_declare.md)).
 - [ ] Trancher les deux décisions ouvertes **avant** d'écrire : l'émission est-elle unilatérale, et
       comment `sample_li` lit la radiance d'une `Texture` (§4). Toutes deux se voient sur l'image, et
       la première vaut un facteur deux.
@@ -255,8 +256,8 @@ avec leur dérive possible. Reste :
 - [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme, déjà
       placée par la CTM (§4).
 - [ ] Ne **pas** toucher au garde `is_last_bounce_specular`.
-- [ ] `cornell_box.stage` ne déclare plus que son panneau — les lumières câblées étant déjà parties
-      avec le prérequis, c'est ici que le témoin devient une scène éclairée par ce qu'elle dit.
+- [ ] `cornell_box.stage` perd ses deux `light` et ne déclare plus que son panneau — c'est ici que le
+      témoin devient une scène éclairée par la seule chose qu'un rayon peut atteindre.
 - [ ] Comparer `naive` et `path` sur ce témoin, et le dire dans le commit.
 - [ ] Étendre à `Sphere` et `Triangle`, puis au maillage — tirage d'un triangle proportionnel à son
       aire, ce qui demande une somme cumulée des aires construite une fois.

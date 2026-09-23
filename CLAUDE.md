@@ -20,7 +20,20 @@ fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a ap
 `docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
 une entrée cochée y garde une ligne, pas son corps.
 
-**Chantier en cours** — aucun. Le sujet de la branche `chore/ctm` est clos : le chargeur tient la
+**Chantier en cours** — aucun. Le sujet de la branche `feat/light` est clos : **une scène est
+éclairée par ce qu'elle déclare**. La grammaire a une production `light` à trois types — `point`,
+`uniform_infinite`, `background_infinite` —, frère des objets dans `SceneNode`, et
+[`Loader::load_scene`](src/loader.rs) n'ajoute plus rien. **Ce que ce chantier a trouvé** : la
+béquille était à *deux* endroits et non un seul — `NaiveIntegrator` recodait en dur le même dégradé
+de ciel que le chargeur câblait, donc retirer les lumières du loader n'aurait pas suffi.
+`background_radiance` est remontée dans le trait [`Integrator`](src/integrators.rs), où elle lit
+`Scene::lights` ; seul `NormalIntegrator` la redéfinit, à noir. Conséquence : la comparaison
+`naive` / `path` — la seule preuve dont `AreaLight` dispose — est désormais possible, et mesurée.
+Décisions, mesure et ce qu'elle rend vérifiable dans
+[docs/eclairage_declare.md](docs/eclairage_declare.md). L'image est restée identique au bit près à
+chaque commit, pour les trois intégrateurs.
+
+Avant lui, `chore/ctm` : le chargeur tient la
 **matrice de transformation courante** et livre une géométrie *déjà placée*. `ObjectTransformedNode`
 visite son placement avant son enfant, une paire `enter`/`leave` du `Visitor` délimite la portée du
 bloc, `SceneBuilderVisitor` compose la matrice sur une pile, et
@@ -54,12 +67,11 @@ Plus tôt encore, `chore/revamp_bvh_for_trimesh` : ses mesures et ses arbitrages
 comparer une mesure fraîche.
 
 La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Y
-vient d'abord la **production `light` de la grammaire `.stage`**, puis
-[`AreaLight`](ideas/area_light.md) — le plus grand écart au modèle physique du projet, les surfaces
-émissives ne contribuant à aucun éclairage indirect. Cet ordre surprend et il est délibéré : tant que
-le loader câble une `PointLight` que `NaiveIntegrator` ne peut pas voir, la comparaison `naive` /
-`path` est impossible, et c'est la seule preuve qu'`AreaLight` ait. Viennent ensuite MIS, qui emporte
-le cosinus de [ideas/cosinus_dirac.md](ideas/cosinus_dirac.md), puis la roulette russe.
+vient d'abord [`AreaLight`](ideas/area_light.md) — le plus grand écart au modèle physique du projet,
+les surfaces émissives ne contribuant à aucun éclairage indirect —, dont tous les prérequis sont
+désormais acquis, y compris la comparaison `naive` / `path` qui est la seule preuve qu'il ait.
+Viennent ensuite MIS, qui emporte le cosinus de
+[ideas/cosinus_dirac.md](ideas/cosinus_dirac.md), puis la roulette russe.
 
 Trois chantiers restent *voisins* du BVH et n'en font délibérément pas partie :
 [les feuilles de maillage à un seul triangle](ideas/cout_traversee_bvh.md), débloquées mais
@@ -70,7 +82,7 @@ d'une exécution ([docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3, qui porte au
 réouverture). **Un gain de construction se rapporte à une exécution entière, jamais au chargement
 seul** ; c'est la leçon de ce dernier, et elle vaut pour le prochain.
 
-**Lancer les tests** — `cargo test` est vert en entier : 155 tests de bibliothèque, 2 tests
+**Lancer les tests** — `cargo test` est vert en entier : 159 tests de bibliothèque, 2 tests
 d'intégration, 11 doc-tests, et les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour
 tout changement de construction ou de traversée d'un accélérateur,
 `cargo run --release --bin bvh_stats -- <scène>`

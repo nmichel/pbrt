@@ -15,20 +15,11 @@ dit en une incise ; quand elle contraint l'ordre, c'est l'ordre qui s'adapte. Le
 plus bas portent le détail de chaque entrée — elles servent à retrouver un sujet, pas à savoir quoi
 faire ensuite.
 
-- [ ] **Production `light` dans la grammaire `.stage`** — passe devant `AreaLight`, et c'est ce qui
-      rend celui-ci démontrable. [`NaiveIntegrator`](src/integrators/naive.rs) ne consulte **jamais**
-      `Scene::lights` ; tant que [`Loader::load_scene`](src/loader.rs#L36) câble une `PointLight` que
-      `path` voit par NEE et qu'un rayon tiré au hasard ne touchera jamais, les deux estimateurs ne
-      peuvent pas converger vers la même image — or cette comparaison est la meilleure preuve dont
-      `AreaLight` dispose ([ideas/area_light.md](ideas/area_light.md) §6), la seule qui attrape un `d²`
-      en trop ou un cosinus manquant. Et la béquille ne peut pas partir avant que la grammaire sache
-      déclarer une lumière, sinon tout `.stage` sans surface émissive rend du noir. La dépendance que
-      cette entrée portait vers `AreaLight` est par ailleurs déjà acquittée : les quatre décisions de
-      conception sont tranchées, dont celle qui dit ce que la production ne couvre pas. Détail sous
-      *Renderer & infrastructure*.
 - [ ] **`AreaLight`** — surfaces émissives enregistrées comme sources échantillonnables. **Le plus
-      grand écart au modèle physique du projet** ; il n'est second ici que parce que sa preuve dépend
-      de l'entrée ci-dessus. Plan détaillé dans [ideas/area_light.md](ideas/area_light.md).
+      grand écart au modèle physique du projet**, et son unique prérequis est acquis : la comparaison
+      `naive` / `path` qui lui sert de preuve est désormais possible
+      ([docs/eclairage_declare.md](docs/eclairage_declare.md) §4). Plan détaillé dans
+      [ideas/area_light.md](ideas/area_light.md).
 - [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
       `is_last_bounce_specular` de l'intégrateur, et emporte avec lui
       [le cosinus qu'un bsdf spéculaire divise](ideas/cosinus_dirac.md), qui se règle dans le même
@@ -71,7 +62,10 @@ faire ensuite.
 - [x] Add cylinder volume
 - [x] Make BVH more generic
 - [x] Add a scene from text file loader — `src/loader/`, et la grammaire `.stage` dit tout ce que le
-      projet possède *sauf* les lumières, entrée ouverte ci-dessus.
+      projet possède.
+- [x] **Production `light` dans la grammaire `.stage`** — une scène est éclairée par ce qu'elle
+      déclare, le chargeur n'ajoute plus rien, et la comparaison `naive` / `path` est possible.
+      [docs/eclairage_declare.md](docs/eclairage_declare.md).
 - [x] Add support for triangle based geometry — `src/shapes/triangle_mesh/`. Reste les normales de
       shading, suivies sous *Justesse / robustesse*.
 - [x] **Chantier BVH** — SAH de maillage corrigé, `intersect_p` descendu dans les formes, arbre de
@@ -224,10 +218,8 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       est jetée.
 - [ ] **`Spectrum` est un triplet RGB sans espace de couleur déclaré** — ni primaires, ni point
       blanc. Le nom promet un rendu spectral qui n'existe pas.
-- [ ] **Les lumières sont câblées dans `Loader::load_scene`** : une `PointLight` en (0, 2, 1) et un
-      `BackgroundInfiniteLight`, ajoutés à toute scène quoi qu'elle dise. Un fichier `.stage` ne
-      décrit donc pas son éclairage — il hérite de celui-là. Le travail de grammaire qui répare cela
-      est sous *Renderer & infrastructure*.
+- [x] Les lumières étaient câblées dans `Loader::load_scene` — un fichier `.stage` décrit désormais
+      son éclairage, et le chargeur n'ajoute rien ([docs/eclairage_declare.md](docs/eclairage_declare.md)).
 
 ## Renderer & infrastructure
 
@@ -266,50 +258,42 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       déjà d'`integrators::Type`, et passer `&Config` fermerait le cycle.
 - [ ] **Aucun exemple ne porte plus de surface émissive**, `cornell_box.rs` ayant été retiré. Le
       témoin visuel de l'`AreaLight` manquante est désormais `test_files/cornell_box.stage`, dont le
-      rendu passe par les lumières que [loader.rs](src/loader.rs) câble plutôt que par quoi que ce
-      soit que le fichier de scène déclare.
-- [ ] **La grammaire `.stage` ne sait pas décrire une lumière.** Elle dit tout ce que le projet
-      possède — caméras, formes, matériaux, textures, transformations — sauf le seul concept sans
-      lequel une scène ne s'affiche pas. Le travail est la chaîne habituelle, mot-clé du
-      [lexer](src/loader/parser/lexer.rs) → [parser](src/loader/parser.rs) → nœud d'
-      [AST](src/loader/ast.rs) → méthode de [`Visitor`](src/loader/visitors.rs) → les deux visiteurs
-      (`PrintVisitor` doit refaire l'aller-retour, `SceneBuilderVisitor` doit appeler
-      `Scene::add_light`) → et le support éditeur d'[editors/vscode/](editors/vscode/), que
-      [tests/vscode_grammar_sync.rs](tests/vscode_grammar_sync.rs) rend obligatoire : tant qu'un
-      mot-clé neuf n'y est ni coloré ni documenté, `cargo test` est rouge. Quatre décisions à prendre
-      avant d'écrire, dont trois ne sont pas évidentes :
-      **(1) Où vit le nœud.** `SceneNode` porte `objects: Vec<Box<dyn ObjectNode>>` ; une lumière est
-      membre de la scène et non d'un objet, donc un `lights: Vec<Box<dyn LightNode>>` frère est la
-      place juste — pas un `object light`, qui la ferait passer par le chemin forme + matériau.
-      **(2) Les lumières d'aire ne passent pas par cette production.** `diffuse_light` existe déjà
-      comme *matériau*, et c'est la bonne route : une surface émissive se déclare en posant ce
-      matériau sur un objet, et c'est le visiteur qui en tire l'`AreaLight`
-      ([ideas/area_light.md](ideas/area_light.md) §4). La production `light` ne couvre donc que les
-      lumières **sans géométrie** — `point`, `uniform_infinite`, `background_infinite` et son
-      dégradé à deux couleurs. Deux syntaxes pour un même concept serait le piège à éviter.
-      **(3) Une position se dit comme celle d'un objet.** `PointLight` prend un `Transform` ; la
-      grammaire a déjà `transform { translate … }`, donc réutiliser ce bloc plutôt qu'inventer un
-      `pos x y z` garde une seule façon de placer une chose dans la scène.
-      **(4) La migration est une rupture, et il faut la vouloir.** Le jour où le loader n'ajoute plus
-      rien, tout `.stage` sans bloc `light` rend du noir — ce qui est honnête, et demande de reprendre
-      les fichiers de `test_files/` un par un. C'est aussi ce qui rend le témoin d'`AreaLight`
-      démontrable : une scène éclairée par ce qu'elle déclare, et rien d'autre.
+      panneau émissif n'éclaire rien : la scène est éclairée par les deux `light` qu'elle déclare, et
+      le jour où elle ne déclarera plus qu'un panneau, elle sera noire tant qu'`AreaLight` n'existe
+      pas. C'est ce que ce témoin doit montrer.
+- [x] **La grammaire `.stage` sait décrire une lumière** — `light point`, `light uniform_infinite`,
+      `light background_infinite`, frères des objets dans le bloc `scene`. Les lumières d'aire n'y
+      passent pas et se disent toujours par le matériau `diffuse_light`. Les quatre décisions de
+      conception, la mesure qui prouve la migration et ce que la production rend vérifiable sont dans
+      [docs/eclairage_declare.md](docs/eclairage_declare.md).
 - [ ] **Les éléments d'une CSG arrivent dans l'ordre inverse de leur déclaration.**
       `SceneBuilderVisitor::pop_csg_elems` les dépile, donc le dernier `elem` écrit devient
       `elements[0]`. Sans effet sur une union ou une intersection, qui sont commutatives ; décisif
       pour `csg substraction`, dont le premier élément est la base dont les autres sont retirés :
       `csg substraction { elem A … elem B … }` retire donc **A de B**. Les constructions
       programmatiques d'`examples/` passent leurs éléments dans l'ordre de lecture et retirent B de
-      A : la grammaire et les exemples ne disent pas la même chose. Aucun fichier de `test_files/`
-      n'emploie `substraction`, ce qui explique que rien ne l'ait révélé — et le jour où l'un en
-      emploiera, il obtiendra l'inverse de ce qu'il écrit. Correctif d'une ligne, mais c'est une
-      rupture de comportement : à faire avec le renommage ci-dessous, qui casse déjà ces fichiers.
+      A : la grammaire et les exemples ne disent pas la même chose. L'entrée de survol de
+      [editors/vscode/src/grammar.js](editors/vscode/src/grammar.js) annonce, elle, « le **premier**
+      `elem` moins tous les suivants » : c'est le comportement voulu, pas celui qu'on obtient, et le
+      correctif fera coïncider les trois. **Scène témoin** :
+      [test_files/csg_sub_cube_sphere.stage](test_files/csg_sub_cube_sphere.stage), seule scène de
+      `test_files/` à employer `substraction`, et qui écrit donc la sphère avant le cube pour obtenir
+      *cube moins sphère* — l'ordre inverse de celui que la grammaire documente, et de celui de
+      [examples/csg_substraction_cube_sphere.rs](examples/csg_substraction_cube_sphere.rs) qui rend la
+      même forme. Correctif d'une ligne, mais c'est une rupture de comportement : à faire avec le
+      renommage ci-dessous, qui casse déjà ces fichiers, et en retournant les deux `elem` de la scène
+      témoin dans le même commit — sans quoi elle rendra *sphère moins cube*, une boule mordue par
+      six faces plates au lieu d'un cube évidé.
 - [ ] **Le mot-clé CSG `substraction` est orthographié à la française** — la forme anglaise est
       `subtraction`, et le reste de la grammaire est en anglais. C'est dans la surface publique du
       langage de scène, donc le renommer casse les `.stage` existants : accepter la rupture, ou
       accepter les deux graphies le temps d'une transition. Le renommage traverse aussi
-      [editors/vscode/](editors/vscode/) — coloration et entrée de survol —, et
+      [editors/vscode/](editors/vscode/) — coloration et entrée de survol —,
+      [test_files/csg_sub_cube_sphere.stage](test_files/csg_sub_cube_sphere.stage), qui est le seul
+      `.stage` à écrire le mot, et
       [tests/vscode_grammar_sync.rs](tests/vscode_grammar_sync.rs) échoue tant que ce n'est pas fait.
+      Le message du parseur, lui, réclame déjà la graphie anglaise qu'il refuse
+      ([parser.rs:209](src/loader/parser.rs#L209)) : c'est par lui que la dette se fait sentir.
 - [ ] **Deux des trois méthodes d'`Intersectable` sont inatteignables à l'étage objet.** Seul
       `intersect_p` y a une racine : [scene.rs:166](src/scene.rs#L166) et
       [scene.rs:182](src/scene.rs#L182) le posent aux primitives pour les rayons d'ombre. La liste
