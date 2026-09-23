@@ -16,6 +16,18 @@ camera pin_hole
   up 0.0 1.0 0.0
 
 scene
+
+  # lighting
+  light point
+    color 15.0 15.0 15.0
+    transform {
+      translate 0.0 2.0 1.0
+    }
+
+  light background_infinite
+    color 1.0 1.0 1.0
+    color 0.5 0.7 1.0
+
   # ground
   object transformed
     object simple

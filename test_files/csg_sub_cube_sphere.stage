@@ -1,0 +1,45 @@
+camera pin_hole
+  pos 1.0 1.3 1.8
+  look 0.0 -1.0 0.0
+  up 0.0 1.0 0.0
+
+scene
+  light point
+    color 15.0 15.0 15.0
+    transform {
+      translate 0.0 2.0 1.0
+    }
+
+  light background_infinite
+    color 1.0 1.0 1.0
+    color 0.5 0.7 1.0
+
+  object transformed
+    object simple
+      csg substraction {
+        elem
+          sphere 0.65
+          transform {
+            translate 0 0 0
+          }
+
+        elem
+          aabox 1.0 1.0 1.0
+          transform {
+            translate 0 0 0
+          }
+      }
+      lambertian color 1 0.6470588235294118 0
+    transform {
+      translate 0 0 0
+    }
+  object transformed
+    object simple
+      rectangle 3 3
+      lambertian checkerboard
+        0.65 0.0 0.0
+        0.65 0.65 0.65
+        2.0
+    transform {
+      translate 0 -0.6 0
+    }

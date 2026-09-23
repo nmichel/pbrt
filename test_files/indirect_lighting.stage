@@ -1,7 +1,6 @@
+# TODO : adujst geometry w/r to http://www.graphics.cornell.edu/online/box/data.html
+
 # Approx Cornell Room
-# 
-# Requires --far 2000
-# 
 camera pin_hole
   pos 0.0 0.0 800.0
   look 0.0 0.0 0.0
@@ -65,32 +64,20 @@ scene
       translate 0.0 0.0 -277.0
     }
 
-  # small box
+  # blocker
   object transformed
     object simple
-      aabox 165.0 330.0 165.0
+      aabox 300.0 10.0 300.0
       lambertian color 1 1 1
     transform {
-#     rotate_y (-15.0 * PI / 180.0)
-      rotate_y -0.262
-      translate 80.0 -150.0 -100.0
+      translate 0.0 100.0 0.0
     }
 
-  # tall box
-  object transformed
-    object simple
-      aabox 165.0 165.0 165.0
-      lambertian color 1 1 1
-    transform {
-#     rotate_y (18.0 * PI / 180.0)
-      rotate_y 0.314
-      translate -100.0 -195.0 100.0
-    }
-
+  # light
   object transformed
     object simple
       rectangle 130.0 105.0
-      diffuse_light color 5.0 5.0 5.0
+      diffuse_light color 15.0 15.0 15.0
     transform {
 #      rotate_y PI
       rotate_y 3.1416

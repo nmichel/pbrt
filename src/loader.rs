@@ -6,26 +6,21 @@ mod visitors;
 
 pub use mesh_loader::load_ply_mesh;
 
-use std::sync::Arc;
-
 use self::parser::Parser;
 use self::visitors::SceneBuilderVisitor;
 use crate::cameras::Camera;
-use crate::colors;
 use crate::config::Config;
-use crate::geom::transform::Transform;
-use crate::geom::vector3::Vector3;
-use crate::lights::{BackgroundInfiniteLight, PointLight, UniformInfiniteLight};
-use crate::materials::{Lambertian, Metal};
-use crate::objects::Simple;
 use crate::scene::Scene;
-use crate::shapes::{Triangle, TriangleMesh};
-use crate::spectrum::Spectrum;
-use crate::textures::{CheckerBoard, PlainColor};
 
 pub struct Loader {}
 
 impl Loader {
+    /// The scene a `.stage` description asks for, and nothing besides.
+    ///
+    /// Lighting comes from the file like everything else: the loader adds no source of its own,
+    /// so a scene is lit by what it declares. It used to add a point light and a sky to every
+    /// description, which made a `.stage` file unable to say what it was lit by — and made the
+    /// two integrators impossible to compare, `naive` never consulting `Scene::lights` at all.
     pub fn load_scene(input: &str, config: &Config) -> (Scene, Box<dyn Camera>) {
         let scene = Parser::parse(input);
 
@@ -33,14 +28,12 @@ impl Loader {
         visitor.visit(&scene);
         visitor.scene.commit();
 
-        visitor.scene.add_light(Arc::new(PointLight::new(
-            Box::new(Transform::translation(Vector3::new(0.0, 2.0, 1.0))),
-            colors::WHITE * 15.0,
-        )));
-        visitor
-            .scene
-            .add_light(Arc::new(BackgroundInfiniteLight::new(colors::WHITE, Spectrum::new(0.5, 0.7, 1.0))));
-        // visitor.scene.add_light(Arc::new(UniformInfiniteLight::new(colors::WHITE * 0.5)));
+        // Not an error: a description is allowed to say this, and an emissive surface the camera
+        // looks straight at is still seen. Everything else is black, though, and the reason is a
+        // line missing from a file rather than anything the renderer did.
+        if visitor.scene.get_light_count() == 0 {
+            eprintln!("warning: this scene declares no `light`; only emission the camera sees directly will show, the rest is black");
+        }
 
         (visitor.scene, visitor.camera.unwrap())
     }
