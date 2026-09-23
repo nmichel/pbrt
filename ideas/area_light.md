@@ -18,8 +18,10 @@ trois chemins indépendants mènent au noir :
 - `background_radiance` somme `le` sur les lumières `Infinite` ; une lumière d'aire n'en est pas.
 
 **Effet net : une surface émissive ne contribue à aucun éclairage indirect.** Elle est visible, elle
-n'éclaire rien. C'est pourquoi toute scène de `test_files/` déclare un `light` en plus de son panneau
-émissif : sans lui elle serait noire partout où la caméra ne vise pas directement le panneau.
+n'éclaire rien. C'est pourquoi toute scène de `test_files/` sauf une déclare un `light` en plus de son
+panneau émissif : sans lui elle serait noire, sous `path`, partout où la caméra ne vise pas
+directement le panneau. L'exception est `cornell_box_exact.stage`, qui ne déclare que son panneau et
+ne se rend donc qu'avec `naive` — c'est le témoin du §6.
 
 Et cela bloque la suite : MIS demande un `Light::pdf_li` à pondérer contre l'échantillonnage de BSDF,
 donc MIS attend ce fichier.
@@ -225,9 +227,19 @@ précisément le cas que MIS répare.
 
   **Ce qu'elle exige de la scène de test**, en revanche, est que son éclairage soit entièrement
   atteignable par un rayon — donc un panneau émissif et rien d'autre.
-- **Le témoin visuel** est `test_files/cornell_box.stage`, qui déclare aujourd'hui un `light point`
-  et un ciel en plus de son panneau. Le rendre éclairé par son seul panneau *est* la démonstration
-  du chantier, et c'est le dernier `light` à retirer.
+- **Le témoin visuel existe** : `test_files/cornell_box_exact.stage`, la Cornell box de la donnée
+  mesurée — géométrie, caméra et panneau publiés. Elle ne déclare aucun `light`, donc son éclairage
+  est entièrement atteignable par un rayon, ce que le point précédent exige ; son en-tête porte la
+  ligne de commande, qui n'est pas celle par défaut.
+
+  Sous `naive` elle donne l'image, et son niveau absolu est recoupé avec l'éclairement direct calculé
+  à la main sur quatre surfaces, l'écart restant allant dans le sens de l'interréflexion. Sous `path`
+  elle donne une pièce noire où seul le panneau se voit : **c'est le défaut du §1, à l'œil nu.** Les
+  deux rendus qui se rejoignent sont la recette d'acceptation de ce chantier.
+
+  `cornell_box.stage` garde son `light point` et son ciel : c'est la scène du même sujet qui se rend
+  aujourd'hui sous les deux intégrateurs, et lui retirer ses `light` n'a plus à servir de
+  démonstration.
 
 ## 7. Ordre d'attaque
 
@@ -256,8 +268,7 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
 - [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme, déjà
       placée par la CTM (§4).
 - [ ] Ne **pas** toucher au garde `is_last_bounce_specular`.
-- [ ] `cornell_box.stage` perd ses deux `light` et ne déclare plus que son panneau — c'est ici que le
-      témoin devient une scène éclairée par la seule chose qu'un rayon peut atteindre.
+- [x] Un témoin dont tout l'éclairage est son panneau : `test_files/cornell_box_exact.stage` (§6).
 - [ ] Comparer `naive` et `path` sur ce témoin, et le dire dans le commit.
 - [ ] Étendre à `Sphere` et `Triangle`, puis au maillage — tirage d'un triangle proportionnel à son
       aire, ce qui demande une somme cumulée des aires construite une fois.

@@ -1,0 +1,170 @@
+# The Cornell box, from the measured data
+#
+# Geometry, camera and light source are those published by the Cornell Program of Computer
+# Graphics: https://www.graphics.cornell.edu/online/box/data.html — the box as it was built and
+# measured, not the idealised version `cornell_box_canonical.stage` draws.
+#
+# Run it with
+#
+#   --fov 39.3077 --far 2000 --output_width 512 --output_height 512
+#   --integrator naive --max_depth 8 --samples_ppx 4000
+#
+# `--fov` is the aperture of the measured camera: a 0.025 film behind a 0.035 lens subtends
+# 2·atan(0.0125 / 0.035) = 39.3077°. The film is square, so the image must be square too — on a
+# non-square image the renderer fits the field of view to the shorter side and the framing is no
+# longer the measured one. `--far` must clear the distance from the eye to the back wall,
+# 800 + 559.2 = 1359.2, which the default of 1000 does not.
+#
+# That field of view is a little wider than the opening it looks into: 571.4 across at the plane
+# z = 0, against a room 556 wide and 548.8 high. The thin black margin around the image is
+# therefore the measured framing itself, and cropping it would mean moving the camera or narrowing
+# the lens.
+#
+# The room is white and closed, so most of what lights it has bounced: measured against a render
+# at depth 12, a wall is 1% short at `--max_depth 8`, 2 to 4% short at 6 and 8 to 13% short at 4.
+# Depth is therefore not where to save time here — sample count is, and `naive` needs a great many
+# of them, having no way to aim a ray at the panel.
+#
+# `--integrator naive` is not a taste: this scene is lit by an emissive surface and by nothing
+# else, which is what the measured box is. `path` samples `Scene::lights` — the declared point and
+# infinite lights — and adds surface emission only after a specular bounce, so it would draw the
+# panel on a black room. `naive` gathers emission at every hit, which is the whole scene here.
+# The comparison of the two is what `AreaLight` has to close; see `ideas/area_light.md`.
+#
+#
+# FRAME — z is negated with respect to the published table
+#
+# The Cornell data is authored for a right-handed camera: eye at (278, 273, -800) looking along
+# +z, up +y, which puts the red wall (x ≈ 556) on the left of the image. `Matrix4::look_at` builds
+# `right = up × dir`, a left-handed basis — pbrt's convention — so feeding it those coordinates
+# verbatim would mirror the image and hang the red wall on the right.
+#
+# So every z of the table is negated here, and the eye moves to +z. x and y are the published
+# numbers untouched; a z is the published number with a minus sign. The room therefore occupies
+#
+#   x ∈ [0, 556]      y ∈ [0, 548.8]      z ∈ [-559.2, 0]
+#
+# and is open towards the camera, at z = 0. A mirror reverses the sense of a rotation, which is
+# why the two blocks turn the opposite way from the angles one reads off the published corners.
+#
+#
+# WHAT THIS FILE CANNOT SAY EXACTLY
+#
+# The measured surfaces are quadrilaterals, and the `.stage` language has rectangles and boxes.
+# Four of the five come through intact: the ceiling and the green wall are exact rectangles in the
+# data, and the floor and the back wall lie exactly in their measured planes — only their edge on
+# the red side is carried out from the measured 549.6 and 552.8 to 556, into the corner where the
+# red wall hides it.
+# The red wall itself is the one real departure: the data gives a leaning quad, from x = 552.8 and
+# 549.6 at the floor to x = 556 at the ceiling, and it stands here as the vertical plane x = 556,
+# up to 6.4 away from the measurement at the floor line.
+#
+# The blocks are measured quads too, their corners out of square by up to a degree and their sides
+# a unit or two apart. Each is reproduced by the box that fits it best: side = mean of the two
+# opposite measured edges, angle = mean of the four edge directions. Every corner then lands within
+# 1.1 of the published one, which the comments below record block by block.
+#
+# The reflectances and the emission are the RGB triples this scene is usually given, not the
+# measured spectra: the data is spectral, from 400 to 700 nm, and this renderer carries three
+# components. What survives of the measurement is its shape — a light that rises towards the red,
+# hence markedly warm, and a red wall far more saturated than the green one.
+#
+# A `transform` block composes its steps as `translation · rotation`, so the rotation is listed
+# first and turns the shape about its own centre before the translation carries it into place.
+
+camera pin_hole
+  pos 278.0 273.0 800.0
+  look 278.0 273.0 0.0
+  up 0.0 1.0 0.0
+
+scene
+
+  # Floor, y = 0. The reference orientation of `rectangle` already faces up, into the room.
+  object transformed
+    object simple
+      rectangle 556.0 559.2
+      lambertian color 0.725 0.71 0.68
+    transform {
+      translate 278.0 0.0 -279.6
+    }
+
+  # Ceiling, y = 548.8. Flipped by a half turn about x so its normal faces down: a lambertian
+  # scatters into the hemisphere of its normal, so a wall facing away from the room is a black
+  # wall.
+  object transformed
+    object simple
+      rectangle 556.0 559.2
+      lambertian color 0.725 0.71 0.68
+    transform {
+      rotate_x 3.14159265
+      translate 278.0 548.8 -279.6
+    }
+
+  # Back wall, z = -559.2. A quarter turn about x stands the rectangle up and aims its normal at
+  # +z; the 548.8 of the pair is then the room's height.
+  object transformed
+    object simple
+      rectangle 556.0 548.8
+      lambertian color 0.725 0.71 0.68
+    transform {
+      rotate_x 1.57079633
+      translate 278.0 274.4 -559.2
+    }
+
+  # Right wall, green, x = 0. An exact rectangle in the data. A quarter turn about z aims the
+  # normal at +x, and the first side of the pair becomes the height.
+  object transformed
+    object simple
+      rectangle 548.8 559.2
+      lambertian color 0.14 0.45 0.091
+    transform {
+      rotate_z -1.57079633
+      translate 0.0 274.4 -279.6
+    }
+
+  # Left wall, red, x = 556. The leaning quad of the data, stood upright; see the header.
+  object transformed
+    object simple
+      rectangle 548.8 559.2
+      lambertian color 0.63 0.065 0.05
+    transform {
+      rotate_z 1.57079633
+      translate 556.0 274.4 -279.6
+    }
+
+  # Short block, at the green wall, turned 16.96° = 0.2960 rad. The measured top face is
+  # (130, 65) (82, 225) (240, 272) (290, 114) in the published frame: sides 167.0, 164.8, 165.7,
+  # 167.3, corners out of square by up to 1.0°. The box below reproduces those corners to 1.1.
+  object transformed
+    object simple
+      aabox 166.1 165.0 166.4
+      lambertian color 0.725 0.71 0.68
+    transform {
+      rotate_y 0.2960
+      translate 185.5 82.5 -169.0
+    }
+
+  # Tall block, at the red wall, turned -17.24° = -0.3009 rad. Measured top face
+  # (423, 247) (265, 296) (314, 456) (472, 406): sides 165.4, 167.3, 165.7, 166.4, corners out of
+  # square by up to 0.5°, reproduced to 0.6.
+  object transformed
+    object simple
+      aabox 165.6 330.0 166.9
+      lambertian color 0.725 0.71 0.68
+    transform {
+      rotate_y -0.3009
+      translate 368.5 165.0 -351.25
+    }
+
+  # The light: the 130 × 105 panel of the data, x ∈ [213, 343], z ∈ [-332, -227]. The data sets it
+  # in the ceiling plane, y = 548.8; it hangs a tenth below so that the two surfaces are not
+  # coplanar and no ray has to arbitrate between them. Turned a half turn about x to aim it down —
+  # `DiffuseLight` emits on both faces, but the ceiling caps the one that faces up.
+  object transformed
+    object simple
+      rectangle 130.0 105.0
+      diffuse_light color 18.4 15.6 8.0
+    transform {
+      rotate_x 3.14159265
+      translate 278.0 548.7 -279.5
+    }
