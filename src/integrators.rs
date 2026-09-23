@@ -1,5 +1,6 @@
 use crate::colors;
 use crate::geom::ray::Ray;
+use crate::lights::LightType;
 use crate::samplers::Sampler;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
@@ -14,8 +15,21 @@ pub trait Integrator: Send + Sync {
     /// stream it is given.
     fn li(&self, ray: &Ray, scene: &Scene, depth: usize, near: f64, far: f64, sampler: &mut dyn Sampler) -> Spectrum;
 
-    fn background_radiance(&self, _ray: &Ray, _scene: &Scene) -> Spectrum {
-        colors::BLACK
+    /// Radiance arriving along a ray that leaves the scene without meeting anything.
+    ///
+    /// It is read from the scene rather than decided here: what a ray finds when it escapes is
+    /// the sum of the `le` of the lights that have no position to escape *from* — the infinite
+    /// ones. An integrator that answered this on its own would light a scene with something the
+    /// description never declared, and two integrators answering it differently could not be
+    /// compared on the same file, which is the only check either of them has.
+    ///
+    /// Over an empty set the sum is black, and that is the honest answer: a scene declaring no
+    /// infinite light has no background.
+    fn background_radiance(&self, ray: &Ray, scene: &Scene) -> Spectrum {
+        scene
+            .query_lights(&LightType::Infinite)
+            .iter()
+            .fold(colors::BLACK, |accumulated, light| accumulated + light.le(ray))
     }
 }
 

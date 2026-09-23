@@ -2,7 +2,7 @@ use crate::colors;
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::interaction::{self, Interaction};
-use crate::lights::{Light, LightType, UniformInfiniteLight};
+use crate::lights::Light;
 use crate::materials::ScatterInfo;
 use crate::samplers::Sampler;
 use crate::scene::Scene;
@@ -112,14 +112,5 @@ impl Integrator for PathIntegrator {
         }
 
         accumulated_radiance
-    }
-
-    fn background_radiance(&self, ray: &Ray, scene: &Scene) -> Spectrum {
-        let infinite_lights = scene.query_lights(&LightType::Infinite);
-        let mut res: Spectrum = colors::BLACK;
-        for light in infinite_lights {
-            res += light.le(ray);
-        }
-        res
     }
 }

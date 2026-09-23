@@ -1,3 +1,4 @@
+use crate::colors;
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
@@ -27,5 +28,15 @@ impl Integrator for NormalIntegrator {
             }
             None => self.background_radiance(&ray, &scene),
         }
+    }
+
+    /// Black, where every other integrator reads the scene's infinite lights.
+    ///
+    /// This one draws normals, not light: it maps a direction onto a colour, and the sky of
+    /// [`BackgroundInfiniteLight`](crate::lights::BackgroundInfiniteLight) is a blue that reads
+    /// as a +z normal. A background that says nothing is what tells a reader where the geometry
+    /// ends.
+    fn background_radiance(&self, _ray: &Ray, _scene: &Scene) -> Spectrum {
+        colors::BLACK
     }
 }
