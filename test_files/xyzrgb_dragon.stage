@@ -62,6 +62,7 @@ scene
       rectangle 900 900
       diffuse_light color 5.0 5.0 5.0
     transform {
-      rotate_y 3.1416
+#     A half turn about x aims the panel down. Emission is one-sided.
+      rotate_x 3.14159
       translate 0.0 400.0 0.0
     }

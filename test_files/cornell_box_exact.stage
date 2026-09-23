@@ -158,8 +158,8 @@ scene
 
   # The light: the 130 × 105 panel of the data, x ∈ [213, 343], z ∈ [-332, -227]. The data sets it
   # in the ceiling plane, y = 548.8; it hangs a tenth below so that the two surfaces are not
-  # coplanar and no ray has to arbitrate between them. Turned a half turn about x to aim it down —
-  # `DiffuseLight` emits on both faces, but the ceiling caps the one that faces up.
+  # coplanar and no ray has to arbitrate between them. Turned a half turn about x to aim it down:
+  # emission is one-sided, so the normal decides which way the lamp points.
   object transformed
     object simple
       rectangle 130.0 105.0

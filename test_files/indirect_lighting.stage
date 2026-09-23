@@ -79,7 +79,8 @@ scene
       rectangle 130.0 105.0
       diffuse_light color 15.0 15.0 15.0
     transform {
-#      rotate_y PI
-      rotate_y 3.1416
+#     A half turn about x aims the panel down, into the room. Emission is one-sided, so a panel
+#     left facing the ceiling would be black.
+      rotate_x 3.14159
       translate 0.0 276.0 0.0
     }

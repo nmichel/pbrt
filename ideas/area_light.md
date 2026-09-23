@@ -140,9 +140,9 @@ Trois conséquences à ne pas manquer :
   variance est là. Un `pdf` nul doit être traité comme « pas d'échantillon », pas divisé.
 - **`d²` est la loi en carré inverse**, et elle sort du changement de mesure, pas d'un facteur
   ajouté à la main. Si on l'écrit deux fois, l'image est trop sombre d'un facteur `d²`.
-- **L'émission est unilatérale** ou non, et c'est un choix à énoncer : si la source n'émet que du
-  côté de `nₗ`, `sample_li` rend une radiance nulle quand `dot(nₗ, −wi) < 0`. `DiffuseLight` doit
-  dire lequel des deux il est.
+- **L'émission est unilatérale**, et c'est tranché : [`DiffuseLight`](../src/materials/diffuse_light.rs)
+  n'émet que du côté de sa normale. `sample_li` doit donc rendre une radiance nulle quand
+  `dot(nₗ, −wi) ≤ 0`, faute de quoi NEE éclairerait depuis une face que l'œil voit noire.
 
 **L'écart assumé du départ.** Échantillonner uniformément l'aire est correct mais bruyant quand la
 source sous-tend un petit angle solide vue du point ombré : la moitié des échantillons peut tomber
@@ -248,7 +248,8 @@ que l'œil voit, au même point, sans qu'un point tiré ait à inventer une dist
 d'observation. L'écueil que ce choix écarte est qu'une source texturée éclaire d'une couleur et se
 voie d'une autre.
 
-Reste la décision de l'émission unilatérale, qui, elle, vaut un facteur deux sur l'image.
+**Les deux décisions qui devaient être prises avant d'écrire le sont** — celle-ci et
+l'unilatéralité du §3. Ce qui suit dans le §7 est du code, plus un arbitrage.
 
 ## 5. Le double comptage, et pourquoi ne pas toucher au garde spéculaire
 
@@ -319,10 +320,9 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       ([docs/eclairage_declare.md](../docs/eclairage_declare.md)).
 - [x] Comment `sample_li` lit la radiance d'une `Texture` (§4) : `Texture::shade` prend un
       [`SurfacePoint`](../src/geom/surface_point.rs), qui se construit sans rayon.
-- [ ] Trancher l'émission unilatérale **avant** d'écrire (§3) : elle se voit sur l'image, et elle
-      vaut un facteur deux. La normale du panneau de `cornell_box.stage` regarde aujourd'hui le
-      plafond — `rotate_y π` laisse `(0, 1, 0)` inchangé —, donc le témoin visuel est à retourner
-      dans le même geste.
+- [x] L'émission est unilatérale, du côté de la normale (§3), et huit scènes disent désormais de
+      quel côté leur lampe éclaire — sept portaient un `rotate_y π`, qui laisse `(0, 1, 0)`
+      inchangé et n'orientait donc rien.
 - [ ] `Emitter` + `Material::emitter`, et `DiffuseLight::emit` qui délègue à `Emitter::l` — la règle
       d'unilatéralité et la lecture de la texture n'ont alors qu'une seule implémentation (§4).
 - [ ] `AreaSampleable` + `ShapeSample`, implémentés sur `Rectangle` d'abord — c'est le panneau du
@@ -342,7 +342,7 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       normalisés ; un `sample_area` qui normaliserait en [0, 1] ferait éclairer une source texturée
       d'une couleur et se voir d'une autre, ce que le §4 interdit.
 - [ ] `lights/area_light.rs` : `sample_li` par `sample_area`, conversion aire → angle solide dérivée
-      dans le doc-comment, radiance nulle du mauvais côté si l'émission est unilatérale.
+      dans le doc-comment, radiance nulle du côté que `DiffuseLight::emit` laisse noir (§3).
 - [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme, déjà
       placée par la CTM (§4).
 - [ ] Ne **pas** toucher au garde `is_last_bounce_specular`.
