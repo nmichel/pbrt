@@ -196,9 +196,14 @@ précisément le cas que MIS répare.
 - **Un test de conservation d'énergie** sur `sample_area`, dans la lignée de
   [pdfs/cosine.rs](../src/pdfs/cosine.rs) et [pdfs/hemisphere.rs](../src/pdfs/hemisphere.rs) :
   l'estimateur Monte-Carlo de l'aire par `Σ 1/pdf / N` doit converger vers `area()`. C'est ce qui
-  attrape un `pdf` faux d'un facteur constant, ce que l'œil ne voit pas.
-- **Un test du changement de mesure** : pour une source plane vue de face à distance `d`, la densité
-  en angle solide rendue doit valoir `d²/aire`, calculable à la main.
+  attrape un `pdf` faux d'un facteur constant, ce que l'œil ne voit pas. **Fait**, avec les deux
+  moments qui éprouvent l'uniformité, que celui-ci seul ne voit pas.
+- **Deux tests du changement de mesure, et il en faut deux.** Le premier est celui qui se calcule à
+  la main : source plane vue de face à distance `d`, densité en angle solide `d²/aire`. Il ne suffit
+  pas — son cosinus vaut 1, donc un cosinus omis y passe, ce que la mutation confirme. Le second est
+  le pendant du précédent une mesure plus haut : `Σ 1/pdf_ω / N` converge vers **l'angle solide
+  sous-tendu** par la source, `Ω = 4·atan(ab / (d·√(a² + b² + d²)))` pour un rectangle vu sur son
+  axe. Il éprouve `d²` et le cosinus d'un seul nombre. **Faits.**
 - **Ce qui n'a pas besoin d'être testé**, et c'est l'intérêt du dessin du §4 : que la lumière et
   l'objet visible soient au même endroit. Ils tiennent le même `Arc`, déjà placé ; il n'y a pas deux
   placements qui pourraient diverger, donc pas de propriété à vérifier.
@@ -280,15 +285,16 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       normaliser au tirage, ou les placer au relais, ferait éclairer une source texturée d'une
       couleur et se voir d'une autre — ce que le §4 interdit, et ce que la mutation des deux
       confirme.
-- [ ] **Le diagnostic de chargement** : un matériau émissif sur une forme non échantillonnable est
-      une erreur nommant la forme (§2). Il ne s'ajoute pas, il tombe de la conjonction des deux
-      questions — le matériau émet-il, la forme s'échantillonne-t-elle —, donc il se pose là où
-      cette conjonction est écrite, avec l'enregistrement ci-dessous et pas avant : une erreur qui
-      se déclenche sans que rien ne soit enregistré n'est que la moitié du geste.
-- [ ] `lights/area_light.rs` : `sample_li` par `sample_area`, conversion aire → angle solide dérivée
-      dans le doc-comment, radiance nulle du côté que `DiffuseLight::emit` laisse noir (§3).
+- [x] [`lights/area_light.rs`](../src/lights/area_light.rs) : `sample_li` par `sample_area`,
+      changement de mesure aire → angle solide dérivé dans l'en-tête du module, et pas d'échantillon
+      du tout du côté que `DiffuseLight` laisse noir (§3). `LightType` gagne `Area`, la seule des
+      trois qu'un rayon puisse toucher.
 - [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme, déjà
-      placée par la CTM (§4).
+      placée par la CTM (§4), **et le diagnostic de chargement avec** — un matériau émissif sur une
+      forme non échantillonnable est une erreur nommant la forme (§2). Les deux sont un seul geste :
+      le diagnostic ne s'ajoute pas, il tombe de la conjonction des deux questions — le matériau
+      émet-il, la forme s'échantillonne-t-elle —, et une erreur qui se déclenche sans que rien ne
+      soit enregistré n'en serait que la moitié.
 - [ ] Ne **pas** toucher au garde `is_last_bounce_specular`.
 - [x] Un témoin dont tout l'éclairage est son panneau : `test_files/cornell_box_exact.stage` (§6).
 - [ ] Comparer `naive` et `path` sur ce témoin, et le dire dans le commit.

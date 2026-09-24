@@ -74,6 +74,11 @@ impl VisibilityTester {
 pub enum LightType {
     Point,
     Infinite,
+
+    /// A source with an extent, which a ray can therefore hit. That is what sets it apart from the
+    /// other two: a point has zero probability of being hit, and an infinite light is only ever
+    /// reached by escaping the scene.
+    Area,
 }
 
 /// This struct captures the result of sampling a light source at a given shading point.
@@ -103,10 +108,12 @@ pub trait Light: Send + Sync {
     fn sample_li(&self, _intersection: &Intersection, _sampler: &mut dyn Sampler) -> Option<(LightLiSample, VisibilityTester)>;
 }
 
+mod area_light;
 mod background_infinite_light;
 mod point_light;
 mod uniform_infinite_light;
 
+pub use self::area_light::AreaLight;
 pub use self::background_infinite_light::BackgroundInfiniteLight;
 pub use self::point_light::PointLight;
 pub use self::uniform_infinite_light::UniformInfiniteLight;
