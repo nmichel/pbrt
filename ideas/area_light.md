@@ -39,46 +39,22 @@ soit une direction `wi`, la radiance reçue, une densité, et de quoi tester l'o
 là : `Intersection` porte le point `p` et la normale `n` du point ombré, et
 `VisibilityTester::between` sait déjà borner la recherche à la distance de la lumière.
 
-Ce qui manque est en amont, et à deux endroits.
+Ce qui manque est en amont.
 
-**Une forme ne sait pas s'échantillonner.** `Shape` est `Intersectable + AABound` — la géométrie
-répond « où le rayon te touche » et « quelle est ta boîte », jamais « donne-moi un point de ta
-surface, et avec quelle densité ». Il faut donc un troisième trait.
+**Une forme sait s'échantillonner, quand elle le peut.** `AreaSampleable` et `ShapeSample` vivent
+dans [src/shapes.rs](../src/shapes.rs), à côté de `Shape` — c'est une face de la géométrie, pas de
+l'objet —, et [`Rectangle`](../src/shapes/rectangle.rs) les implémente. Le trait est à part plutôt
+qu'une méthode de `Shape` parce que `Plane` a une aire infinie et `csg::Union` une aire qui n'est
+pas calculable : si `Shape` l'exigeait, ces formes devraient répondre à une question qu'elles ne
+savent pas poser, et les seuls corps honnêtes seraient un panic ou un mensonge. Le raisonnement
+complet et la dérivation du tirage sont dans les doc-comments.
 
-**Pourquoi un trait à part et non une méthode de `Shape` :** `Plane` a une aire infinie et
-`csg::Union` une aire qui n'est pas calculable. Si `Shape` l'exigeait, chaque forme devrait fournir
-une implémentation, y compris celles qui n'en ont pas. Un trait séparé fait de « être
-échantillonnable par aire » une propriété qu'une forme a ou n'a pas, ce qu'elle est.
-
-À placer dans `src/shapes.rs`, à côté de `Shape` : c'est une face de la géométrie, pas de l'objet.
-
-```rust
-/// A point drawn on a surface, with the density it was drawn with.
-pub struct ShapeSample {
-    /// Where the point is, and its surface parameters, so the emitted radiance is read from the
-    /// very texture the visible surface shows. A `SurfacePoint` is built without a ray, which is
-    /// exactly what a drawn point can supply.
-    pub sp: SurfacePoint,
-
-    /// Density **in area measure** — 1/area for a uniform draw. The conversion to solid angle
-    /// belongs to the light: it needs the shaded point, which a shape knows nothing about.
-    pub pdf: f64,
-}
-
-pub trait AreaSampleable: Send + Sync {
-    fn area(&self) -> f64;
-
-    /// Draws a point, consuming `u` rather than drawing from a sampler — the contract
-    /// `Pdf::generate` already holds, and the one that keeps a render reproducible.
-    fn sample_area(&self, u: &Vector2f) -> ShapeSample;
-}
-```
-
-**Et le visiteur ne peut pas savoir qu'une forme le sait.** Sa pile tient des `Arc<dyn Shape>` : le
-type concret est perdu au moment précis où la question se pose. Rust n'a pas d'upcast de trait
-objet, et `Any` suivi d'un downcast serait le bricolage à éviter. La sortie est une méthode par
-défaut sur `Shape` qui rend l'autre face de la forme, avec un receveur `Arc<Self>` pour qu'elle
-rende un handle possédé :
+**Ce qui manque encore est la route jusqu'à cette face.** Le visiteur ne peut pas savoir qu'une forme
+la possède : sa pile tient des `Arc<dyn Shape>`, donc le type concret est perdu au moment précis où
+la question se pose. Rust n'a pas d'upcast de trait objet, et `Any` suivi d'un downcast serait le
+bricolage à éviter. La sortie est une méthode par défaut sur `Shape` qui rend l'autre face de la
+forme, avec un receveur `Arc<Self>` pour qu'elle rende un handle possédé — la symétrique exacte du
+`Material::emitter` déjà en place (§4) :
 
 ```rust
 pub trait Shape: Intersectable + AABound {
@@ -317,9 +293,14 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       `DiffuseLight::emit` qui délègue à `Emitter::l` : la règle d'unilatéralité et la lecture de la
       texture n'ont qu'une implémentation (§4). Le `Option` de `emit` ne dit plus qu'une chose —
       `None` signifie « pas un émetteur », une face sombre rendant `Some(BLACK)`.
-- [ ] `AreaSampleable` + `ShapeSample`, implémentés sur `Rectangle` d'abord — c'est le panneau du
-      Cornell box, et son échantillonnage uniforme est deux nombres.
-- [ ] Test de conservation d'aire sur cette implémentation, avant tout usage.
+- [x] `AreaSampleable` + `ShapeSample` dans [src/shapes.rs](../src/shapes.rs), implémentés sur
+      [`Rectangle`](../src/shapes/rectangle.rs) — le panneau du Cornell box, dont l'échantillonnage
+      uniforme est deux nombres.
+- [x] Conservation de l'aire, **et** uniformité du tirage. La première seule ne suffit pas : la
+      densité étant constante, `Σ 1/pdf / N` vaut l'aire quel que soit l'endroit où tombent les
+      points. Il faut un second moment pour la forme du tirage, et un premier pour son centre — `x²`
+      étant pair, il donne la même valeur sur `[0, a]` que sur `[-a, a]`, donc il ne verrait pas un
+      tirage sur la mauvaise moitié.
 - [ ] `Shape::area_sampler`, sa valeur par défaut, et le diagnostic de chargement qui va avec : un
       matériau émissif sur une forme non échantillonnable est une erreur nommant la forme (§2). Ce
       diagnostic ne s'ajoute pas, il tombe de la conjonction des deux questions — le matériau
@@ -329,10 +310,11 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       chargement**. La densité en mesure d'aire, elle, traverse inchangée : `Transform` n'offre que
       translations et rotations, et sa précondition d'isométrie est déjà écrite dans l'en-tête de
       [shapes/transformed.rs](../src/shapes/transformed.rs).
-- [ ] Test que les (u, v) d'un point *tiré* sont ceux d'un point *touché* au même endroit — pendant
-      de `test_a_placed_point_and_a_hit_point_agree`. `Rectangle` rend `u = p.x, v = p.z`, non
-      normalisés ; un `sample_area` qui normaliserait en [0, 1] ferait éclairer une source texturée
-      d'une couleur et se voir d'une autre, ce que le §4 interdit.
+- [x] Les (u, v) d'un point *tiré* sont ceux d'un point *touché* au même endroit, sur la forme nue.
+      `Rectangle` rend `u = p.x, v = p.z`, non normalisés ; un `sample_area` qui normaliserait en
+      [0, 1] ferait éclairer une source texturée d'une couleur et se voir d'une autre, ce que le §4
+      interdit. **Reste à le vérifier sur la forme *placée***, pendant exact de
+      `test_a_placed_point_and_a_hit_point_agree`, avec le relais ci-dessus.
 - [ ] `lights/area_light.rs` : `sample_li` par `sample_area`, conversion aire → angle solide dérivée
       dans le doc-comment, radiance nulle du côté que `DiffuseLight::emit` laisse noir (§3).
 - [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme, déjà
