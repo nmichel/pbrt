@@ -2,8 +2,23 @@ use crate::geom::aabound::AABound;
 use crate::geom::intersectable::Intersectable;
 use crate::geom::surface_point::SurfacePoint;
 use crate::geom::vector2::Vector2f;
+use std::sync::Arc;
 
-pub trait Shape: Intersectable + AABound {}
+pub trait Shape: Intersectable + AABound {
+    /// The area-sampling face of this shape, when it has one.
+    ///
+    /// Rust has no trait upcast, and a scene is assembled from `Arc<dyn Shape>` — the concrete type
+    /// is gone exactly where it would have answered. Asking the shape keeps "can I be sampled by
+    /// area" a property the shape states, rather than one a caller infers from a type it no longer
+    /// has, and `Any` followed by a downcast would be the contrivance to avoid.
+    ///
+    /// The default is `None`, so a shape with no area to draw from — [`Plane`], the constructive
+    /// operators of [`csg`] — says so by saying nothing. The receiver is owned because the answer
+    /// is a handle the caller keeps; this is asked once per object, when a scene is built.
+    fn area_sampler(self: Arc<Self>) -> Option<Arc<dyn AreaSampleable>> {
+        None
+    }
+}
 
 /// A point drawn on a surface, and the density it was drawn with.
 pub struct ShapeSample {

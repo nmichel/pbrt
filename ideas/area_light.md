@@ -49,45 +49,16 @@ pas calculable : si `Shape` l'exigeait, ces formes devraient répondre à une qu
 savent pas poser, et les seuls corps honnêtes seraient un panic ou un mensonge. Le raisonnement
 complet et la dérivation du tirage sont dans les doc-comments.
 
-**Ce qui manque encore est la route jusqu'à cette face.** Le visiteur ne peut pas savoir qu'une forme
-la possède : sa pile tient des `Arc<dyn Shape>`, donc le type concret est perdu au moment précis où
-la question se pose. Rust n'a pas d'upcast de trait objet, et `Any` suivi d'un downcast serait le
-bricolage à éviter. La sortie est une méthode par défaut sur `Shape` qui rend l'autre face de la
-forme, avec un receveur `Arc<Self>` pour qu'elle rende un handle possédé — la symétrique exacte du
-`Material::emitter` déjà en place (§4) :
+**La route jusqu'à cette face est en place.** `Shape::area_sampler` a un corps par défaut à `None`,
+`Rectangle` rend `Some(self)`, et [`shapes::Transformed`](../src/shapes/transformed.rs) relaie —
+sans quoi, le chargeur enveloppant toute forme dans ce décorateur, **tout objet émissif aurait
+paru non échantillonnable**. C'est la symétrique exacte du `Material::emitter` du §4, et pour la
+même raison : Rust n'a pas d'upcast de trait objet, et le type concret est perdu au moment précis
+où la question se pose.
 
-```rust
-pub trait Shape: Intersectable + AABound {
-    /// The area-sampling face of this shape, when it has one.
-    ///
-    /// Rust has no trait upcast, and the scene builder holds shapes as `Arc<dyn Shape>` by the
-    /// time it needs the answer. Asking the shape keeps "can I be sampled by area" a property the
-    /// shape states, rather than one the caller infers from a type it no longer has.
-    fn area_sampler(self: Arc<Self>) -> Option<Arc<dyn AreaSampleable>> {
-        None
-    }
-}
-
-impl Shape for Rectangle {
-    fn area_sampler(self: Arc<Self>) -> Option<Arc<dyn AreaSampleable>> {
-        Some(self)
-    }
-}
-```
-
-`self: Arc<Self>` est un receveur compatible avec les traits objets, le corps par défaut passe, et
-`Plane`, `csg::*` et `TriangleMesh` répondent `None` sans une ligne. C'est le prix, en Rust, d'une
-propriété qu'un objet a ou n'a pas ; les deux autres routes cassent l'une l'invariant « les deux
-méthodes vont ensemble » — poser `area()` et `sample_area()` sur `Shape` en `Option` —, l'autre la
-lisibilité.
-
-**`shapes::Transformed` est la seule forme pour qui le corps par défaut est un piège.** Le chargeur
-enveloppe toute forme dans ce décorateur, donc c'est lui, et non la `Rectangle` qu'il contient, à qui
-la question est posée : sans un relais explicite, il répond `None` et **tout objet émissif tombe sur
-l'erreur de chargement du corollaire ci-dessous**. Il relaie donc à son enfant et place le point
-tiré, comme il place déjà une touche. La densité, elle, traverse inchangée — `Transform` n'offre que
-translations et rotations, donc l'aire est préservée, et c'est la précondition d'isométrie déjà
-écrite dans l'en-tête de [shapes/transformed.rs](../src/shapes/transformed.rs) qui le garantit.
+Le relais place le point tiré comme il place déjà une touche, et laisse traverser inchangées les
+(u, v) — un placement ne déplace pas un point dans son propre paramétrage — ainsi que la densité,
+exprimée en mesure d'aire, qu'une isométrie ne change pas.
 
 **Corollaire, et il n'est pas facultatif : un matériau émissif posé sur une forme qui ne sait pas
 s'échantillonner est une erreur de chargement**, nommant la forme fautive. Rendre l'objet visible
@@ -301,20 +272,19 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       points. Il faut un second moment pour la forme du tirage, et un premier pour son centre — `x²`
       étant pair, il donne la même valeur sur `[0, a]` que sur `[-a, a]`, donc il ne verrait pas un
       tirage sur la mauvaise moitié.
-- [ ] `Shape::area_sampler`, sa valeur par défaut, et le diagnostic de chargement qui va avec : un
-      matériau émissif sur une forme non échantillonnable est une erreur nommant la forme (§2). Ce
-      diagnostic ne s'ajoute pas, il tombe de la conjonction des deux questions — le matériau
-      émet-il, la forme s'échantillonne-t-elle (§4).
-- [ ] `shapes::Transformed` relaie `area_sampler` et place le point tiré. Le chargeur enveloppe
-      toute forme dans ce décorateur, donc sans ce relais **tout objet émissif devient une erreur de
-      chargement**. La densité en mesure d'aire, elle, traverse inchangée : `Transform` n'offre que
-      translations et rotations, et sa précondition d'isométrie est déjà écrite dans l'en-tête de
-      [shapes/transformed.rs](../src/shapes/transformed.rs).
-- [x] Les (u, v) d'un point *tiré* sont ceux d'un point *touché* au même endroit, sur la forme nue.
-      `Rectangle` rend `u = p.x, v = p.z`, non normalisés ; un `sample_area` qui normaliserait en
-      [0, 1] ferait éclairer une source texturée d'une couleur et se voir d'une autre, ce que le §4
-      interdit. **Reste à le vérifier sur la forme *placée***, pendant exact de
-      `test_a_placed_point_and_a_hit_point_agree`, avec le relais ci-dessus.
+- [x] `Shape::area_sampler` et sa valeur par défaut, `Rectangle` qui rend `Some(self)`, et le
+      relais par `shapes::Transformed`, sans lequel toute forme placée aurait paru non
+      échantillonnable (§2).
+- [x] Les (u, v) d'un point *tiré* sont ceux d'un point *touché* au même endroit, sur la forme nue
+      **comme sur la forme placée**. `Rectangle` rend `u = p.x, v = p.z`, non normalisés ; les
+      normaliser au tirage, ou les placer au relais, ferait éclairer une source texturée d'une
+      couleur et se voir d'une autre — ce que le §4 interdit, et ce que la mutation des deux
+      confirme.
+- [ ] **Le diagnostic de chargement** : un matériau émissif sur une forme non échantillonnable est
+      une erreur nommant la forme (§2). Il ne s'ajoute pas, il tombe de la conjonction des deux
+      questions — le matériau émet-il, la forme s'échantillonne-t-elle —, donc il se pose là où
+      cette conjonction est écrite, avec l'enregistrement ci-dessous et pas avant : une erreur qui
+      se déclenche sans que rien ne soit enregistré n'est que la moitié du geste.
 - [ ] `lights/area_light.rs` : `sample_li` par `sample_area`, conversion aire → angle solide dérivée
       dans le doc-comment, radiance nulle du côté que `DiffuseLight::emit` laisse noir (§3).
 - [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme, déjà

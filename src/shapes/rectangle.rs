@@ -5,6 +5,7 @@ use crate::geom::surface_point::SurfacePoint;
 use crate::geom::vector2::Vector2f;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
+use std::sync::Arc;
 
 use super::{AreaSampleable, Shape, ShapeSample};
 
@@ -22,7 +23,11 @@ impl Rectangle {
     }
 }
 
-impl Shape for Rectangle {}
+impl Shape for Rectangle {
+    fn area_sampler(self: Arc<Self>) -> Option<Arc<dyn AreaSampleable>> {
+        Some(self)
+    }
+}
 
 impl AreaSampleable for Rectangle {
     /// The rectangle spans [-half_width, half_width] × [-half_height, half_height] in the y = 0

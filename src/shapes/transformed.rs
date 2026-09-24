@@ -55,10 +55,12 @@ use std::sync::Arc;
 use crate::geom::aabound::{AABound, AABoundingBox};
 use crate::geom::intersectable::{Intersectable, IntersectionResult};
 use crate::geom::ray::Ray;
+use crate::geom::surface_point::SurfacePoint;
 use crate::geom::transform::{Transform, Transformable};
+use crate::geom::vector2::Vector2f;
 use crate::geom::vector3::Vector3f;
 
-use super::Shape;
+use super::{AreaSampleable, Shape, ShapeSample};
 
 /// A shape and the transformation that places it in the world.
 pub struct Transformed {
@@ -72,7 +74,70 @@ impl Transformed {
     }
 }
 
-impl Shape for Transformed {}
+impl Shape for Transformed {
+    /// The child's area-sampling face, placed.
+    ///
+    /// **This relay is not optional.** A scene wraps every shape in this decorator, so this is the
+    /// object the question is put to — not the [`Rectangle`](super::Rectangle) inside it. Left to
+    /// the default, it would answer `None` for a shape that plainly can be sampled, and every
+    /// placed emitter would look unsamplable.
+    ///
+    /// The child is asked once, here, rather than at every draw: the answer is a handle, and
+    /// probing through `Arc<dyn Shape>` on the sampling path would clone a reference count per
+    /// point drawn.
+    fn area_sampler(self: Arc<Self>) -> Option<Arc<dyn AreaSampleable>> {
+        let local_sampler = Arc::clone(&self.shape).area_sampler()?;
+
+        Some(Arc::new(PlacedAreaSampler {
+            shape: local_sampler,
+            to_world: (*self.to_world).clone(),
+        }))
+    }
+}
+
+/// A shape's area-sampling face, wearing the placement of the [`Transformed`] it came from.
+///
+/// It holds its own copy of the transformation — a [`Transform`] is a value, and so is cheap to
+/// own — rather than borrowing from the decorator. Nothing else would let the returned handle
+/// outlive the call that asked for it.
+struct PlacedAreaSampler {
+    shape: Arc<dyn AreaSampleable>,
+    to_world: Transform,
+}
+
+impl AreaSampleable for PlacedAreaSampler {
+    /// The child's area, unchanged.
+    ///
+    /// This rests on the precondition of this module: the placement preserves distances, which is
+    /// true of the rotations and translations [`Transform`] offers. An isometry maps a surface onto
+    /// one of the same area, so there is nothing to scale. A scaling placement would break this the
+    /// way it already breaks the ray distances above — and it would do so silently, since an area
+    /// off by a factor changes how much light a source emits without changing anything one can see
+    /// about its shape.
+    fn area(&self) -> f64 {
+        self.shape.area()
+    }
+
+    /// The child's point, placed — the position and the normal travel out, as they do for a hit.
+    ///
+    /// The texture coordinates cross unchanged: they name a place in the surface's own
+    /// parameterisation, which a placement does not touch. So does the density, and for the reason
+    /// [`area`](Self::area) gives — it is expressed in area measure, and the area is the same on
+    /// both sides of an isometry.
+    fn sample_area(&self, u: &Vector2f) -> ShapeSample {
+        let local = self.shape.sample_area(u);
+
+        ShapeSample {
+            sp: SurfacePoint {
+                p: self.to_world.transform_point_to_world(&local.sp.p),
+                n: self.to_world.transform_normal_to_world(&local.sp.n),
+                u: local.sp.u,
+                v: local.sp.v,
+            },
+            pdf: local.pdf,
+        }
+    }
+}
 
 impl Intersectable for Transformed {
     /// Every hit the child reports, each one placed in the world.
@@ -130,15 +195,15 @@ mod tests {
     use super::*;
 
     use crate::geom::vector3;
-    use crate::shapes::{Rectangle, Sphere};
+    use crate::shapes::{Plane, Rectangle, Sphere};
 
     const EPSILON: f64 = 1e-12;
 
     /// A placement aligned with no axis and away from the origin, so that a conversion which
     /// silently did nothing — or applied the inverse — could not pass.
     ///
-    /// A `Transform` is not `Clone`, so a test needing both the placement and a shape built with it
-    /// calls this twice; it is deterministic, and the two are the same placement.
+    /// Deterministic, so a test needing both the placement and a shape built with it calls this
+    /// twice and gets the same placement both times.
     fn placement() -> Box<Transform> {
         let rotation = Transform::rotation_y(0.7) * Transform::rotation_x(-0.4);
         Box::new(Transform::translation(Vector3f::new(2.0, -3.0, 0.5)) * rotation)
@@ -327,6 +392,74 @@ mod tests {
                     axis
                 );
             }
+        }
+    }
+
+    /// The decorator relays the question rather than answering it from its own default.
+    ///
+    /// Both ways round, because the default `None` is right for a shape with no area and wrong for
+    /// a shape that has one — and a relay that answered `Some` unconditionally would be just as
+    /// broken as the default, only in the other direction. `Plane` is the honest counter-example:
+    /// it is unbounded, so no placement can give it an area.
+    #[test]
+    fn test_the_area_sampling_face_survives_a_placement() {
+        let placed_rectangle: Arc<dyn Shape> = Arc::new(Transformed::new(Arc::new(Rectangle::new(2.0, 3.0)), placement()));
+        let placed_plane: Arc<dyn Shape> = Arc::new(Transformed::new(Arc::new(Plane::new()), placement()));
+
+        assert!(placed_rectangle.area_sampler().is_some(), "a placed rectangle can still be sampled");
+        assert!(placed_plane.area_sampler().is_none(), "a placed plane still has no area");
+    }
+
+    /// Placing a surface does not change its area, so it does not change the density either.
+    ///
+    /// `Transform` offers only rotations and translations, and an isometry maps a surface onto one
+    /// of the same area. Were that to stop holding — a scaling placement — the error would be
+    /// silent: an area off by a factor changes how much light a source emits without changing
+    /// anything one can see about its shape.
+    #[test]
+    fn test_a_placement_changes_neither_the_area_nor_the_density() {
+        const WIDTH: f64 = 2.0;
+        const HEIGHT: f64 = 3.0;
+
+        let placed: Arc<dyn Shape> = Arc::new(Transformed::new(Arc::new(Rectangle::new(WIDTH, HEIGHT)), placement()));
+        let sampler = placed.area_sampler().unwrap();
+
+        assert!((sampler.area() - WIDTH * HEIGHT).abs() < EPSILON, "placed area is {}", sampler.area());
+
+        let sample = sampler.sample_area(&Vector2f::new(0.3, 0.8));
+        assert!((sample.pdf - 1.0 / (WIDTH * HEIGHT)).abs() < EPSILON, "placed density is {}", sample.pdf);
+    }
+
+    /// A point *drawn* on a placed surface and a point *hit* by a ray are the same point, named the
+    /// same way — the counterpart of `test_a_placed_point_and_a_hit_point_agree`, for the face a
+    /// light will use.
+    ///
+    /// This is what the whole decorator is for, and the two halves fail differently. Were the
+    /// position not placed, a light would sample a surface sitting where the object is not, and
+    /// only the shadow it cast would show it. Were the texture coordinates placed — they must not
+    /// be, a placement does not move a point within its own parameterisation — a textured emitter
+    /// would light a scene from one part of its texture while the eye saw another.
+    #[test]
+    fn test_a_drawn_point_on_a_placed_surface_is_the_point_a_ray_finds() {
+        let rectangle = Arc::new(Rectangle::new(2.0, 3.0));
+        let placed: Arc<dyn Shape> = Arc::new(Transformed::new(Arc::clone(&rectangle) as Arc<dyn Shape>, placement()));
+        let sampler = Arc::clone(&placed).area_sampler().unwrap();
+
+        for (i, j) in [(0.1, 0.2), (0.5, 0.5), (0.9, 0.75), (0.0, 0.0)] {
+            let sample = sampler.sample_area(&Vector2f::new(i, j));
+
+            // Aimed at the drawn point from along its own normal, as the placed-hit test does.
+            let origin = sample.sp.p + sample.sp.n * 2.5;
+            let ray = Ray::spawn_from_through(&origin, &sample.sp.p);
+            let hits = placed.intersect(&ray, 0.0, 100.0);
+
+            assert_eq!(hits.len(), 1, "a ray aimed at {} must meet the placed surface", sample.sp.p);
+            let hit = hits[0];
+
+            assert_close(&hit.p, &sample.sp.p, "drawn against hit position");
+            assert_close(&hit.n, &sample.sp.n, "drawn against hit normal");
+            assert!((hit.u - sample.sp.u).abs() < EPSILON, "u: hit {}, drawn {}", hit.u, sample.sp.u);
+            assert!((hit.v - sample.sp.v).abs() < EPSILON, "v: hit {}, drawn {}", hit.v, sample.sp.v);
         }
     }
 
