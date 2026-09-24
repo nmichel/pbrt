@@ -190,10 +190,11 @@ serait le seul indice.
 ### L'émission appartient au matériau, et c'est un écart délibéré à pbrt
 
 Une question se cache sous le `emitter` du bloc ci-dessus : **qui répond à « que cette surface
-émet-elle ? »** Aujourd'hui c'est le matériau, par `Material::emit`, et les deux intégrateurs
-l'appellent. Dans pbrt c'est la lumière : le matériau n'émet pas du tout, la primitive porte
-optionnellement une `AreaLight`, et l'interaction la lui demande — le stub mort
-[`Intersection::le`](../src/geom/intersectable.rs) est cette conception-là, recopiée puis commentée.
+émet-elle ? »** Ici c'est le matériau, par [`Emitter::l`](../src/materials.rs), et `Material::emit`
+comme, demain, `AreaLight::sample_li` y lisent la même implémentation. Dans pbrt c'est la lumière :
+le matériau n'émet pas du tout, la primitive porte optionnellement une `AreaLight`, et l'interaction
+la lui demande — le stub mort [`Intersection::le`](../src/geom/intersectable.rs) est cette
+conception-là, recopiée puis commentée.
 
 **L'émission reste au matériau**, pour deux raisons qui ne sont pas de goût. Le tableau du §2 de
 CLAUDE.md énonce déjà `Material` comme « échantillonner (`scatter`) et évaluer (`f`) une BSDF,
@@ -201,35 +202,14 @@ CLAUDE.md énonce déjà `Material` comme « échantillonner (`scatter`) et éva
 la primitive percerait exactement la couture au nom de laquelle la route `Scene::commit` est écartée
 en tête de section — dans l'autre sens, mais c'est la même.
 
-La forme concrète est la **symétrique** de `Shape::area_sampler` (§2), et pour la même raison : le
-visiteur tient un `Arc<dyn Material>` au moment où la question se pose, donc le même problème
-d'upcast appelle la même sortie.
+**La forme est en place** : `Emitter` et `Material::emitter` vivent dans
+[src/materials.rs](../src/materials.rs), `DiffuseLight` les implémente, et le doc-comment de chacun
+porte son raisonnement. `AreaLight` tiendra un `Arc<dyn Emitter>` et non un `Arc<dyn Material>` :
+elle ne recevra pas un objet capable de `scatter` dont elle ignorerait les trois quarts.
 
-```rust
-// dans src/materials.rs, à côté de Material — comme AreaSampleable est à côté de Shape
-pub trait Emitter: Send + Sync {
-    /// Emitted radiance leaving `sp` towards `w`.
-    fn l(&self, sp: &SurfacePoint, w: &Vector3f) -> Spectrum;
-}
-
-pub trait Material: Send + Sync {
-    /// The emitting face of this material, when it has one.
-    fn emitter(self: Arc<Self>) -> Option<Arc<dyn Emitter>> {
-        None
-    }
-}
-```
-
-`DiffuseLight` implémente `Emitter::l` — la lecture de la texture et la règle d'unilatéralité y
-vivent **une seule fois** — et son `Material::emit` y délègue. `AreaLight` tient un
-`Arc<dyn Emitter>` et non un `Arc<dyn Material>` : elle ne reçoit pas un objet capable de `scatter`
-dont elle ignorerait les trois quarts. Deux points d'entrée et non un seul parce que leurs appelants
-diffèrent : `emit` est sur le chemin chaud, appelé par `&self` à chaque touche ; `emitter` n'est
-appelée qu'une fois par objet, au chargement, d'où son receveur possédé.
-
-Sur le nom : pbrt distingue `Light::Le(ray)` — ce que `Light` a déjà ici pour les lumières
-infinies — de `DiffuseAreaLight::L(p, n, uv, w)`, la radiance émise depuis un point de surface. D'où
-`l`, la distinction étant portée par le doc-comment.
+Ce qui reste à en faire est au §7. Le trait n'attend qu'un second consommateur — aujourd'hui seuls
+`Material::emit` et les tests l'appellent —, et `Material::emitter` qu'un appelant au chargement,
+lequel arrivera avec `Shape::area_sampler` dont il est la symétrique exacte (§2).
 
 **Le prix, et il se paie au chantier suivant : MIS.** Quand un rayon échantillonné par la BSDF touche
 une surface émissive, l'intégrateur doit pondérer par `power_heuristic(pdf_bsdf, pdf_li)`, donc
@@ -303,6 +283,16 @@ précisément le cas que MIS répare.
   `cornell_box.stage` garde son `light point` et son ciel : c'est la scène du même sujet qui se rend
   aujourd'hui sous les deux intégrateurs, et lui retirer ses `light` n'a plus à servir de
   démonstration.
+- **Le second témoin est [test_files/indirect_lighting.stage](../test_files/indirect_lighting.stage)**,
+  et il vise autre chose que le premier. Un bloqueur opaque de 300 × 10 × 300 est posé entre le
+  panneau et le sol, donc **presque tout ce qui éclaire le sol y arrive par rebond** : c'est la
+  quantité que le défaut du §1 supprime, isolée par la géométrie plutôt que déduite d'un niveau
+  moyen. Là où `cornell_box_exact.stage` dit si le niveau absolu est juste, celui-ci dit si le
+  transport indirect existe.
+
+  Il n'est pas encore un témoin utilisable : il déclare un `light point`, donc son sol n'est pas
+  noir aujourd'hui et l'écart à mesurer est dilué. Le rendre éclairé par son seul panneau est à
+  faire **avec** l'`AreaLight`, dans le même geste que la comparaison du témoin principal.
 
 ## 7. Ordre d'attaque
 
@@ -323,8 +313,10 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
 - [x] L'émission est unilatérale, du côté de la normale (§3), et huit scènes disent désormais de
       quel côté leur lampe éclaire — sept portaient un `rotate_y π`, qui laisse `(0, 1, 0)`
       inchangé et n'orientait donc rien.
-- [ ] `Emitter` + `Material::emitter`, et `DiffuseLight::emit` qui délègue à `Emitter::l` — la règle
-      d'unilatéralité et la lecture de la texture n'ont alors qu'une seule implémentation (§4).
+- [x] `Emitter` + `Material::emitter` dans [src/materials.rs](../src/materials.rs), et
+      `DiffuseLight::emit` qui délègue à `Emitter::l` : la règle d'unilatéralité et la lecture de la
+      texture n'ont qu'une implémentation (§4). Le `Option` de `emit` ne dit plus qu'une chose —
+      `None` signifie « pas un émetteur », une face sombre rendant `Some(BLACK)`.
 - [ ] `AreaSampleable` + `ShapeSample`, implémentés sur `Rectangle` d'abord — c'est le panneau du
       Cornell box, et son échantillonnage uniforme est deux nombres.
 - [ ] Test de conservation d'aire sur cette implémentation, avant tout usage.

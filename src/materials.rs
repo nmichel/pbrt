@@ -1,9 +1,11 @@
 use crate::colors;
 use crate::geom::ray::Ray;
+use crate::geom::surface_point::SurfacePoint;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::samplers::Sampler;
 use crate::spectrum::Spectrum;
+use std::sync::Arc;
 
 pub struct ScatterInfo {
     pub attenuation: Spectrum,
@@ -15,6 +17,44 @@ impl ScatterInfo {
     pub fn new(attenuation: Spectrum, scattered: Ray, pdf: f64) -> Self {
         Self { attenuation, scattered, pdf }
     }
+}
+
+/// A surface that emits light of its own, evaluated at a point on it.
+///
+/// Reference: PBR Book, 3ed, chapter 12 — *Light Sources*, « Area Lights ».
+/// <https://www.pbr-book.org/3ed-2018/Light_Sources/Area_Lights>
+///
+/// # Frame
+///
+/// `sp.n` and `w` are both in world coordinates, and `w` points **away** from the surface, along
+/// the direction the radiance is leaving in. So `sp.n ⋅ w` is the cosine of the angle between the
+/// normal and that direction, and its sign says which face is being asked about.
+///
+/// That sign is the whole of the convention, and it is what a caller gets wrong. An eye path
+/// already holds the direction it wants — `Intersection::wo` looks back along the ray that
+/// arrived. Something sampling a source towards a shaded point holds the opposite, a direction
+/// pointing *at* the surface, and has to negate it first. Handed the un-negated one, a one-sided
+/// emitter answers for the face opposite the one being asked about: the face it leaves dark.
+///
+/// # Why a trait of its own, rather than one more method on `Material`
+///
+/// A [`SurfacePoint`] and a direction are everything an emitted radiance depends on. `Material`
+/// cannot say that: its methods take an `Interaction`, which carries the ray that found the
+/// surface, and a point *drawn* on a surface — uniformly over its area, to estimate an integral
+/// over that surface — has no ray behind it. A caller holding such a point could not build one.
+///
+/// So this is the face of a material that a consumer other than the eye can use, and
+/// [`Material::emitter`] is how that consumer reaches it.
+///
+/// # Zero is a radiance
+///
+/// The return type is a `Spectrum` and not an `Option`: a surface that emits nothing towards `w` —
+/// because `w` is on the face it does not light — emits *zero*, which is a value. Whether a
+/// material emits **at all** is the separate question [`Material::emitter`] answers, and keeping
+/// the two apart is what stops one `None` from meaning both.
+pub trait Emitter: Send + Sync {
+    /// The radiance leaving `sp` towards `w`.
+    fn l(&self, sp: &SurfacePoint, w: &Vector3f) -> Spectrum;
 }
 
 /// A bsdf: it samples a scattered direction, evaluates its own density over directions, and emits.
@@ -36,7 +76,27 @@ pub trait Material: Send + Sync {
         None
     }
 
+    /// The radiance this surface emits towards the viewer, or `None` if it is not an emitter.
+    ///
+    /// `None` is the answer of a material that does not emit — the default below, which is what
+    /// every bsdf in the project keeps. It is **not** how an emitter reports a dark face: that is
+    /// `Some(BLACK)`, zero radiance being a value. An integrator therefore never has to know which
+    /// of the two it is looking at.
     fn emit(&self, _ray: &Ray, _interaction: &Interaction) -> Option<Spectrum> {
+        None
+    }
+
+    /// The emitting face of this material, when it has one.
+    ///
+    /// Rust has no trait upcast, and whoever needs to know holds an `Arc<dyn Material>` by the time
+    /// the question arises — the concrete type is gone exactly where it would have answered. Asking
+    /// the material keeps "do I emit" a property it states, rather than one a caller infers from a
+    /// type it no longer has.
+    ///
+    /// The receiver is owned so that the answer is a handle the caller keeps, and it is consumed:
+    /// a caller that also needs the material clones the `Arc` first. That cost is paid once per
+    /// object, when a scene is built — [`Self::emit`] is the one on the shading path.
+    fn emitter(self: Arc<Self>) -> Option<Arc<dyn Emitter>> {
         None
     }
 
@@ -100,6 +160,21 @@ pub use self::metal::Metal;
 mod tests {
     use super::*;
     use crate::geom::shading_frame;
+    use crate::textures::PlainColor;
+
+    /// The trait's default, asked the way a scene builder asks it: through an `Arc<dyn Material>`,
+    /// where the concrete type is gone.
+    ///
+    /// Asking it that way is also what checks that an `Arc<Self>` receiver leaves `Material`
+    /// usable as a trait object — a call on a bare `Lambertian` would compile whether or not it
+    /// did. A material that does not emit has no emitting face, and that is the half of the
+    /// answer a load-time diagnostic will read.
+    #[test]
+    fn test_a_material_that_does_not_emit_has_no_emitter() {
+        let material: Arc<dyn Material> = Arc::new(Lambertian::new(Arc::new(PlainColor::new(colors::WHITE))));
+
+        assert!(material.emitter().is_none());
+    }
 
     /// Round-trip through a division and a multiplication by the same cosine, so the claim being
     /// checked is conservation and not bit-exact equality — `(1/c)·c` is not always 1 in binary
