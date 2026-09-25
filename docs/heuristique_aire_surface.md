@@ -31,7 +31,7 @@ Références :
   Interactive Ray Tracing, 2007 — la construction binnée implémentée ici.
 - V. Havran, *Heuristic Ray Shooting Algorithms*, thèse, Czech Technical University, 2000,
   ch. 4 — la probabilité géométrique, traitée en détail.
-- [PBR Book, *Bounding Volume Hierarchies*](https://www.pbr-book.org/3ed-2018/Primitives_and_Intersection_Acceleration/Bounding_Volume_Hierarchies)
+- [PBR Book, 4ᵉ éd., *Bounding Volume Hierarchies*](https://pbr-book.org/4ed/Primitives_and_Intersection_Acceleration/Bounding_Volume_Hierarchies)
   — la présentation de référence, dont les conventions de coût sont comparées en §2.
 
 ---
@@ -803,7 +803,7 @@ le test qui aurait rendu visible la lecture par bin de la §3.
   référence à ouvrir pour la mesure des droites et la formule de Cauchy.
 - M. Stich, H. Friedrich, A. Dietrich, *Spatial Splits in Bounding Volume Hierarchies*, High
   Performance Graphics, 2009 — les découpages spatiaux, la limite §6.
-- [PBR Book, *Bounding Volume Hierarchies*](https://www.pbr-book.org/3ed-2018/Primitives_and_Intersection_Acceleration/Bounding_Volume_Hierarchies)
+- [PBR Book, 4ᵉ éd., *Bounding Volume Hierarchies*](https://pbr-book.org/4ed/Primitives_and_Intersection_Acceleration/Bounding_Volume_Hierarchies)
   — l'implémentation binnée de référence, et la convention de coût normalisée de la §2.
 - [arithmetique_flottante.md](arithmetique_flottante.md) — le modèle d'erreur invoqué en §4 et
   §5, et la raison du débordement d'une boîte vide.

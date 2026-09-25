@@ -21,8 +21,8 @@ impl ScatterInfo {
 
 /// A surface that emits light of its own, evaluated at a point on it.
 ///
-/// Reference: PBR Book, 3ed, chapter 12 — *Light Sources*, « Area Lights ».
-/// <https://www.pbr-book.org/3ed-2018/Light_Sources/Area_Lights>
+/// Reference: PBR Book, 4ed, §12.4 — *Light Sources*, « Area Lights ».
+/// <https://pbr-book.org/4ed/Light_Sources/Area_Lights>
 ///
 /// # Frame
 ///
@@ -111,8 +111,8 @@ pub trait Material: Send + Sync {
 
 /// Divides out the cosine the integrator will apply to a specular scattering event.
 ///
-/// Reference: PBR Book, 3ed, §8.2.2 — *Specular Reflection and Transmission*.
-/// <https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#SpecularReflection>
+/// Reference: PBR Book, 4ed, §9.3 — *Specular Reflection and Transmission*.
+/// <https://pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission>
 ///
 /// # The departure from the physical model, and why it is the right one
 ///

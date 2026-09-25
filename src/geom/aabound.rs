@@ -141,7 +141,7 @@ impl AABoundingBox {
     /// Slab method of Kay & Kajiya, as presented in
     /// <https://raytracing.github.io/books/RayTracingTheNextWeek.html#boundingvolumehierarchies>,
     /// with the robustness treatment of
-    /// <https://www.pbr-book.org/3ed-2018/Shapes/Basic_Shape_Interface#RayBoundsIntersections>.
+    /// <https://pbr-book.org/4ed/Shapes/Basic_Shape_Interface#RayndashBoundsIntersections>.
     ///
     /// # Principle
     ///

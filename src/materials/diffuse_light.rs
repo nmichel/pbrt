@@ -1,7 +1,7 @@
 //! A surface that emits, uniformly over the hemisphere it faces.
 //!
-//! Reference: PBR Book, 3ed, chapter 12 — *Light Sources*, « Area Lights ».
-//! <https://www.pbr-book.org/3ed-2018/Light_Sources/Area_Lights>
+//! Reference: PBR Book, 4ed, §12.4 — *Light Sources*, « Area Lights ».
+//! <https://pbr-book.org/4ed/Light_Sources/Area_Lights>
 
 use super::{Emitter, Material};
 use crate::colors;

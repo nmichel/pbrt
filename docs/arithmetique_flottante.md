@@ -650,10 +650,10 @@ Une borne d'erreur ne vaut que par la précision de son périmètre. Celle-ci co
   représentation, §3.1 pour le modèle standard et γ(n). La source du lemme.
 - Goldberg, *What Every Computer Scientist Should Know About Floating-Point Arithmetic* (ACM
   Computing Surveys, 1991) — l'introduction de référence à IEEE-754.
-- [PBR Book, *Managing Rounding Error*](https://www.pbr-book.org/3ed-2018/Shapes/Managing_Rounding_Error)
+- [PBR Book, 4ᵉ éd., *Managing Rounding Error*](https://pbr-book.org/4ed/Shapes/Managing_Rounding_Error)
   — la même analyse appliquée au ray tracing, et le type `EFloat` qui propage les bornes
   depuis les entrées.
-- [PBR Book, *Ray–Bounds Intersections*](https://www.pbr-book.org/3ed-2018/Shapes/Basic_Shape_Interface#RayBoundsIntersections)
+- [PBR Book, 4ᵉ éd., *Ray–Bounds Intersections*](https://pbr-book.org/4ed/Shapes/Basic_Shape_Interface#RayndashBoundsIntersections)
   — la variante de pbrt, qui élargit t₁ seul par un facteur (1 + 2γ(3)). Moins cher, mais un
   facteur multiplicatif n'élargit que si t₁ > 0 ; `hit` élargit les deux bornes en magnitude,
   ce qui est conservateur quels que soient les signes.

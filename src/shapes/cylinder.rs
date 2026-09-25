@@ -26,7 +26,7 @@ impl Shape for Cylinder {}
 
 impl Intersectable for Cylinder {
     fn intersect(&self, ray: &crate::geom::ray::Ray, near: f64, far: f64) -> IntersectionResult {
-        // Borrowed from https://www.pbr-book.org/3ed-2018/Utilities/Mathematical_Routines#Quadratic
+        // Borrowed from https://pbr-book.org/4ed/Utilities/Mathematical_Infrastructure#FindingZeros
 
         let Ray { ref origin, ref direction } = ray;
         let a: f64 = direction.x * direction.x + direction.z * direction.z;

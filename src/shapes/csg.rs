@@ -1,6 +1,6 @@
 //! Constructive solid geometry: a shape built from other shapes by set operations.
 //!
-//! Reference: PBR Book, 3ed, chapter 3 — *Shapes*, and the classic treatment in Roth,
+//! Reference: PBR Book, 4ed, chapter 6 — *Shapes*, and the classic treatment in Roth,
 //! *Ray Casting for Modeling Solids* (1982), which is where ray casting against a CSG tree comes
 //! from.
 //!

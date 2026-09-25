@@ -1,8 +1,8 @@
 //! A location on a surface: where it is, where it sits in the surface's own parameterisation, and
 //! which way the surface faces there.
 //!
-//! Reference: PBR Book, 3ed, chapter 2 — *Geometry and Transformations*, « Interactions ».
-//! <https://www.pbr-book.org/3ed-2018/Geometry_and_Transformations/Interactions>
+//! Reference: PBR Book, 4ed, §3.11 — *Geometry and Transformations*, « Interactions ».
+//! <https://pbr-book.org/4ed/Geometry_and_Transformations/Interactions>
 //!
 //! # The four fields
 //!

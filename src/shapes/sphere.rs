@@ -25,7 +25,7 @@ impl Sphere {
 impl Shape for Sphere {}
 
 impl Intersectable for Sphere {
-    /// See https://www.pbr-book.org/3ed-2018/Shapes/Spheres
+    /// See https://pbr-book.org/4ed/Shapes/Spheres
     /// see https://en.wikipedia.org/wiki/Spherical_coordinate_system
     /// See https://en.wikipedia.org/wiki/Chain_rule
     ///

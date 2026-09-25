@@ -35,8 +35,8 @@ pub struct ShapeSample {
 
 /// A surface that can hand out points of itself, drawn uniformly over its area.
 ///
-/// Reference: PBR Book, 3ed, chapter 14 — *Light Transport I*, « Sampling Light Sources ».
-/// <https://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources>
+/// Reference: PBR Book, 4ed, §6.1.7 — *Shapes*, « Sampling ».
+/// <https://pbr-book.org/4ed/Shapes/Basic_Shape_Interface#Sampling>
 ///
 /// # Why a trait apart from `Shape`
 ///

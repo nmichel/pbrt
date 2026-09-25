@@ -3,8 +3,8 @@ use crate::geom::vector3::Vector3f;
 
 /// A probability density over directions, and the map that draws from it.
 ///
-/// Reference: PBR Book, 3ed, §13.6 — *2D Sampling with Multidimensional Transformations*.
-/// <https://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/2D_Sampling_with_Multidimensional_Transformations>
+/// Reference: PBR Book, 4ed, §A.5 — *Sampling Multidimensional Functions*.
+/// <https://pbr-book.org/4ed/Sampling_Algorithms/Sampling_Multidimensional_Functions>
 ///
 /// **Frame**: directions are unit vectors of the shading frame — see
 /// [`ShadingFrame`](crate::geom::shading_frame::ShadingFrame), which states the convention and holds

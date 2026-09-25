@@ -92,7 +92,7 @@ pas ce qu'un estimateur estime, seulement sa dispersion.
 ## 6. Sa limite, à énoncer le jour où il arrive
 
 Stratifier chaque dimension séparément donne un hypercube latin, pas une stratification conjointe de
-l'espace des chemins ; le bénéfice décroît avec la dimension (PBR Book §8.6). Il est réel sur la
+l'espace des chemins ; le bénéfice décroît avec la dimension (PBR Book 4ᵉ éd., §8.5). Il est réel sur la
 gigue, la lentille et le premier sommet, et se dégrade là où les chemins d'un même pixel divergent —
 le branchement de [`dielectric.rs`](../src/materials/dielectric.rs), et les profondeurs inégales.
 Cela affaiblit la garantie d'étalement sans jamais introduire de biais.

@@ -68,7 +68,7 @@ impl Matrix4 {
     }
 
     pub fn perspective(fov: f64, n: f64, f: f64) -> Self {
-        // see https://www.pbr-book.org/3ed-2018/Camera_Models/Projective_Camera_Models#Perspective
+        // see https://pbr-book.org/4ed/Cameras_and_Film/Projective_Camera_Models#PerspectiveCamera
 
         let s = 1.0 / (fov / 2.0).tan();
         Self {

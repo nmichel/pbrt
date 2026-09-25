@@ -8,8 +8,8 @@ use std::f64::consts::PI;
 
 /// A uniform sample of the unit disk, drawn from a sample of the unit square.
 ///
-/// Reference: PBR Book, 3ed, §13.6.2 — *Sampling a Unit Disk*.
-/// <https://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/2D_Sampling_with_Multidimensional_Transformations>
+/// Reference: PBR Book, 4ed, §A.5.1 — *Sampling a Unit Disk*.
+/// <https://pbr-book.org/4ed/Sampling_Algorithms/Sampling_Multidimensional_Functions#SamplingaUnitDisk>
 ///
 /// **Frame**: `u` is a point of [0,1)², the result a point of the disk of radius 1 centred on the
 /// origin. The lens lies in the plane z = 0 of camera space, so the two coordinates are (x, y).

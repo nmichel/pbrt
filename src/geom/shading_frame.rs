@@ -1,7 +1,7 @@
 //! The orthonormal frame a surface interaction defines, and the change of basis into it.
 //!
-//! Reference: PBR Book, 3ed, chapter 8 — *Reflection Models*, « Geometric Setting ».
-//! <https://www.pbr-book.org/3ed-2018/Reflection_Models#x0-GeometricSetting>
+//! Reference: PBR Book, 4ed, §9.1.1 — *Reflection Models*, « Geometric Setting and Conventions ».
+//! <https://pbr-book.org/4ed/Reflection_Models/BSDF_Representation#GeometricSettingandConventions>
 //!
 //! # Frame
 //!

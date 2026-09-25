@@ -1,8 +1,9 @@
 //! A surface that lights a scene: an emitter spread over an area, sampled by drawing points of it.
 //!
-//! Reference: PBR Book, 3ed, chapter 14 — *Light Transport I*, « Sampling Light Sources », and
-//! chapter 5.5, « Working with Radiometric Integrals », for the change of measure below.
-//! <https://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources>
+//! Reference: PBR Book, 4ed, §12.4 — *Light Sources*, « Area Lights », and §4.2.3 — « Integrals
+//! over Area », whose equation (4.9) is the change of measure below.
+//! <https://pbr-book.org/4ed/Light_Sources/Area_Lights>
+//! <https://pbr-book.org/4ed/Radiometry,_Spectra,_and_Color/Working_with_Radiometric_Integrals#IntegralsoverArea>
 //!
 //! # Two participants, one surface
 //!
