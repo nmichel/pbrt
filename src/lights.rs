@@ -1,3 +1,12 @@
+//! The sources a scene is lit by, and what each of them hands an integrator.
+//!
+//! Reference: PBR Book, 4ed, chapter 12 — *Light Sources*.
+//! <https://pbr-book.org/4ed/Light_Sources>
+//!
+//! The derivations — the radiometric quantities, the area-to-solid-angle jacobian, and the two
+//! unrelated reasons an inverse square shows up — are in `docs/sources_de_lumiere.md`. This file
+//! states only the contract the three families have in common.
+
 use super::geom::intersectable::Intersection;
 use super::geom::ray::Ray;
 use super::geom::vector3::Vector3f;
@@ -82,6 +91,20 @@ pub enum LightType {
 }
 
 /// This struct captures the result of sampling a light source at a given shading point.
+///
+/// # The contract, which is the seam
+///
+/// An integrator knows nothing of light sources: it weights `spectrum` by the bsdf and a cosine and
+/// divides by `pdf`. That estimator is only unbiased if every source agrees on what the three
+/// fields mean, and the agreement is a matter of **measure**:
+///
+/// - `pdf` is a density **per unit solid angle at the shaded point**, for the direction `wi`;
+/// - `spectrum` is the radiance arriving from `wi`, and radiance does not fall off with distance.
+///
+/// The inverse square law therefore belongs to whichever of the two the source's own physics puts
+/// it in — the density for a source with an area, the radiance for a point source, which has an
+/// intensity and no radiance at all. Writing it in both is the mistake the measure conventions
+/// exist to prevent, and it only changes how bright an image is, never its shape.
 pub struct LightLiSample {
     /// The spectral radiance received from the sampled point on the light source.
     pub spectrum: Spectrum,
@@ -89,7 +112,11 @@ pub struct LightLiSample {
     /// The direction from the shading point to the sampled point on the light source.
     pub wi: Vector3f,
 
-    /// The probability density function value associated with sampling `wi`.
+    /// The density of `wi`, per unit solid angle at the shaded point.
+    ///
+    /// A source described by a delta distribution has no such density: it answers `1.0`, the
+    /// neutral element that makes the integrator's division harmless. That value is not a density,
+    /// which is why multiple importance sampling will have to tell the two cases apart.
     pub pdf: f64,
 }
 

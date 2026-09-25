@@ -1,7 +1,12 @@
 # `AreaLight` — une surface émissive qui éclaire
 
-Indexé depuis [IDEAS.md](../IDEAS.md). Non commencé, et en tête de la liste. **C'est le plus grand
-écart au modèle physique du projet**, et tous ses prérequis sont acquis (§7).
+Indexé depuis [IDEAS.md](../IDEAS.md). En cours, et en tête de la liste. **C'est le plus grand écart
+au modèle physique du projet** : les pièces existent et sont testées, mais aucune scène ne construit
+encore d'`AreaLight`, donc rien n'a changé dans l'image. Le §7 dit où l'on en est.
+
+La radiométrie et les dérivations, pour les parties qui ont atterri, vivent désormais dans
+[docs/sources_de_lumiere.md](../docs/sources_de_lumiere.md) — ce fichier ne garde que ce qui reste à
+faire, et disparaîtra avec le sujet.
 
 ## 1. Le défaut
 
@@ -65,6 +70,11 @@ s'échantillonner est une erreur de chargement**, nommant la forme fautive. Rend
 mais non échantillonné reconduirait en silence le défaut même que ce chantier répare.
 
 ## 3. Le changement de mesure, qui est le cœur du sujet
+
+**Atterri** ([lights/area_light.rs](../src/lights/area_light.rs)). La dérivation complète, depuis les
+grandeurs radiométriques, est en [docs/sources_de_lumiere.md](../docs/sources_de_lumiere.md) §3 ; ce
+qui suit est la forme sous laquelle la décision a été prise, et seul « l'écart assumé du départ »,
+en fin de section, porte encore quelque chose qui n'est pas fait.
 
 C'est le point où une erreur est invisible à l'œil et fausse l'image d'un facteur constant, donc
 c'est là que la dérivation doit être écrite dans le code (CLAUDE.md §4). Référence : PBR Book 4e,

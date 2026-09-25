@@ -28,6 +28,16 @@ impl Light for BackgroundInfiniteLight {
         self.f * (1.0 - factor) + self.t * factor
     }
 
+    /// Draws a direction and reports the radiance arriving along it.
+    ///
+    /// Reference: PBR Book, 4ed, §12.5 — *Infinite Area Lights*.
+    /// <https://pbr-book.org/4ed/Light_Sources/Infinite_Area_Lights>
+    ///
+    /// Same measure as [`UniformInfiniteLight`](super::UniformInfiniteLight) — a direction density
+    /// of `1/4π`, no distance, no jacobian — and the same departure, plus one of its own: the
+    /// gradient is not importance sampled, so the bright part of the sky is drawn no more often
+    /// than the dark part. The value must agree with `le`, which answers the same question for a
+    /// ray that escapes the scene.
     fn sample_li(&self, intersection: &Intersection, sampler: &mut dyn Sampler) -> Option<(LightLiSample, VisibilityTester)> {
         let sphere_pdf = SpherePdf {};
 

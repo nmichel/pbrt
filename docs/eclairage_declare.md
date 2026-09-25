@@ -4,6 +4,10 @@ Ce que le langage `.stage` dit d'une source de lumière, et ce que cela rend vé
 code tel qu'il est ; ce qui reste à faire est dans [IDEAS.md](../IDEAS.md) et
 [ideas/](../ideas/).
 
+Sujet voisin et distinct : [sources_de_lumiere.md](sources_de_lumiere.md) traite de ce que ces
+sources rendent à un intégrateur — la radiance, la densité, et la mesure dans laquelle elle est
+exprimée —, avec les dérivations.
+
 ## 1. Deux façons de déclarer une source, et elles ne se recouvrent pas
 
 | | **`light`** | **matériau `diffuse_light`** |
