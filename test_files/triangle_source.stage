@@ -1,0 +1,51 @@
+# A triangular lamp. THIS SCENE DOES NOT LOAD YET.
+#
+#   image_stats: an emissive material sits on a `mesh`, which cannot hand out points of itself:
+#   it would be seen and would light nothing
+#
+# `TriangleMesh` does not implement `AreaSampleable`, so `SceneBuilderVisitor` refuses the
+# description rather than render a lamp that lights nothing. The file is here because it is the
+# witness the work that lifts that restriction will be measured on. See `ideas/area_light.md` §7.
+#
+#   --integrator naive|path --renderer mt --threads 8 --seed 0
+#   --samples_ppx 1024 --max_depth 4 --output_width 256 --output_height 192
+#
+# WHY IT IS A MESH AND NOT A `triangle`
+#
+# **The language has no triangle.** Its shapes are `sphere`, `rectangle`, `plane`, `cylinder`,
+# `aabox`, `mesh` and the csg operations; a triangle exists only inside a mesh. So the lamp here is
+# `test_files/lamp_triangle.ply`, three vertices and one face written by hand, and adding a
+# `triangle` production instead would mean crossing lexer, parser, ast, both visitors and the
+# editor support — a subject of its own, not a step of this one.
+#
+# WHAT IT WILL ISOLATE
+#
+# One triangle, so it measures the per-triangle draw and nothing else. The mesh of *several*
+# triangles is a second question and wants a second witness: choosing which triangle to draw from,
+# in proportion to its area, needs a cumulative sum that a single-triangle lamp never exercises.
+# That witness should hold triangles of markedly unequal area, since an equal-area mesh cannot tell
+# a correct choice from a uniform one.
+#
+# The lamp spans roughly 4 by 3.5 and hangs at the height of the panel of `direct_lighting.stage`,
+# whose camera this keeps, so the two can be read against each other.
+
+camera pin_hole
+  pos 0.0 2.9 0.0
+  look 0.0 0.0 0.0
+  up 0.0 0.0 -1.0
+
+scene
+
+  object simple
+    rectangle 12 12
+    lambertian color 0.6 0.6 0.6
+
+  # The lamp. The winding of the ply already aims its normal at -Y, so there is no half turn here
+  # as there is on a `rectangle` lamp — see the comments in the ply itself.
+  object transformed
+    object simple
+      mesh file "test_files/lamp_triangle.ply"
+      diffuse_light color 6.0 6.0 6.0
+    transform {
+      translate 0.0 3.0 0.0
+    }

@@ -1,0 +1,52 @@
+# A spherical lamp. THIS SCENE DOES NOT LOAD YET.
+#
+#   image_stats: an emissive material sits on a `sphere`, which cannot hand out points of itself:
+#   it would be seen and would light nothing
+#
+# `Sphere` does not implement `AreaSampleable`, so `SceneBuilderVisitor` refuses the description
+# rather than render a lamp that lights nothing. The file is here because it is the witness the
+# work that lifts that restriction will be measured on, and because writing it afterwards would
+# mean measuring a change against a scene invented to suit it. See `ideas/area_light.md` §7.
+#
+#   --integrator naive|path --renderer mt --threads 8 --seed 0
+#   --samples_ppx 1024 --max_depth 4 --output_width 256 --output_height 192
+#
+# WHAT IT WILL ISOLATE
+#
+# The same question as `direct_lighting.stage` — do `naive` and `path` agree — on the first source
+# that is not flat. It is deliberately that scene with the panel swapped for a sphere of the same
+# span and the camera left where it was, so the two figures can be read against each other.
+#
+# WHY A SPHERE IS NOT A RECTANGLE WITH A DIFFERENT SHAPE
+#
+# A point drawn uniformly over the area of a sphere lands on the far side half of the time, and
+# every one of those is dropped: emission is one-sided, so `cos θₗ ≤ 0` answers "no sample" before
+# any density is computed. Half the draws are therefore spent to produce nothing, whatever the
+# sphere's size or distance — a waste the rectangle has no equivalent of, since every point of a
+# flat source faces the same way.
+#
+# That is why pbrt samples the cone the sphere subtends from the shaded point rather than its area,
+# and it makes this scene the one where the difference between the two draws shows without any
+# grazing geometry being arranged. A uniform-area draw that is merely *correct* here is already a
+# result; that it is wasteful is the measurement to take.
+
+camera pin_hole
+  pos 0.0 2.9 0.0
+  look 0.0 0.0 0.0
+  up 0.0 0.0 -1.0
+
+scene
+
+  object simple
+    rectangle 12 12
+    lambertian color 0.6 0.6 0.6
+
+  # The lamp. A sphere emits through every point of its surface, so unlike a `rectangle` it needs
+  # no rotation to be aimed: there is no face to choose.
+  object transformed
+    object simple
+      sphere 1.0
+      diffuse_light color 6.0 6.0 6.0
+    transform {
+      translate 0.0 3.0 0.0
+    }

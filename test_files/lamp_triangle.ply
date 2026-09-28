@@ -1,0 +1,20 @@
+ply
+format ascii 1.0
+comment A single triangle, written by hand to serve as an emissive lamp.
+comment
+comment The winding is the whole point of this file. The cross product of (v1 - v0) and (v2 - v0)
+comment is (0, -14, 0), so the normal points at -Y and the lamp lights whatever is below it with no
+comment rotation applied. Reversing any two vertices would aim it at the sky instead, and an
+comment emitter facing away is black rather than wrong - there is nothing to see and nothing to
+comment debug.
+element vertex 3
+property float x
+property float y
+property float z
+element face 1
+property list uchar uint vertex_indices
+end_header
+-2.0 0.0 -1.2
+2.0 0.0 -1.2
+0.0 0.0 2.3
+3 0 1 2
