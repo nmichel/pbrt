@@ -359,12 +359,32 @@ veut éclairer des deux côtés pose deux surfaces dos à dos.
 ombré, quand `cos θₗ ≤ 0`, ou quand la densité n'est pas un nombre utilisable. La raison est
 économique : un échantillon qui ne vaut rien coûte quand même un rayon d'ombre.
 
-### 6.5 L'état actuel
+### 6.5 Qui la construit
 
-Le type existe, il est testé, et **aucune scène n'en construit encore** : le chargeur ne relie pas
-un matériau émissif à la forme qui le porte. Les surfaces émissives sont donc visibles mais
-n'éclairent rien d'autre qu'elles-mêmes, ce qui est le plus grand écart au modèle physique du projet.
-Ce qu'il reste à faire est dans [ideas/area_light.md](../ideas/area_light.md) §7.
+[`SceneBuilderVisitor::visit_object_simple`](../src/loader/visitors/scene_builder.rs), à l'endroit
+où il tient la forme *et* le matériau. Il pose l'objet visible, puis interroge les deux :
+`Material::emitter` et `Shape::area_sampler`. Si les deux répondent, la forme placée part dans une
+`AreaLight` sans qu'aucune géométrie soit recopiée — c'est le même `Arc`.
+
+La quatrième combinaison, celle où le matériau émet et où la forme ne sait pas s'échantillonner,
+**arrête le chargement en nommant la forme**. Ce n'est pas une vérification ajoutée : c'est le bras
+qu'aucun autre ne couvre, et rendre la scène quand même reconduirait en silence, pour cet objet, le
+défaut que la lumière d'aire existe pour supprimer.
+
+### 6.6 Le rayon d'ombre s'arrête avant la source
+
+Le segment testé s'arrête à `(1 − 10⁻⁴)` de la distance à la source, et cet écart-là n'est pas
+cosmétique. Le point tiré sur une lumière d'aire **est un point d'une surface de la scène** : un
+segment qui l'atteint exactement trouve cette surface en travers de son propre chemin, `intersect_p`
+acceptant une touche à `t == far`. Mesuré sur le panneau de `cornell_box_exact.stage`, depuis un
+point du sol qui le voit à la verticale : **1508 rayons d'ombre sur 2000 revenaient occultés par le
+panneau lui-même**, 425 par le grand bloc — ceux-là légitimement — et 67 passaient.
+
+C'est le pendant exact de `SHADOW_RAY_EPSILON`, qui écarte le départ de la surface ombrée ; aucun
+des deux ne répare ce que l'autre traite. La différence est que celui-ci est **relatif** : ce qu'il
+doit franchir est l'erreur d'arrondi sur la distance elle-même, laquelle croît avec cette distance.
+Une source ponctuelle n'est jamais sur une surface, et c'est pourquoi le défaut n'apparaît qu'avec
+les lumières d'aire.
 
 ## 7. Les deux 1/d², qui n'ont pas la même cause
 
@@ -431,8 +451,9 @@ et c'est elle qui a rendu ce chantier vérifiable.
 5. **Pas d'émission bilatérale** (§6.3) — un choix, pas un manque.
 6. **Choix uniforme de la source** parmi `N` ([path.rs](../src/integrators/path.rs)) — une petite
    source très lumineuse est tirée aussi souvent qu'un grand panneau faible.
-7. **Aucune `AreaLight` n'est construite** (§6.5) — le seul de cette liste qui soit un défaut plutôt
-   qu'une approximation.
+7. **Le rayon d'ombre ne teste pas le dernier dix-millième du segment** (§6.6) — un occulteur collé
+   à la source passe inaperçu. C'est le prix d'un défaut bien pire, et le seul de cette liste dont
+   la mesure soit dans ce document.
 
 ## 10. Références
 

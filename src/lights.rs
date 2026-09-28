@@ -30,6 +30,26 @@ use super::spectrum::Spectrum;
 /// uses for its slabs; see `docs/arithmetique_flottante.md` §1. Not done here.
 const SHADOW_RAY_EPSILON: f64 = 0.00001;
 
+/// How much of the segment to the light is left untested, as a fraction of its length.
+///
+/// The far end of a shadow ray is the mirror image of the near end, and it bites hardest on an
+/// area light: the point sampled on the source **is a point of a surface in the scene**, so the
+/// segment ends exactly on that surface, and `intersect_p` — which accepts a hit at `t == far` —
+/// reports the source as standing in its own way. Measured on the panel of
+/// `test_files/cornell_box_exact.stage`, from a floor point that sees it straight up, three
+/// shadow rays in four came back occluded by the panel itself.
+///
+/// It cannot be repaired at the other end. Stepping off the *shaded* surface, as
+/// [`SHADOW_RAY_EPSILON`] does, says nothing about where the segment stops; and no tightening of
+/// the comparison helps, rounding putting the computed distance on either side of the exact one.
+/// The segment has to stop short.
+///
+/// **This one is relative**, unlike its counterpart above, and deliberately: what has to be
+/// cleared is a rounding error on the distance itself, which grows with that distance. The price
+/// is a genuine occluder within the last hundredth of a percent of the way going unseen — a
+/// lampshade pressed against a lamp.
+const SHADOW_RAY_END_EPSILON: f64 = 0.0001;
+
 /// The occlusion query that comes with a light sample: is anything standing between the shaded
 /// point and the light?
 ///
@@ -47,12 +67,16 @@ pub struct VisibilityTester {
 
 impl VisibilityTester {
     /// Visibility of a light sitting at `to`, seen from `from`.
+    ///
+    /// The segment stops just short of `to`, by [`SHADOW_RAY_END_EPSILON`]: a point drawn on an
+    /// area light lies on a surface the accelerator knows, and a segment reaching it exactly finds
+    /// that surface in its own way.
     pub fn between(from: &Vector3f, to: &Vector3f) -> Self {
         // `spawn_from_through` normalises the direction, so the parametric distance along the ray
         // and the euclidean distance to the light are the same number.
         Self {
             ray: Ray::spawn_from_through(from, to),
-            distance: (to - from).length(),
+            distance: (to - from).length() * (1.0 - SHADOW_RAY_END_EPSILON),
         }
     }
 

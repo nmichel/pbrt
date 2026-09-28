@@ -20,8 +20,29 @@ fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a ap
 `docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
 une entrée cochée y garde une ligne, pas son corps.
 
-**Chantier en cours** — aucun. Le sujet de la branche `feat/light` est clos : **une scène est
-éclairée par ce qu'elle déclare**. La grammaire a une production `light` à trois types — `point`,
+**Chantier en cours** — `feat/area_light` : **une surface émissive éclaire la scène**. Un objet dont
+le matériau émet est enregistré comme [`AreaLight`](src/lights/area_light.rs) par
+[`SceneBuilderVisitor`](src/loader/visitors/scene_builder.rs), sur la forme *déjà placée* que rend
+l'objet visible — un seul `Arc<dyn Shape>`, donc aucune géométrie à tenir d'accord. L'émission reste
+une face du matériau (`Emitter`), l'échantillonnage une face de la forme (`AreaSampleable`), et le
+changement de mesure aire → angle solide vit seul dans l'en-tête d'`area_light.rs`. Le diagnostic de
+chargement tombe de la conjonction des deux questions : un matériau émissif sur une forme non
+échantillonnable arrête le chargement en nommant la forme.
+
+**Ce que ce chantier a trouvé** : le panneau s'occultait lui-même. Le point tiré sur une source
+d'aire *est* un point d'une surface de la scène, et `intersect_p` accepte une touche à `t == far`,
+donc trois rayons d'ombre sur quatre revenaient bloqués par la lampe. `SHADOW_RAY_END_EPSILON`
+arrête le segment avant la source — relatif, là où celui du départ est absolu. C'est un défaut
+latent qu'aucune source ponctuelle ne pouvait révéler, et c'est la comparaison `naive` / `path` qui
+l'a levé. Elle est désormais la preuve du chantier : 74,79 contre 74,83 sur
+`cornell_box_exact.stage`, `naive` à 16384 chemins par pixel contre 1024 pour `path` — et la
+première de ces deux colonnes n'a de sens que parce qu'on a montré que `naive` avait cessé de
+monter. Radiométrie et dérivations dans [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md),
+mesure dans [docs/eclairage_declare.md](docs/eclairage_declare.md) §4. Les références au PBR Book
+pointent désormais la 4ᵉ édition.
+
+Avant lui, le sujet de la branche `feat/light` est clos : **une scène est éclairée par ce qu'elle
+déclare**. La grammaire a une production `light` à trois types — `point`,
 `uniform_infinite`, `background_infinite` —, frère des objets dans `SceneNode`, et
 [`Loader::load_scene`](src/loader.rs) n'ajoute plus rien. **Ce que ce chantier a trouvé** : la
 béquille était à *deux* endroits et non un seul — `NaiveIntegrator` recodait en dur le même dégradé
@@ -67,9 +88,9 @@ Plus tôt encore, `chore/revamp_bvh_for_trimesh` : ses mesures et ses arbitrages
 comparer une mesure fraîche.
 
 La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Y
-vient d'abord [`AreaLight`](ideas/area_light.md) — le plus grand écart au modèle physique du projet,
-les surfaces émissives ne contribuant à aucun éclairage indirect —, dont tous les prérequis sont
-désormais acquis, y compris la comparaison `naive` / `path` qui est la seule preuve qu'il ait.
+vient d'abord [`AreaLight`](ideas/area_light.md), en cours : ce qui était le plus grand écart au
+modèle physique du projet est levé pour le `Rectangle`, et ce qui reste est de l'étendre à `Sphere`,
+`Triangle` et au maillage, puis d'échantillonner l'angle solide plutôt que l'aire.
 Viennent ensuite MIS, qui emporte le cosinus de
 [ideas/cosinus_dirac.md](ideas/cosinus_dirac.md), puis la roulette russe.
 
@@ -82,7 +103,7 @@ d'une exécution ([docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3, qui porte au
 réouverture). **Un gain de construction se rapporte à une exécution entière, jamais au chargement
 seul** ; c'est la leçon de ce dernier, et elle vaut pour le prochain.
 
-**Lancer les tests** — `cargo test` est vert en entier : 159 tests de bibliothèque, 2 tests
+**Lancer les tests** — `cargo test` est vert en entier : 184 tests de bibliothèque, 2 tests
 d'intégration, 11 doc-tests, et les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour
 tout changement de construction ou de traversée d'un accélérateur,
 `cargo run --release --bin bvh_stats -- <scène>`

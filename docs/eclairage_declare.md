@@ -15,7 +15,7 @@ exprimée —, avec les dérivations.
 | S'écrit | directement sous `scene` | sur un `object`, à la place du matériau |
 | A une géométrie | non | oui — celle de la forme qui le porte |
 | Un rayon peut la toucher | jamais | oui, et il la voit |
-| Entre dans `Scene::lights` | à la construction, par `SceneBuilderVisitor` | pas encore ([ideas/area_light.md](../ideas/area_light.md)) |
+| Entre dans `Scene::lights` | à la construction, par `SceneBuilderVisitor` | à la construction, par le même visiteur, en `AreaLight` |
 
 La frontière est celle de la géométrie, et c'est la seule qui découpe proprement. Une source
 ponctuelle et un ciel n'ont pas de surface : rien dans la scène ne peut être touché et reconnu comme
@@ -75,16 +75,33 @@ finie (0–255) :
 | `--integrator naive` | 192,29 | 186,16 | 208,40 |
 | `--integrator path` | 192,31 | 186,19 | 208,45 |
 
-Cinq centièmes d'un niveau d'écart au pire, sur une image où l'éclairage indirect compte. **C'est
-cette comparaison qui est la preuve d'`AreaLight`** ([ideas/area_light.md](../ideas/area_light.md)
-§6) : un `d²` en trop, un cosinus manquant ou une mesure non convertie changent la luminosité sans
-changer la forme de l'image, et seul un second estimateur les attrape. Elle était impossible tant
-qu'une `PointLight` était ajoutée à toute scène, `path` la voyant par NEE et `naive` n'ayant aucune
-chance de la toucher.
+Cinq centièmes d'un niveau d'écart au pire, sur une image où l'éclairage indirect compte. Un `d²` en
+trop, un cosinus manquant ou une mesure non convertie changent la luminosité sans changer la forme
+de l'image, et seul un second estimateur les attrape. La comparaison était impossible tant qu'une
+`PointLight` était ajoutée à toute scène, `path` la voyant par NEE et `naive` n'ayant aucune chance
+de la toucher.
+
+**C'est elle qui a servi de preuve à `AreaLight`.** Sur `cornell_box_exact.stage`, dont le seul
+éclairage est son panneau, 256 × 256, `--max_depth 8`, `--seed 0` :
+
+| | R | V | B |
+|---|---|---|---|
+| `naive`, 4096 chemins/pixel | 74,62 | 61,43 | 35,40 |
+| `naive`, 16384 chemins/pixel | 74,79 | 61,60 | 35,52 |
+| `path`, **1024** chemins/pixel | 74,83 | 61,64 | 35,56 |
+
+Quatre centièmes d'un niveau entre les deux dernières lignes. Les deux premières sont là pour dire
+que `naive` est bien arrivé : il converge par le dessous, n'ayant aucun moyen de viser le panneau,
+et à 64 chemins par pixel il n'en est encore qu'à 59,54. **Comparer deux estimateurs demande donc de
+montrer que le plus lent a cessé de bouger**, faute de quoi leur accord ne prouve rien.
+
+Le rapport des colonnes de gauche est ce que NEE achète : `path` atteint à 1024 chemins ce que
+`naive` n'atteint pas à 16384.
 
 ## 5. Une scène sans lumière
 
 [`Loader::load_scene`](../src/loader.rs) écrit un avertissement sur stderr plutôt que de refuser le
-fichier : une description a le droit de ne rien éclairer, et une surface émissive que la caméra vise
-directement reste visible. Le reste est noir, et la cause est une ligne absente d'un fichier, pas le
-renderer.
+fichier : une description a le droit de ne rien éclairer. L'énoncé est plus fort qu'il n'y paraît,
+un objet émissif enregistrant sa propre lumière : une liste vide veut donc dire qu'aucune source
+d'aucune sorte n'existe, et que l'image sera noire. La cause est une ligne absente d'un fichier, pas
+le renderer.

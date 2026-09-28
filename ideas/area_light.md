@@ -299,15 +299,22 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       changement de mesure aire → angle solide dérivé dans l'en-tête du module, et pas d'échantillon
       du tout du côté que `DiffuseLight` laisse noir (§3). `LightType` gagne `Area`, la seule des
       trois qu'un rayon puisse toucher.
-- [ ] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme, déjà
+- [x] Enregistrement par `SceneBuilderVisitor` : l'objet et la lumière partagent la même forme, déjà
       placée par la CTM (§4), **et le diagnostic de chargement avec** — un matériau émissif sur une
-      forme non échantillonnable est une erreur nommant la forme (§2). Les deux sont un seul geste :
-      le diagnostic ne s'ajoute pas, il tombe de la conjonction des deux questions — le matériau
-      émet-il, la forme s'échantillonne-t-elle —, et une erreur qui se déclenche sans que rien ne
-      soit enregistré n'en serait que la moitié.
-- [ ] Ne **pas** toucher au garde `is_last_bounce_specular`.
+      forme non échantillonnable arrête le chargement en nommant la forme (§2). Les deux sont un
+      seul geste : le diagnostic ne s'ajoute pas, il tombe de la conjonction des deux questions — le
+      matériau émet-il, la forme s'échantillonne-t-elle. `ShapeNode` gagne un `name()` pour que le
+      message cite le mot que l'auteur a écrit, un `Arc<dyn Shape>` n'ayant plus de nom à donner.
+- [x] Ne **pas** toucher au garde `is_last_bounce_specular` — il tient : l'émission n'est comptée
+      qu'en vue directe ou après un rebond spéculaire, NEE fait le reste, et rien n'est compté deux
+      fois. Ce qui le fera tomber est MIS.
 - [x] Un témoin dont tout l'éclairage est son panneau : `test_files/cornell_box_exact.stage` (§6).
-- [ ] Comparer `naive` et `path` sur ce témoin, et le dire dans le commit.
+- [x] Comparer `naive` et `path` sur ce témoin, et le dire dans le commit. **Ce que la comparaison a
+      trouvé** : le panneau s'occultait lui-même. Le point tiré sur une source d'aire est un point
+      d'une surface de la scène, et `intersect_p` accepte une touche à `t == far`, donc trois rayons
+      d'ombre sur quatre revenaient bloqués par la lampe. Corrigé par un `SHADOW_RAY_END_EPSILON`
+      relatif, pendant exact de celui du départ ; mesure et raisonnement en
+      [docs/sources_de_lumiere.md](../docs/sources_de_lumiere.md) §6.6.
 - [ ] Étendre à `Sphere` et `Triangle`, puis au maillage — tirage d'un triangle proportionnel à son
       aire, ce qui demande une somme cumulée des aires construite une fois.
 - [ ] Échantillonnage en angle solide depuis le point de référence, en remplacement du tirage

@@ -3,13 +3,25 @@ use crate::loader::visitors::Visitor;
 
 use super::{Node, TransformNode};
 
-pub trait ShapeNode: Node {}
+/// A shape as the description writes it, before anything is built from it.
+pub trait ShapeNode: Node {
+    /// The `.stage` keyword that introduces this shape.
+    ///
+    /// A diagnostic about a shape has to quote back the word its author wrote, and the abstract
+    /// syntax is the last place that word still exists: a built `Arc<dyn Shape>` is a trait object
+    /// and has no name left to give.
+    fn name(&self) -> &'static str;
+}
 
 pub struct SphereShapeNode {
     pub radius: f64,
 }
 
-impl ShapeNode for SphereShapeNode {}
+impl ShapeNode for SphereShapeNode {
+    fn name(&self) -> &'static str {
+        "sphere"
+    }
+}
 
 impl Node for SphereShapeNode {
     fn visit(self: &Self, visitor: &mut dyn Visitor) {
@@ -28,7 +40,11 @@ pub struct RectangleShapeNode {
     pub half_height: f64,
 }
 
-impl ShapeNode for RectangleShapeNode {}
+impl ShapeNode for RectangleShapeNode {
+    fn name(&self) -> &'static str {
+        "rectangle"
+    }
+}
 
 impl Node for RectangleShapeNode {
     fn visit(self: &Self, visitor: &mut dyn Visitor) {
@@ -44,7 +60,11 @@ impl RectangleShapeNode {
 
 pub struct PlaneShapeNode {}
 
-impl ShapeNode for PlaneShapeNode {}
+impl ShapeNode for PlaneShapeNode {
+    fn name(&self) -> &'static str {
+        "plane"
+    }
+}
 
 impl Node for PlaneShapeNode {
     fn visit(self: &Self, visitor: &mut dyn Visitor) {
@@ -63,7 +83,11 @@ pub struct CylinderShapeNode {
     pub height: f64,
 }
 
-impl ShapeNode for CylinderShapeNode {}
+impl ShapeNode for CylinderShapeNode {
+    fn name(&self) -> &'static str {
+        "cylinder"
+    }
+}
 
 impl Node for CylinderShapeNode {
     fn visit(self: &Self, visitor: &mut dyn Visitor) {
@@ -81,7 +105,11 @@ pub struct AABoxShapeNode {
     pub extend: Vector3f,
 }
 
-impl ShapeNode for AABoxShapeNode {}
+impl ShapeNode for AABoxShapeNode {
+    fn name(&self) -> &'static str {
+        "aabox"
+    }
+}
 
 impl Node for AABoxShapeNode {
     fn visit(self: &Self, visitor: &mut dyn Visitor) {
@@ -100,7 +128,11 @@ pub struct MeshShapeNode {
     pub reverse: bool,
 }
 
-impl ShapeNode for MeshShapeNode {}
+impl ShapeNode for MeshShapeNode {
+    fn name(&self) -> &'static str {
+        "mesh"
+    }
+}
 
 impl Node for MeshShapeNode {
     fn visit(self: &Self, visitor: &mut dyn Visitor) {
@@ -128,7 +160,11 @@ pub struct CSGShapeElemNode {
     pub transform: Box<TransformNode>,
 }
 
-impl ShapeNode for CSGShapeElemNode {}
+impl ShapeNode for CSGShapeElemNode {
+    fn name(&self) -> &'static str {
+        "elem"
+    }
+}
 
 impl Node for CSGShapeElemNode {
     fn visit(self: &Self, visitor: &mut dyn Visitor) {
@@ -148,7 +184,11 @@ pub struct CSGShapeIntersectionNode {
     pub elems: Vec<Box<CSGShapeElemNode>>,
 }
 
-impl ShapeNode for CSGShapeIntersectionNode {}
+impl ShapeNode for CSGShapeIntersectionNode {
+    fn name(&self) -> &'static str {
+        "csg intersection"
+    }
+}
 
 impl Node for CSGShapeIntersectionNode {
     fn visit(self: &Self, visitor: &mut dyn Visitor) {
@@ -169,7 +209,11 @@ pub struct CSGShapeUnionNode {
     pub elems: Vec<Box<CSGShapeElemNode>>,
 }
 
-impl ShapeNode for CSGShapeUnionNode {}
+impl ShapeNode for CSGShapeUnionNode {
+    fn name(&self) -> &'static str {
+        "csg union"
+    }
+}
 
 impl Node for CSGShapeUnionNode {
     fn visit(self: &Self, visitor: &mut dyn Visitor) {
@@ -190,7 +234,11 @@ pub struct CSGShapeSubstractionNode {
     pub elems: Vec<Box<CSGShapeElemNode>>,
 }
 
-impl ShapeNode for CSGShapeSubstractionNode {}
+impl ShapeNode for CSGShapeSubstractionNode {
+    fn name(&self) -> &'static str {
+        "csg substraction"
+    }
+}
 
 impl Node for CSGShapeSubstractionNode {
     fn visit(self: &Self, visitor: &mut dyn Visitor) {

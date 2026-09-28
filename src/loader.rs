@@ -28,11 +28,12 @@ impl Loader {
         visitor.visit(&scene);
         visitor.scene.commit();
 
-        // Not an error: a description is allowed to say this, and an emissive surface the camera
-        // looks straight at is still seen. Everything else is black, though, and the reason is a
-        // line missing from a file rather than anything the renderer did.
+        // Not an error: a description is allowed to say this. It is a stronger statement than it
+        // looks, though, because an emissive object registers a light of its own — so an empty
+        // list means no source of any kind, declared or emissive, and an image that comes out
+        // black. The cause is a line missing from a file rather than anything the renderer did.
         if visitor.scene.get_light_count() == 0 {
-            eprintln!("warning: this scene declares no `light`; only emission the camera sees directly will show, the rest is black");
+            eprintln!("warning: nothing lights this scene — it declares no `light` and holds no emissive material; the image will be black");
         }
 
         (visitor.scene, visitor.camera.unwrap())
