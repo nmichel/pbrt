@@ -1,0 +1,59 @@
+# A strip light skimming a floor: the witness for variance.
+#
+#   --integrator path --renderer mt --threads 8 --seed 0 --fov 40
+#   --samples_ppx 64 --max_depth 3 --output_width 256 --output_height 192
+#
+# WHAT IT ISOLATES
+#
+# How much noise uniform sampling over the area of a source costs, and therefore what sampling the
+# solid angle it subtends would buy. The mean is not the reading here — two images of the same
+# scene have the same mean and can differ entirely in how grainy they are. What is read is the root
+# mean square against a converged render of the same scene, which `image_stats` prints.
+#
+# WHY A STRIP, AND WHY SO LOW
+#
+# A point drawn uniformly over the source is weighted by `cos θ · cos θₗ / d²`, and the estimator is
+# noisy exactly in proportion to how much that quantity varies from one drawn point to another. A
+# small or distant source varies little and is sampled well by the naive draw; this arrangement is
+# built to be the opposite on every term at once.
+#
+# The strip is 20 long and 0.6 wide, and hangs 0.35 above the floor. From a point of the floor in
+# frame, its near end is about a unit away and its far end fifteen, so `d²` alone spans a factor of
+# two hundred; and `cos θₗ` runs from about 0.3 under the near end down to 0.02 at the far one,
+# the strip being seen almost edge-on from there. Most of the points drawn therefore land where
+# they are worth nearly nothing, which is the whole complaint against the uniform draw.
+#
+# `--max_depth 3` because the scene is a floor and a lamp: there is nothing for a longer path to
+# find, and the measurement should not pay for it.
+#
+# FRAMING
+#
+# The strip sits **behind** the camera, at z = 5 against the camera's z = 4, so it cannot enter the
+# frame. The image is floor only, lit from behind at a grazing angle, and every pixel of it is a
+# sample of the quantity being measured. The narrow `--fov 40` is part of the arrangement and not a
+# preference: a wider one tips the top of the frame above the horizon, and the black sky it would
+# then hold is not floor and would dilute both figures.
+
+camera pin_hole
+  pos 0.0 2.0 4.0
+  look 0.0 0.0 0.0
+  up 0.0 1.0 0.0
+
+scene
+
+  # The floor, at y = 0 and large enough that the frame never reaches its edge — a rectangle is
+  # authored in that plane already, so it needs no placement.
+  object simple
+    rectangle 40 40
+    lambertian color 0.6 0.6 0.6
+
+  # The strip, face down and skimming the floor. Emission is one-sided along the normal and a
+  # `rectangle` faces +Y, so without the half turn about x this lamp would light the sky.
+  object transformed
+    object simple
+      rectangle 20 0.6
+      diffuse_light color 600.0 600.0 600.0
+    transform {
+      rotate_x 3.14159265
+      translate 0.0 0.35 5.0
+    }

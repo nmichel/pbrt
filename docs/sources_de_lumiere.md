@@ -440,7 +440,82 @@ BSDF, `path` les atteint par NEE, et les deux doivent converger vers la même im
 ou un cosinus manquant les sépare. La mesure est en [eclairage_declare.md](eclairage_declare.md) §4,
 et c'est elle qui a rendu ce chantier vérifiable.
 
-## 9. Les écarts au modèle physique, rassemblés
+## 9. Les témoins, et ce que chacun répond
+
+Trois scènes de `test_files/` servent de banc de mesure à l'éclairage. Chacune répond à **une**
+question, et aucune ne répond à celle d'une autre — c'est le point de la section. Chaque fichier
+porte en en-tête sa ligne de commande et la raison de son cadrage ; les chiffres ci-dessous sont
+ceux du code tel qu'il est, lus par [`image_stats`](../src/bin/image_stats.rs), canal rouge, en
+256 × 192 et `--seed 0`.
+
+Aucune image de référence n'est versionnée, et il n'y a pas à en versionner : un rendu se rejoue
+depuis sa graine, bit pour bit, quel que soit le nombre de fils
+([rendu_reproductible.md](rendu_reproductible.md)). **Une référence est une ligne de commande, pas
+un fichier.**
+
+### 9.1 `direct_lighting.stage` — le biais
+
+Un sol et un panneau 4 × 4 à trois unités au-dessus, rien d'autre. Le panneau sous-tend beaucoup :
+vu du centre du sol son facteur de forme vaut 0,36, donc mieux qu'un rayon cosinusoïdal sur trois
+l'atteint. C'est ce qui rend `naive` — qui n'a aucun moyen de viser une source — utilisable comme
+second estimateur pour un coût raisonnable.
+
+| chemins/pixel | `naive` | `path` |
+|---|---|---|
+| 16 | 97,80 | 103,27 |
+| 64 | 102,75 | 103,51 |
+| 256 | 103,43 | 103,57 |
+| 1024 | 103,57 | 103,59 |
+| 4096 | **103,59** | — |
+
+Les deux estimateurs se rejoignent au centième, et `naive` y arrive en **1024 chemins** là où
+`cornell_box_exact.stage` lui en demande 16384 (§8). C'est la différence entre une boucle de mesure
+qu'on lance en travaillant et une qu'on lance en partant déjeuner. Aucun pixel ne sature, ce qui est
+une condition et non un hasard : le panneau est derrière l'objectif.
+
+### 9.2 `grazing_source.stage` — la variance
+
+Une bande de 20 sur 0,6 qui rase le sol à 0,35 de haut, la caméra devant elle. Le poids d'un point
+tiré, `cos θ · cos θₗ / d²`, y varie autant qu'il est possible : `d²` d'un facteur deux cents entre
+les deux bouts de la bande, et `cos θₗ` de 0,3 à 0,02. Le tirage uniforme par aire dépense donc
+l'essentiel de ses points là où ils ne valent rien.
+
+Ce qui se lit ici n'est pas la moyenne mais **l'écart quadratique moyen** contre un rendu convergé
+de la même scène, `path` à 8192 chemins, de moyenne 86,08 :
+
+| chemins/pixel | moyenne | écart quadratique |
+|---|---|---|
+| 64 | 85,84 | 7,42 |
+| 256 | 86,02 | 3,72 |
+| 1024 | 86,08 | 1,79 |
+
+L'écart est divisé par deux quand les chemins sont multipliés par quatre : c'est le `1/√N` d'un
+estimateur Monte-Carlo, et le fait qu'il tienne sur trois points dit que ces chiffres mesurent bien
+du bruit et non un défaut. **C'est la ligne de base d'un échantillonnage par angle solide**, dont
+tout l'objet est de faire baisser cette colonne à nombre de chemins constant.
+
+**Ce témoin ne dit rien du biais**, et il faut le savoir avant de s'en servir : une bande mince
+sous-tend trop peu d'angle solide pour que `naive` la trouve, qui donne 73,24 à 4096 chemins et
+81,58 à 16384, toujours en train de monter vers 86,08. Ce qui est un défaut ici est précisément la
+qualité recherchée en 9.1.
+
+### 9.3 `indirect_lighting.stage` — le transport
+
+Une pièce approchant la Cornell box, avec une dalle de 300 × 10 × 300 entre le panneau et le sol :
+presque rien n'atteint le sol directement, donc ce qu'on y lit a rebondi. C'est la quantité qu'une
+surface émissive non enregistrée comme lumière supprime entièrement.
+
+| chemins/pixel | `naive` | `path` |
+|---|---|---|
+| 256 | 66,21 | 70,26 |
+| 1024 | 69,70 | 70,41 |
+| 4096 | **70,28** | — |
+
+Treize centièmes d'écart, sur une image dont l'éclairage est presque tout indirect. La scène
+déclarait naguère une `light point` à l'intérieur de la pièce, qui éclairait le sol directement et
+noyait dans le terme direct la mesure du terme indirect.
+
+## 10. Les écarts au modèle physique, rassemblés
 
 1. **`pdf = 1` pour une source δ** (§4.4) — correct pour l'estimateur, incomparable pour MIS.
 2. **Tirage sur la sphère entière** pour les sources à l'infini (§5) — non biaisé, variance portée de
@@ -455,7 +530,7 @@ et c'est elle qui a rendu ce chantier vérifiable.
    à la source passe inaperçu. C'est le prix d'un défaut bien pire, et le seul de cette liste dont
    la mesure soit dans ce document.
 
-## 10. Références
+## 11. Références
 
 - [PBR Book, 4ᵉ éd., §4.2 — *Working with Radiometric
   Integrals*](https://pbr-book.org/4ed/Radiometry,_Spectra,_and_Color/Working_with_Radiometric_Integrals)

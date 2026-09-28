@@ -1,0 +1,63 @@
+# A floor and a lamp, and nothing else: the witness for bias.
+#
+#   --integrator naive|path --renderer mt --threads 8 --seed 0
+#   --samples_ppx 1024 --max_depth 4 --output_width 256 --output_height 192
+#
+# WHAT IT ISOLATES
+#
+# Whether `naive` and `path` agree. They estimate the same integral by routes that share nothing —
+# `naive` reaches the lamp only by sampling the bsdf and never consults `Scene::lights`, `path`
+# aims at it through next event estimation — so a factor lost anywhere in the area-light chain
+# separates them. A missing cosine, an inverse square applied twice, a measure left unconverted:
+# each scales the image without changing its shape, which the eye does not catch and the other
+# estimator does.
+#
+# WHY IT IS BUILT THIS WAY
+#
+# The point is that `naive` converge *quickly*, and everything here serves that. The panel is large
+# and close, so it subtends a great deal of the hemisphere: seen from the centre of the floor its
+# form factor is 0.36, meaning better than one cosine-weighted ray in three lands on it. There are
+# no walls and no declared `light`, so almost all of the light is direct and a short path is enough
+# — `--max_depth 4` already has the answer.
+#
+# Compare with `cornell_box_exact.stage`, which is the opposite on both counts: a small panel in a
+# closed white room, where `naive` needed 16384 paths per pixel. That scene says whether the
+# absolute level is right against measured data; this one is the cheap loop to run while working.
+#
+# FRAMING
+#
+# The camera hangs just under the panel and looks straight down, so the lamp is *behind* it and
+# cannot enter the frame however wide the field of view is opened. Framing it out by aiming away
+# would be a tuning that the next change to the scene breaks; putting it behind the lens is a
+# property of the arrangement.
+#
+# That matters to the measurement and is not cosmetic: a source in frame saturates its pixels, and
+# a mean then speaks partly for light the encoding has already cut off — `image_stats` prints the
+# saturated count precisely so that this cannot pass unnoticed.
+#
+# `up` points along −z because the view direction is −y: a camera looking straight down cannot be
+# told that up is +y, the two being parallel and their cross product zero.
+
+camera pin_hole
+  pos 0.0 2.9 0.0
+  look 0.0 0.0 0.0
+  up 0.0 0.0 -1.0
+
+scene
+
+  # The floor, at y = 0. A `rectangle` is authored there already, so it needs no placement at all —
+  # and an identity `transform` is not free, `Transformed` renormalising the ray it passes down.
+  object simple
+    rectangle 12 12
+    lambertian color 0.6 0.6 0.6
+
+  # The lamp, 4 by 4, three units up. Emission is one-sided along the normal, and a `rectangle`
+  # faces +Y, so the half turn about x is what aims it at the floor rather than at the sky.
+  object transformed
+    object simple
+      rectangle 4 4
+      diffuse_light color 1.5 1.5 1.5
+    transform {
+      rotate_x 3.14159265
+      translate 0.0 3.0 0.0
+    }

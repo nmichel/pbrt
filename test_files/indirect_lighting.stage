@@ -1,19 +1,44 @@
-# TODO : adujst geometry w/r to http://www.graphics.cornell.edu/online/box/data.html
+# A room whose floor is lit almost entirely by bounce: the witness for transport.
+#
+#   --integrator naive|path --renderer mt --threads 8 --seed 0 --far 2000 --fov 56
+#   --samples_ppx 1024 --max_depth 8 --output_width 256 --output_height 192
+#
+# `--fov 56` is what fits the room's opening — 555 across, seen from 523 away — to the frame. The
+# default 90 leaves a black margin all round, which is not the scene and would dilute every figure
+# read off the image. `--far 2000` clears the 1077 from the eye to the back wall, which the default
+# does not.
+#
+# WHAT IT ISOLATES
+#
+# Whether light that has bounced arrives at all, and in the right quantity. A slab 300 by 10 by 300
+# hangs between the panel and the floor, wide enough that almost nothing reaches the floor directly:
+# what lights it has come off the ceiling and the walls. Where `direct_lighting.stage` says whether
+# the level is right, this one says whether the indirect term exists — and it is the quantity that
+# a scene whose emissive surfaces are not registered as lights loses entirely.
+#
+# It needs a long path, hence `--max_depth 8`: cutting at 3 or 4 here removes the very thing being
+# measured, which is not true of the two other witnesses.
+#
+# The panel itself stays in frame, a saturated half-percent of the pixels. It is the one thing here
+# that both integrators read the same way — straight off the material, with no transport involved —
+# so it shifts their two means by the same amount and cancels in the difference between them.
+#
+# WHY IT DECLARES NO `light`
+#
+# It used to carry a point light inside the room, which lit the floor directly and drowned the
+# measurement in the term it is meant to isolate. The room is now lit by its panel alone, so every
+# photon reaching the floor has visited a wall — and `naive`, which never consults `Scene::lights`,
+# and `path`, which aims at the panel through next event estimation, have to agree on that number.
+#
+# An approximate Cornell room: the published geometry is in `cornell_box_exact.stage`, which is the
+# scene to read for measured data. This one is shaped for the blocker, not for fidelity.
 
-# Approx Cornell Room
 camera pin_hole
   pos 0.0 0.0 800.0
   look 0.0 0.0 0.0
   up 0.0 1.0 0.0
 
 scene
-
-  # lighting
-  light point
-    color 15.0 15.0 15.0
-    transform {
-      translate 0.0 2.0 1.0
-    }
 
   # Ceiling
   object transformed
