@@ -315,10 +315,45 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       d'ombre sur quatre revenaient bloqués par la lampe. Corrigé par un `SHADOW_RAY_END_EPSILON`
       relatif, pendant exact de celui du départ ; mesure et raisonnement en
       [docs/sources_de_lumiere.md](../docs/sources_de_lumiere.md) §6.6.
-- [ ] Étendre à `Sphere` et `Triangle`, puis au maillage — tirage d'un triangle proportionnel à son
-      aire, ce qui demande une somme cumulée des aires construite une fois.
+- [x] **`Sphere` échantillonnable par aire.** `area()` vaut `4πr²` et le tirage est φ uniforme avec
+      **cos θ** uniforme — pas θ, qui entasserait les points aux pôles sans que rien ne manque à
+      l'image. Les (u, v) du point tiré sont ceux du paramétrage de
+      `compute_intersection_details`, sans quoi une lampe texturée éclairerait d'une couleur et se
+      verrait d'une autre. Rien d'autre n'a été touché : l'enregistrement interroge
+      `Material::emitter` et `Shape::area_sampler`, donc répondre à la seconde a suffi pour qu'une
+      sphère émissive devienne une source.
+
+      **Le prix, mesuré** : la part des tirages qui survit est la calotte que le point ombré voit,
+      soit `(1 − r/d)/2` exactement — la moitié au mieux, et moins de près. Sur le témoin,
+      32,7 % survivent juste sous la lampe et 43,8 % à 8,5 d'écart, contre 33,3 % et 44,1 % prédits.
+      **Deux tirages sur trois sont jetés là où la lumière compte le plus**, et c'est la ligne de
+      base que l'échantillonnage par cône doit battre.
+- [ ] **`Triangle` puis le maillage.** Deux questions et non une : tirer *dans* un triangle, et
+      choisir *lequel* proportionnellement à son aire — ce second point demandant une somme cumulée
+      construite une fois. [lamp_triangle.ply](../test_files/lamp_triangle.ply) n'a qu'un triangle
+      et ne peut rien dire du choix ; il faudra un second témoin à triangles d'aires nettement
+      inégales, un maillage régulier ne distinguant pas un choix correct d'un choix uniforme.
 - [ ] Échantillonnage en angle solide depuis le point de référence, en remplacement du tirage
-      uniforme par aire, une fois la variance mesurée sur le témoin.
+      uniforme par aire, une fois la variance mesurée sur le témoin — elle l'est
+      ([docs/sources_de_lumiere.md](../docs/sources_de_lumiere.md) §9.2).
+
+      **Ce que cela coûte est plus petit qu'il n'y paraît**, et vaut d'être su avant de choisir
+      l'ordre. `Light` ne bouge pas : `sample_li` reçoit déjà le point de référence et promet déjà
+      une densité en angle solide, donc les trois sources sans géométrie ne sont pas concernées.
+      Seul `AreaSampleable` change, il n'a que deux implémentations, et il change **par ajout** —
+      la seconde méthode a un corps par défaut qui est exactement la conversion qu'`AreaLight`
+      écrit aujourd'hui, comme les deux variantes de `Shape::Sample` chez pbrt. Aucune
+      implémentation existante n'est donc forcée de changer.
+
+      Les deux vraies difficultés sont ailleurs. **Le relais de `Transformed`** : tant que le corps
+      par défaut s'applique il est juste, son `sample_area` rendant déjà des points en espace
+      monde ; mais dès qu'une forme redéfinit le tirage, celui-ci a lieu en espace local et le
+      relais doit y porter le point de référence puis ramener le résultat — densité comprise, qu'un
+      déplacement laisse invariante mais qu'une mise à l'échelle ne laisserait pas. `Matrix4::scale`
+      existe, la grammaire n'a pas d'étape `scale`, et ses quatre usages sont dans les caméras : le
+      défaut est latent, pas vivant. **Et le `pdf` de `ShapeSample`** porterait alors deux mesures
+      selon la méthode qui l'a produit, ce qui est l'ambiguïté qu'on a retirée du `Option` de
+      `Material::emit` pour la même raison. Deux types de retour distincts.
 
 Ensuite seulement, et dans leurs propres entrées d'`IDEAS.md` : `Light::pdf_li` puis MIS, qui fait
 tomber le garde spéculaire, puis la roulette russe.

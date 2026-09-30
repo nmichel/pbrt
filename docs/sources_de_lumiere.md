@@ -515,6 +515,34 @@ Treize centièmes d'écart, sur une image dont l'éclairage est presque tout ind
 déclarait naguère une `light point` à l'intérieur de la pièce, qui éclairait le sol directement et
 noyait dans le terme direct la mesure du terme indirect.
 
+### 9.4 `sphere_source.stage` — une source qui n'est pas plate
+
+Le témoin de 9.1 avec son panneau remplacé par une sphère et sa caméra laissée en place, pour que
+les deux jeux de chiffres se lisent l'un contre l'autre.
+
+| chemins/pixel | `naive` | `path` |
+|---|---|---|
+| 64 | 100,56 | 106,17 |
+| 256 | 105,85 | 106,71 |
+| 1024 | 106,69 | 106,85 |
+| 4096 | **106,84** | **106,87** |
+
+Trois centièmes d'écart : le tirage uniforme sur l'aire d'une sphère est non biaisé.
+
+**Il est en revanche coûteux, et d'une quantité qui se calcule.** L'émission étant unilatérale, un
+point tiré sur la face opposée part en « pas d'échantillon » (§6.4), et la part qui survit est la
+calotte que le point ombré voit :
+
+```text
+[21]  part utile = (1 − r/d) / 2
+```
+
+Une moitié au mieux, quand `d → ∞`, et d'autant moins qu'on est près. Sur ce témoin — lampe de
+rayon 1 à trois unités du sol — 32,7 % des tirages survivent juste dessous et 43,8 % à 8,5 d'écart,
+contre 33,3 % et 44,1 % que donne [21]. **Deux tirages sur trois sont jetés là où la lumière compte
+le plus.** Un rectangle n'a pas d'équivalent de ce gaspillage, tous ses points regardant du même
+côté ; c'est ce qui fait de cette scène celle où l'échantillonnage du cône sous-tendu se lira.
+
 ## 10. Les écarts au modèle physique, rassemblés
 
 1. **`pdf = 1` pour une source δ** (§4.4) — correct pour l'estimateur, incomparable pour MIS.

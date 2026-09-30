@@ -1,34 +1,31 @@
-# A spherical lamp. THIS SCENE DOES NOT LOAD YET.
-#
-#   image_stats: an emissive material sits on a `sphere`, which cannot hand out points of itself:
-#   it would be seen and would light nothing
-#
-# `Sphere` does not implement `AreaSampleable`, so `SceneBuilderVisitor` refuses the description
-# rather than render a lamp that lights nothing. The file is here because it is the witness the
-# work that lifts that restriction will be measured on, and because writing it afterwards would
-# mean measuring a change against a scene invented to suit it. See `ideas/area_light.md` §7.
+# A spherical lamp: the first source that is not flat.
 #
 #   --integrator naive|path --renderer mt --threads 8 --seed 0
-#   --samples_ppx 1024 --max_depth 4 --output_width 256 --output_height 192
+#   --samples_ppx 4096 --max_depth 4 --output_width 256 --output_height 192
 #
-# WHAT IT WILL ISOLATE
+# WHAT IT ISOLATES
 #
-# The same question as `direct_lighting.stage` — do `naive` and `path` agree — on the first source
-# that is not flat. It is deliberately that scene with the panel swapped for a sphere of the same
-# span and the camera left where it was, so the two figures can be read against each other.
+# The same question as `direct_lighting.stage` — do `naive` and `path` agree — asked of a curved
+# source. It is deliberately that scene with the panel swapped for a sphere and the camera left
+# where it was, so the two sets of figures can be read against each other.
 #
 # WHY A SPHERE IS NOT A RECTANGLE WITH A DIFFERENT SHAPE
 #
-# A point drawn uniformly over the area of a sphere lands on the far side half of the time, and
-# every one of those is dropped: emission is one-sided, so `cos θₗ ≤ 0` answers "no sample" before
-# any density is computed. Half the draws are therefore spent to produce nothing, whatever the
-# sphere's size or distance — a waste the rectangle has no equivalent of, since every point of a
-# flat source faces the same way.
+# A point drawn uniformly over the area of a sphere lands on the side facing away, and is dropped:
+# emission is one-sided, so `cos θₗ ≤ 0` answers "no sample" before any density is computed. The
+# share that survives is the cap the shaded point can see, and from a distance d it is exactly
 #
-# That is why pbrt samples the cone the sphere subtends from the shaded point rather than its area,
-# and it makes this scene the one where the difference between the two draws shows without any
-# grazing geometry being arranged. A uniform-area draw that is merely *correct* here is already a
-# result; that it is wasteful is the measurement to take.
+#   (1 − r/d) / 2
+#
+# — a half at best, and worse the closer one stands. Measured on this scene, whose lamp has r = 1
+# and hangs 3 above the floor: 32.7 % of the draws survive straight underneath it, 43.8 % from 8.5
+# away, against 33.3 % and 44.1 % predicted. **Two draws in three are thrown away where the light
+# matters most.**
+#
+# The rectangle has no equivalent of this, every point of a flat source facing the same way. It is
+# why pbrt samples the cone a sphere subtends from the shaded point rather than its area, and it
+# makes this the scene where that change will be read. A uniform-area draw that is merely *correct*
+# here is only half the result; the other half is the waste above, which is the baseline to beat.
 
 camera pin_hole
   pos 0.0 2.9 0.0
