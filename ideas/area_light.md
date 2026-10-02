@@ -328,22 +328,22 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       32,7 % survivent juste sous la lampe et 43,8 % à 8,5 d'écart, contre 33,3 % et 44,1 % prédits.
       **Deux tirages sur trois sont jetés là où la lumière compte le plus**, et c'est la ligne de
       base que l'échantillonnage par cône doit battre.
-- [ ] **`Triangle` puis le maillage.** Deux questions et non une : tirer *dans* un triangle, et
-      choisir *lequel* proportionnellement à son aire — ce second point demandant une somme cumulée
-      construite une fois. [lamp_triangle.ply](../test_files/lamp_triangle.ply) n'a qu'un triangle
-      et ne peut rien dire du choix ; il faudra un second témoin à triangles d'aires nettement
-      inégales, un maillage régulier ne distinguant pas un choix correct d'un choix uniforme.
-- [ ] Échantillonnage en angle solide depuis le point de référence, en remplacement du tirage
-      uniforme par aire, une fois la variance mesurée sur le témoin — elle l'est
-      ([docs/sources_de_lumiere.md](../docs/sources_de_lumiere.md) §9.2).
+- [x] **Le trait s'élargit, et la sphère tire dans son cône.** Les deux ensemble : une interface
+      neuve sans un seul usage qui l'exerce ne se vérifie pas. Bruit divisé par **seize** à nombre
+      de chemins constant, moyenne inchangée ([docs/sources_de_lumiere.md](../docs/sources_de_lumiere.md)
+      §9.4). **Ce que ça a coûté** : deux défauts que seuls les tests ont vus. La direction tirée
+      des *points* au lieu des *angles* s'annulait en `0/0` dès qu'un chemin faisait du NEE depuis
+      un sommet posé sur la lampe — un échantillon sur deux cents, la moitié de l'image noire à 512
+      chemins. Et le vecteur entier nié au lieu de sa seule composante axiale plaçait le point à
+      φ+π de sa direction : **aucune image ne le montrait**, la sphère étant uniforme.
 
-      **Ce que cela coûte est plus petit qu'il n'y paraît**, et vaut d'être su avant de choisir
-      l'ordre. `Light` ne bouge pas : `sample_li` reçoit déjà le point de référence et promet déjà
-      une densité en angle solide, donc les trois sources sans géométrie ne sont pas concernées.
-      Seul `AreaSampleable` change, il n'a que deux implémentations, et il change **par ajout** —
-      la seconde méthode a un corps par défaut qui est exactement la conversion qu'`AreaLight`
-      écrit aujourd'hui, comme les deux variantes de `Shape::Sample` chez pbrt. Aucune
-      implémentation existante n'est donc forcée de changer.
+      **Ce que cela coûte est plus petit qu'il n'y paraît.** `Light` ne bouge pas : `sample_li`
+      reçoit déjà le point de référence et promet déjà une densité en angle solide, donc les trois
+      sources sans géométrie ne sont pas concernées. Seul `AreaSampleable` change, il n'a que deux
+      implémentations, et il change **par ajout** — la seconde méthode a un corps par défaut qui
+      est exactement la conversion qu'`AreaLight` écrit aujourd'hui, comme les deux variantes de
+      `Shape::Sample` chez pbrt. Aucune implémentation existante n'est forcée de changer, et le
+      rectangle garde donc le tirage par aire jusqu'à ce qu'on vienne le chercher.
 
       Les deux vraies difficultés sont ailleurs. **Le relais de `Transformed`** : tant que le corps
       par défaut s'applique il est juste, son `sample_area` rendant déjà des points en espace
@@ -354,6 +354,37 @@ mesurée à cinq centièmes d'un niveau sur une scène où l'éclairage indirect
       défaut est latent, pas vivant. **Et le `pdf` de `ShapeSample`** porterait alors deux mesures
       selon la méthode qui l'a produit, ce qui est l'ambiguïté qu'on a retirée du `Option` de
       `Material::emit` pour la même raison. Deux types de retour distincts.
+
+      Le témoin et sa ligne de base existent :
+      [sphere_source.stage](../test_files/sphere_source.stage), dont deux tirages sur trois partent
+      aujourd'hui à la poubelle sous la lampe. Un tirage dans le cône sous-tendu n'en jette aucun ;
+      c'est ce chiffre-là, et l'écart quadratique à nombre de chemins constant, qui diront le gain.
+- [ ] **Le rectangle sphérique.** La même question pour `Rectangle`, et c'est une pièce d'un autre
+      ordre que le cône : découpage en quadrilatères sphériques, aire par excès sphérique,
+      inversion d'une densité en deux temps. Référence à suivre, à vérifier le jour venu : Ureña,
+      Fajardo, King, *An Area-Preserving Parametrization for Spherical Rectangles*, EGSR 2013, dont
+      pbrt se sert pour ses *bilinear patches*. Le témoin est
+      [grazing_source.stage](../test_files/grazing_source.stage) et sa ligne de base est l'échelle
+      d'écart quadratique 7,42 / 3,72 / 1,79 de
+      [docs/sources_de_lumiere.md](../docs/sources_de_lumiere.md) §9.2.
+
+## 8. Reporté : le triangle et le maillage
+
+Hors de l'ordre d'attaque ci-dessus, délibérément. Ce chantier ferme sur la sphère et sur
+l'échantillonnage en angle solide ; les sources triangulaires attendent.
+
+Deux questions et non une : tirer *dans* un triangle, et choisir **lequel** proportionnellement à
+son aire — ce second point demandant une somme cumulée construite une fois, donc un état à placer
+et un coût de construction à mesurer sur un maillage réel.
+[lamp_triangle.ply](../test_files/lamp_triangle.ply) n'a qu'un triangle et ne peut rien dire du
+choix : il faudra un second témoin à triangles d'aires nettement inégales, un maillage régulier ne
+distinguant pas un choix correct d'un choix uniforme.
+[triangle_source.stage](../test_files/triangle_source.stage) est écrite et ne charge pas, le
+diagnostic la refusant en nommant la forme.
+
+**À faire passer dans `IDEAS.md` quand ce fichier disparaîtra** — c'est la seule entrée du §7 qui
+survivra à la clôture du chantier, et elle n'a pas sa place dans un fichier qui s'efface avec son
+sujet.
 
 Ensuite seulement, et dans leurs propres entrées d'`IDEAS.md` : `Light::pdf_li` puis MIS, qui fait
 tomber le garde spéculaire, puis la roulette russe.

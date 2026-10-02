@@ -335,6 +335,50 @@ pub fn normalize(v: &Vector3f) -> Vector3f {
     o
 }
 
+/// Two unit vectors completing the **unit** vector `v` into a right-handed orthonormal basis.
+///
+/// Reference: PBR Book, 4ed, §3.3.4 — *Coordinate System from a Vector*.
+/// <https://pbr-book.org/4ed/Geometry_and_Transformations/Vectors#CoordinateSystemfromaVector>
+///
+/// Which pair comes back is **arbitrary and must not be relied upon**: a single axis leaves a free
+/// rotation about itself, and nothing here chooses it meaningfully. That is exactly what a caller
+/// drawing an azimuth uniformly needs, and all it may ask for — a caller that cares where the
+/// tangent points has to say so, and this cannot hear it.
+///
+/// # Why not simply cross `v` with a fixed axis
+///
+/// Because `v` can *be* that axis, and the cross product of parallel vectors is zero: the basis
+/// would collapse without saying so, for one direction in the whole sphere. Picking the axis `v`
+/// leans on least — the one whose component is smallest in magnitude — bounds the collapse away:
+/// a unit vector always has a component of magnitude at least 1/√3, so the vector crossed in is
+/// never closer than that to `v`, and the cross product never shorter.
+///
+/// # Example
+/// ```
+/// use pbrt::geom::vector3::{coordinate_system, dot, Vector3f};
+/// let z = Vector3f::new(0.0, 0.0, 1.0);
+/// let (x, y) = coordinate_system(&z);
+/// assert!(dot(&x, &y).abs() < 1e-15);
+/// assert!(dot(&x, &z).abs() < 1e-15);
+/// assert!((x.length() - 1.0).abs() < 1e-15);
+/// ```
+pub fn coordinate_system(v: &Vector3f) -> (Vector3f, Vector3f) {
+    let other = if v.x.abs() <= v.y.abs() && v.x.abs() <= v.z.abs() {
+        Vector3f::new(1.0, 0.0, 0.0)
+    }
+    else if v.y.abs() <= v.z.abs() {
+        Vector3f::new(0.0, 1.0, 0.0)
+    }
+    else {
+        Vector3f::new(0.0, 0.0, 1.0)
+    };
+
+    let first = normalize(&cross(v, &other));
+    let second = cross(v, &first);
+
+    (first, second)
+}
+
 impl<T> Index<usize> for Vector3<T> {
     type Output = T;
 

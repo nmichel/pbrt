@@ -386,6 +386,27 @@ doit franchir est l'erreur d'arrondi sur la distance elle-même, laquelle croît
 Une source ponctuelle n'est jamais sur une surface, et c'est pourquoi le défaut n'apparaît qu'avec
 les lumières d'aire.
 
+### 6.7 Deux façons de traverser le pont, et qui choisit
+
+Le §3 convertit une densité d'aire en densité d'angle solide *après* le tirage. Rien n'oblige à
+passer par là : une forme qui sait quel angle solide elle sous-tend peut tirer **dedans**, et
+dépenser chacun de ses points là où la lumière vient réellement.
+
+[`AreaSampleable`](../src/shapes.rs) porte donc deux méthodes. `sample_area` reste la réponse
+honnête à « donne-moi un point de toi », question où aucun point de référence n'intervient ;
+`sample_solid_angle` prend le point d'où l'on regarde, et son **corps par défaut** est exactement la
+conversion du §3. Toute forme l'a donc gratuitement, et celle qui sait mieux faire redéfinit.
+Aujourd'hui [`Sphere`](../src/shapes/sphere.rs) redéfinit, par le cône qu'elle sous-tend ;
+[`Rectangle`](../src/shapes/rectangle.rs) ne redéfinit pas encore, et la méthode pour lui est
+l'échantillonnage du rectangle sphérique, d'un tout autre ordre de difficulté.
+
+**Ce que ce partage déplace**, et c'est le point : `Light` ne change pas. `sample_li` recevait déjà
+le point de référence et promettait déjà une densité en angle solide. Ce qui restait à séparer était
+la géométrie de l'émission — une forme rend un point quelle que soit la face, avec une densité juste
+des deux côtés, et c'est [`AreaLight`](../src/lights/area_light.rs) qui sait que l'émetteur est
+unilatéral et jette ce qui regarde ailleurs. Sans cette séparation, une forme ne pourrait pas tirer
+dans son propre angle solide sans qu'on lui parle d'émission.
+
 ## 7. Les deux 1/d², qui n'ont pas la même cause
 
 C'est le piège du domaine, et il mérite son propre tableau.
@@ -529,19 +550,35 @@ les deux jeux de chiffres se lisent l'un contre l'autre.
 
 Trois centièmes d'écart : le tirage uniforme sur l'aire d'une sphère est non biaisé.
 
-**Il est en revanche coûteux, et d'une quantité qui se calcule.** L'émission étant unilatérale, un
-point tiré sur la face opposée part en « pas d'échantillon » (§6.4), et la part qui survit est la
-calotte que le point ombré voit :
+**Le tirage par aire y était en revanche coûteux, et d'une quantité qui se calcule.** L'émission
+étant unilatérale, un point tiré sur la face opposée part en « pas d'échantillon » (§6.4), et la
+part qui survit est la calotte que le point ombré voit :
 
 ```text
 [21]  part utile = (1 − r/d) / 2
 ```
 
 Une moitié au mieux, quand `d → ∞`, et d'autant moins qu'on est près. Sur ce témoin — lampe de
-rayon 1 à trois unités du sol — 32,7 % des tirages survivent juste dessous et 43,8 % à 8,5 d'écart,
-contre 33,3 % et 44,1 % que donne [21]. **Deux tirages sur trois sont jetés là où la lumière compte
-le plus.** Un rectangle n'a pas d'équivalent de ce gaspillage, tous ses points regardant du même
-côté ; c'est ce qui fait de cette scène celle où l'échantillonnage du cône sous-tendu se lira.
+rayon 1 à trois unités du sol — 32,7 % des tirages survivaient juste dessous et 43,8 % à 8,5
+d'écart, contre 33,3 % et 44,1 % que donne [21] : **deux tirages sur trois jetés là où la lumière
+compte le plus.**
+
+**C'est ce que le tirage dans le cône supprime** (§6.7). Écart quadratique contre la même référence
+convergée, la seule différence entre les deux colonnes étant la méthode de tirage de la sphère :
+
+| chemins/pixel | tirage par aire | tirage dans le cône |
+|---|---|---|
+| 16 | 26,75 | **1,41** |
+| 64 | 12,80 | **0,79** |
+| 256 | 6,40 | **0,51** |
+
+Le bruit est divisé par **seize**, et la moyenne ne bouge pas — 106,89 contre 106,87 : le gain est
+de la variance en moins, pas une image différente. Seize fois moins de bruit à nombre de chemins
+constant vaut, à bruit constant, environ **250 fois moins de chemins**, l'écart d'un estimateur de
+Monte-Carlo décroissant en `1/√N`.
+
+Un rectangle n'a pas d'équivalent de ce gaspillage, tous ses points regardant du même côté ; son
+gain à lui se lira sur le témoin rasant de 9.2, et par une autre méthode (§6.7).
 
 ## 10. Les écarts au modèle physique, rassemblés
 
@@ -549,8 +586,9 @@ côté ; c'est ce qui fait de cette scène celle où l'échantillonnage du cône
 2. **Tirage sur la sphère entière** pour les sources à l'infini (§5) — non biaisé, variance portée de
    `V` à `2V + μ²`.
 3. **Pas d'échantillonnage par importance du dégradé** de `BackgroundInfiniteLight` (§5).
-4. **Tirage uniforme sur l'aire** d'une source étendue, et non sur l'angle solide qu'elle sous-tend
-   (§3.2) — non biaisé, bruyant quand la source est grande ou vue de biais.
+4. **Tirage uniforme sur l'aire** pour le `Rectangle`, et non sur l'angle solide qu'il sous-tend
+   (§6.7) — non biaisé, bruyant quand la source est grande ou vue de biais. La `Sphere` ne l'a
+   plus.
 5. **Pas d'émission bilatérale** (§6.3) — un choix, pas un manque.
 6. **Choix uniforme de la source** parmi `N` ([path.rs](../src/integrators/path.rs)) — une petite
    source très lumineuse est tirée aussi souvent qu'un grand panneau faible.

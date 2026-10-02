@@ -60,7 +60,7 @@ use crate::geom::transform::{Transform, Transformable};
 use crate::geom::vector2::Vector2f;
 use crate::geom::vector3::Vector3f;
 
-use super::{AreaSampleable, Shape, ShapeSample};
+use super::{AreaSampleable, Shape, ShapeSample, SolidAngleSample};
 
 /// A shape and the transformation that places it in the world.
 pub struct Transformed {
@@ -136,6 +136,43 @@ impl AreaSampleable for PlacedAreaSampler {
             },
             pdf: local.pdf,
         }
+    }
+
+    /// The child's draw, with the reference point carried **into** its space and the result brought
+    /// back out.
+    ///
+    /// The trait's default body would work here without a line of this, and would be correct: it
+    /// draws by area — which this type already places — and converts in world space. What it would
+    /// *not* do is let the child draw in its own solid angle, because the child has never been told
+    /// where anything is looked at from. So the one thing this adds is the journey of `reference`,
+    /// and it is the whole reason the override exists.
+    ///
+    /// **The density crosses unchanged**, and that rests on the precondition of this module: the
+    /// placement preserves distances. An isometry maps a cone onto a cone of the same opening, so a
+    /// density per unit solid angle is the same number read from either side. A scaling placement
+    /// would break this exactly as it already breaks [`area`](Self::area), and as quietly.
+    ///
+    /// `wi` **crosses the placement** like the direction it is, and is on no account recomputed as
+    /// `(p − reference).normalized()` on this side. The two are the same direction in exact
+    /// arithmetic, a rotation taking a unit vector to a unit vector — but the subtraction cancels
+    /// to nothing whenever the drawn point is the reference point, which happens every time a path
+    /// runs next event estimation from a vertex lying on this very lamp. It came back `NaN`, one
+    /// sample in two hundred, and a pixel that met one stayed black: see the note on a reference
+    /// sitting on the surface in [`Sphere::sample_solid_angle`](super::Sphere).
+    fn sample_solid_angle(&self, reference: &Vector3f, u: &Vector2f) -> Option<SolidAngleSample> {
+        let local_reference = self.to_world.transform_point_to_local(reference);
+        let local = self.shape.sample_solid_angle(&local_reference, u)?;
+
+        Some(SolidAngleSample {
+            sp: SurfacePoint {
+                p: self.to_world.transform_point_to_world(&local.sp.p),
+                n: self.to_world.transform_normal_to_world(&local.sp.n),
+                u: local.sp.u,
+                v: local.sp.v,
+            },
+            wi: self.to_world.transform_direction_to_world(&local.wi),
+            pdf: local.pdf,
+        })
     }
 }
 

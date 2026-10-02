@@ -12,52 +12,26 @@
 //! is the very [`Arc`] the visible object renders, already placed in world space, so the two cannot
 //! drift apart. Nothing here has to agree with anything — there is only one geometry.
 //!
-//! # The change of measure, which is the whole of this file
+//! # Where the measure changes, and where it no longer does
 //!
-//! An integrator works in **solid angle**: it divides a contribution by `pdf` where the sample is a
-//! *direction*. A shape draws in **area**. The bridge between the two densities is the jacobian of
-//! the map from one to the other, and getting it wrong is invisible to the eye — it scales an image
-//! by a constant.
+//! An integrator works in **solid angle**; a surface is parameterised by **area**. The jacobian
+//! between the two densities used to be written out here, and is not any more: it belongs to the
+//! shapes, which is where a shape can choose to skip it. [`solid_angle_from_area`] holds the
+//! derivation, and [`AreaSampleable::sample_solid_angle`] is what this file asks.
 //!
-//! Write `p` for the shaded point, `pₗ` for the point drawn on the source, `nₗ` for the normal
-//! there, `d = ‖pₗ − p‖`, and `θₗ` for the angle at the source between `nₗ` and the direction back
-//! towards `p`. A patch `dA` of the source, seen from `p`, subtends
+//! What stays here is the one thing a shape cannot answer: **which face emits**. A shape hands
+//! back a point whichever side it was drawn on, with a density that is honest either way; it is
+//! this file that knows the emitter is one-sided ([`Emitter`]) and drops what faces the wrong way.
+//! The two questions used to be answered by one comparison, and separating them is what lets a
+//! shape draw in its own solid angle without ever being told about emission.
 //!
-//! ```text
-//! [1]  dω = dA · cos θₗ / d²
-//! ```
+//! # A departure, now only half of one
 //!
-//! — `cos θₗ` because the patch is foreshortened by its tilt away from `p`, and `1/d²` because a
-//! fixed patch subtends less angle the further it sits. Densities transform by the reciprocal of
-//! that jacobian, since the same event must carry the same probability under either measure:
-//!
-//! ```text
-//! [2]  p(ω) = p(A) · dA/dω = p(A) · d² / cos θₗ
-//! ```
-//!
-//! **The inverse-square law is [1], and nothing else.** It is already in the density, so a
-//! `sample_li` that also divided its radiance by `d²` would darken the image by `d²` a second time.
-//! The radiance this returns is therefore the radiance the source emits, undiminished: radiance
-//! along a ray does not fall off with distance, and what falls off is the solid angle the source
-//! occupies — which is exactly what [2] accounts for.
-//!
-//! **`cos θₗ` is not under an absolute value**, where the general jacobian would put one. Emission
-//! here is one-sided ([`Emitter`]), so a shaded point on the unlit face receives nothing at all,
-//! and that case is answered with "no sample" before the division is reached. The absolute value
-//! would matter for a two-sided emitter; this does not have one.
-//!
-//! **`cos θₗ → 0` makes the density explode**, and that is correct rather than a defect: a source
-//! seen edge-on subtends almost no solid angle, so a point drawn on it stands for a vanishing
-//! fraction of the directions leaving `p`, and its contribution is divided by a large number. The
-//! variance is real, and it is what sampling by solid angle would remove.
-//!
-//! # A departure: the draw is uniform over the area
-//!
-//! Points are drawn uniformly over the surface, not over the solid angle it subtends from the
-//! shaded point. The estimator stays **unbiased** — [2] is exact — but it is noisy when the source
-//! is large and seen at a grazing angle, because most of the points drawn then land where they
-//! matter least. pbrt samples the solid angle directly from a reference point; that is the next
-//! step, and it costs variance rather than correctness to postpone.
+//! A [`Sphere`](crate::shapes::Sphere) draws within the cone it subtends, so every one of its
+//! samples lands where the light comes from. A [`Rectangle`](crate::shapes::Rectangle) still draws
+//! uniformly over its area and converts: unbiased, and noisy when the source is large and seen at
+//! a grazing angle, because most of the points then land where they matter least. Which shape does
+//! which is now the shape's business, and this file does not change either way.
 
 use std::sync::Arc;
 
@@ -86,49 +60,38 @@ impl Light for AreaLight {
 
     /// Draws a point of the source and reports what reaches `intersection` from it.
     ///
-    /// The steps are those of the module header: draw in area measure, build the direction, convert
-    /// the density to solid angle by [2], and read the radiance at the very point drawn.
+    /// The shape is asked for a point *as seen from* the shaded point, so it comes back with a
+    /// density already over directions — by its own draw if it knows one, by the conversion of
+    /// [`solid_angle_from_area`](crate::shapes::solid_angle_from_area) otherwise. What this adds is
+    /// the emission: which face the point was drawn on, and what it radiates.
     ///
-    /// # The three ways there is no sample
+    /// # The two ways there is no sample
     ///
-    /// All three answer `None` rather than a sample carrying zero, because a sample worth nothing
-    /// still costs a shadow ray.
+    /// Both answer `None` rather than a sample carrying zero, because a sample worth nothing still
+    /// costs a shadow ray.
     ///
-    /// - **The drawn point *is* the shaded point.** `d² = 0` leaves no direction to speak of.
-    /// - **The shaded point lies on the unlit face**, `cos θₗ ≤ 0`. The source emits nothing that
-    ///   way, and this is also what keeps [2] from dividing by zero.
-    /// - **The density is not a usable number.** `d²/cos θₗ` overflows for a point close to the
-    ///   plane of the source, and a density of zero or infinity cannot be divided by.
+    /// - **There is no direction, or no usable density.** The shape says so, and the reasons are
+    ///   geometric: the shaded point lies on the surface, or a density came out of a vanishing
+    ///   cosine as something that cannot be divided by.
+    /// - **The shaded point lies on the unlit face.** This one is not geometry and the shape cannot
+    ///   know it: emission is one-sided, so a point whose normal turns away radiates nothing this
+    ///   way. A shape that draws in its own solid angle never produces such a point, and the test
+    ///   then costs a dot product and never fires.
     fn sample_li(&self, intersection: &Intersection, sampler: &mut dyn Sampler) -> Option<(LightLiSample, VisibilityTester)> {
-        let sample = self.shape.sample_area(&sampler.get_2d());
-
-        let to_light = sample.sp.p - intersection.p;
-        let squared_distance = to_light.squared_length();
-        if squared_distance == 0.0 {
-            return None;
-        }
-
-        let wi = to_light.normalized();
+        let sample = self.shape.sample_solid_angle(&intersection.p, &sampler.get_2d())?;
 
         // The direction the radiance leaves the source in: away from it, back towards the shaded
         // point. `Emitter::l` is stated in those terms, and handing it `wi` — which points the
         // other way — would ask about the face opposite the one being lit.
-        let w = -wi;
-        let cos_theta_l = vector3::dot(&sample.sp.n, &w);
-        if cos_theta_l <= 0.0 {
-            return None;
-        }
-
-        // (2)
-        let pdf = sample.pdf * squared_distance / cos_theta_l;
-        if !pdf.is_finite() || pdf <= 0.0 {
+        let w = -sample.wi;
+        if vector3::dot(&sample.sp.n, &w) <= 0.0 {
             return None;
         }
 
         let light_sample = LightLiSample {
             spectrum: self.emitter.l(&sample.sp, &w),
-            wi,
-            pdf,
+            wi: sample.wi,
+            pdf: sample.pdf,
         };
 
         Some((light_sample, VisibilityTester::between(&intersection.p, &sample.sp.p)))
