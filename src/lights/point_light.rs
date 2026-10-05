@@ -41,7 +41,7 @@ impl Light for PointLight {
     /// no variance, and the `sampler` is untouched.
     ///
     /// `pdf` is `1.0` so that the integrator's division leaves [1] alone — see [`LightLiSample`],
-    /// and `docs/sources_de_lumiere.md` §4 for what that costs multiple importance sampling.
+    /// and `docs/sources_de_lumiere.md` §5 for what that costs multiple importance sampling.
     fn sample_li(&self, intersection: &Intersection, _sampler: &mut dyn Sampler) -> Option<(LightLiSample, VisibilityTester)> {
         let world_light_pos = self.t.transform_point_to_world(&Vector3f::new(0.0, 0.0, 0.0));
         let wi = &world_light_pos - &intersection.p;

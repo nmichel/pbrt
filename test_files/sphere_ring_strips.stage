@@ -1,0 +1,192 @@
+# A sphere on a floor, ringed by ten grazing panels whose colours run once round the hue wheel,
+# under late-afternoon daylight.
+#
+#   --integrator path --renderer mt --threads 8 --seed 0 --fov 40
+#   --samples_ppx 256 --max_depth 4 --output_width 512 --output_height 512
+#
+# The panels are those of `dragon_rgb_strips.stage`, at the same scale: long, low rectangles
+# standing upright on the floor, their emitting face turned towards the centre. Ten of them stand
+# on a circle of radius 0.16, 36° apart; each is 0.07 long against a pitch of 0.1 along the
+# circle, so a gap of about 0.03 separates two neighbours. Panel k has hue 36°·k at full
+# saturation, so every azimuth of the sphere is lit mostly by the panel facing it and the floor
+# carries a ring of coloured shadows behind it.
+#
+# The sphere has radius 0.05 and rests 0.0002 above the floor. White, so the colour it shows is the
+# colour of the light it receives.
+#
+# The camera stands outside the ring and above it, and sees the backs of the near panels as dark
+# bars: emission is one-sided. As in `floor_strip.stage`, the foot of each panel, a fraction of a
+# thousandth of its height above the floor, is where the uniform-area draw of a `rectangle` is
+# noisiest — see `ideas/rectangle_spherique.md` §4.
+
+camera pin_hole
+  pos 0.0 0.25 0.46
+  look 0.0 0.03 0.0
+  up 0.0 1.0 0.0
+
+scene
+
+  # Late-afternoon daylight, in two parts.
+  #
+  # The sky: `background_infinite` blends its first colour, straight down, into its second,
+  # straight up, linearly in the y of the direction. A warm first colour and a deep blue second
+  # one give a zenith that is blue and a horizon, halfway, that is the orange of a low sun. Below
+  # the horizon the floor hides the sky, so only the upper half of that blend is ever seen.
+  light background_infinite
+    color 0.36 0.15 0.045
+    color 0.024 0.045 0.135
+
+  # The sun, 8° above the horizon, behind the sphere and to the left of the image, so the sphere
+  # and the panels cast long shadows towards the camera. It is an emissive sphere, and therefore an
+  # `AreaLight` sampled within the cone it subtends: the real sun is a disk 0.53° across, and its
+  # shadows have a soft edge — a penumbra 0.53° wide, about 0.0093 here behind a blocker 1 away.
+  #
+  # Size. The cone a sphere subtends is bounded by the lines of sight tangent to it, and a tangent
+  # is perpendicular to the radius at its point of contact: centre, eye and contact point make a
+  # right triangle whose hypotenuse is d, so sin θmax = r / d. A half-angle of 0.265° at
+  # d = 20.19 from the origin gives r = d · sin(0.265°) = 0.0934. The sun is far enough that its direction barely changes across the scene: the ring's
+  # 0.32 turns it by less than one degree.
+  #
+  # Radiance. A surface facing it receives E = L · Ω, with Ω = 2π(1 − cos θmax) = 6.72·10⁻⁵ sr the
+  # solid angle of the disk. The radiance below is chosen for E ≈ (6, 3.3, 1.5): 0.8 in red on
+  # the floor, which it reaches at 8°. The cone draw makes this size cheap — its density is constant
+  # over the disk, so a sun this small is no noisier than a point light.
+  object transformed
+    object simple
+      sphere 0.0934
+      diffuse_light color 89000.0 49000.0 22300.0
+    transform {
+      translate 12.0 2.78 -16.0
+    }
+
+  # The floor, at y = 0, large enough that the frame never reaches its edge.
+  object simple
+    rectangle 4 4
+    lambertian color 0.6 0.6 0.6
+
+  # The sphere, centred on the vertical axis.
+  object transformed
+    object simple
+      sphere 0.05
+      lambertian color 0.8 0.8 0.8
+    transform {
+      translate 0.0 0.0502 0.0
+    }
+
+  # The ten panels, each 0.01 high and 0.07 long, their lower edge 0.000002 above the floor.
+  #
+  # A `rectangle` is authored flat, facing +Y. The quarter turn about z stands it up with its
+  # normal along -X and its first side as its height. The panel at azimuth φ stands at
+  # 0.16·(sin φ, 0, cos φ) and must face the centre, its normal along -(sin φ, 0, cos φ); a turn
+  # of φ − π/2 about y carries -X there. Azimuth 0 faces the camera; increasing φ runs towards +X,
+  # which `Matrix4::look_at` puts on the left of the image (see `cornell_box_exact.stage`).
+
+  # Panel 0, azimuth 0°, hue 0°.
+  object transformed
+    object simple
+      rectangle 0.01 0.07
+      diffuse_light color 30.0 0.0 0.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y -1.57079633
+      translate 0.00000000 0.005002 0.16000000
+    }
+
+  # Panel 1, azimuth 36°, hue 36°.
+  object transformed
+    object simple
+      rectangle 0.01 0.07
+      diffuse_light color 30.0 18.0 0.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y -0.94247780
+      translate 0.09404564 0.005002 0.12944272
+    }
+
+  # Panel 2, azimuth 72°, hue 72°.
+  object transformed
+    object simple
+      rectangle 0.01 0.07
+      diffuse_light color 24.0 30.0 0.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y -0.31415927
+      translate 0.15216904 0.005002 0.04944272
+    }
+
+  # Panel 3, azimuth 108°, hue 108°.
+  object transformed
+    object simple
+      rectangle 0.01 0.07
+      diffuse_light color 6.0 30.0 0.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y 0.31415927
+      translate 0.15216904 0.005002 -0.04944272
+    }
+
+  # Panel 4, azimuth 144°, hue 144°.
+  object transformed
+    object simple
+      rectangle 0.01 0.07
+      diffuse_light color 0.0 30.0 12.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y 0.94247780
+      translate 0.09404564 0.005002 -0.12944272
+    }
+
+  # Panel 5, azimuth 180°, hue 180°.
+  object transformed
+    object simple
+      rectangle 0.01 0.07
+      diffuse_light color 0.0 30.0 30.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y 1.57079633
+      translate 0.00000000 0.005002 -0.16000000
+    }
+
+  # Panel 6, azimuth 216°, hue 216°.
+  object transformed
+    object simple
+      rectangle 0.01 0.07
+      diffuse_light color 0.0 12.0 30.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y 2.19911486
+      translate -0.09404564 0.005002 -0.12944272
+    }
+
+  # Panel 7, azimuth 252°, hue 252°.
+  object transformed
+    object simple
+      rectangle 0.01 0.07
+      diffuse_light color 6.0 0.0 30.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y 2.82743339
+      translate -0.15216904 0.005002 -0.04944272
+    }
+
+  # Panel 8, azimuth 288°, hue 288°.
+  object transformed
+    object simple
+      rectangle 0.01 0.07
+      diffuse_light color 24.0 0.0 30.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y 3.45575192
+      translate -0.15216904 0.005002 0.04944272
+    }
+
+  # Panel 9, azimuth 324°, hue 324°.
+  object transformed
+    object simple
+      rectangle 0.01 0.07
+      diffuse_light color 30.0 0.0 18.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y 4.08407045
+      translate -0.09404564 0.005002 0.12944272
+    }

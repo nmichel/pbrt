@@ -1,0 +1,68 @@
+# Three spheres in a row above a floor, lit by a panel standing on that floor.
+#
+#   --integrator path --renderer mt --threads 8 --seed 0 --fov 40
+#   --samples_ppx 256 --max_depth 4 --output_width 512 --output_height 512
+#
+# The only source is the panel: a long, low rectangle standing upright on the floor, parallel to
+# the row of spheres and in front of it, its emitting face turned towards them. Emission is
+# one-sided, so the camera, which stands on the other side, sees the panel's back as a black band,
+# and the floor on the camera's side of it receives no direct light.
+#
+# The panel's lower edge rests a thousandth above the floor so that the two surfaces do not touch
+# along a shared line and no ray has to arbitrate between them.
+#
+# That foot is also where this scene is noisy, and the isolated bright pixels it shows — behind the
+# panel and on the spheres included — are not a defect. A `rectangle` is sampled uniformly over its
+# area, so a floor point at the foot weighs its draw by cos θ · cos θₗ / d² with d close to zero: a
+# rare and enormous contribution, reached by any path whose bounce lands there. `naive` agrees with
+# `path` on the mean. Sampling the solid angle the panel subtends would bound it; this scene is a
+# witness for that change, see `ideas/rectangle_spherique.md` §4.
+
+camera pin_hole
+  pos 6.0 5.0 7.0
+  look 0.8 0.4 0.3
+  up 0.0 1.0 0.0
+
+scene
+
+  # The floor, at y = 0, large enough that the frame never reaches its edge.
+  object simple
+    rectangle 60 60
+    lambertian color 0.6 0.6 0.6
+
+  # The three spheres, radius 1, their bottoms 0.2 above the floor, in a row along z.
+  object transformed
+    object simple
+      sphere 1.0
+      lambertian color 0.75 0.75 0.75
+    transform {
+      translate 0.0 1.2 2.5
+    }
+
+  object transformed
+    object simple
+      sphere 1.0
+      lambertian color 0.75 0.75 0.75
+    transform {
+      translate 0.0 1.2 0.0
+    }
+
+  object transformed
+    object simple
+      sphere 1.0
+      lambertian color 0.75 0.75 0.75
+    transform {
+      translate 0.0 1.2 -2.5
+    }
+
+  # The panel, parallel to the row and 2 in front of it on the camera's side. A `rectangle` is
+  # authored flat, facing +Y; a quarter turn about z stands it up, turns its normal to -X, towards
+  # the spheres, and makes its first side the height.
+  object transformed
+    object simple
+      rectangle 0.1 5.0
+      diffuse_light color 6.0 6.0 6.0
+    transform {
+      rotate_z 1.57079633
+      translate 2.0 0.051 0.0
+    }

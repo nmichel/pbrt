@@ -20,7 +20,8 @@ fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a ap
 `docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
 une entrée cochée y garde une ligne, pas son corps.
 
-**Chantier en cours** — `feat/area_light` : **une surface émissive éclaire la scène**. Un objet dont
+**Chantier en cours** — aucun. Le sujet de la branche `feat/area_light` est clos : **une surface
+émissive éclaire la scène**. Un objet dont
 le matériau émet est enregistré comme [`AreaLight`](src/lights/area_light.rs) par
 [`SceneBuilderVisitor`](src/loader/visitors/scene_builder.rs), sur la forme *déjà placée* que rend
 l'objet visible — un seul `Arc<dyn Shape>`, donc aucune géométrie à tenir d'accord. L'émission reste
@@ -37,9 +38,19 @@ latent qu'aucune source ponctuelle ne pouvait révéler, et c'est la comparaison
 l'a levé. Elle est désormais la preuve du chantier : 74,79 contre 74,83 sur
 `cornell_box_exact.stage`, `naive` à 16384 chemins par pixel contre 1024 pour `path` — et la
 première de ces deux colonnes n'a de sens que parce qu'on a montré que `naive` avait cessé de
-monter. Radiométrie et dérivations dans [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md),
-mesure dans [docs/eclairage_declare.md](docs/eclairage_declare.md) §4. Les références au PBR Book
-pointent désormais la 4ᵉ édition.
+monter. La `Sphere` tire ensuite **dans le cône qu'elle sous-tend** plutôt que sur son aire — bruit
+divisé par seize à nombre de chemins constant —, ce qui a demandé d'élargir `AreaSampleable` d'une
+seconde méthode, par ajout : son corps par défaut est la conversion d'avant, donc aucune
+implémentation n'a dû changer. **Tout le sujet est dans
+[docs/sources_de_lumiere.md](docs/sources_de_lumiere.md)**, qui dérive intégralement chaque source —
+matrices jacobiennes, déterminants, changements de mesure — et porte les témoins et leurs chiffres.
+Les références au PBR Book pointent désormais la 4ᵉ édition.
+
+**Ce que ce chantier a trouvé en plus** : deux défauts qu'aucune image ne montrait. Une direction
+reprise du *point* au lieu des *angles* tirés s'annule en `0/0` dès qu'un chemin éclaire depuis un
+sommet posé sur la lampe ; et un signe d'orientation plaçait le point tiré à φ+π de sa propre
+direction, ce qu'une source uniforme rend à l'identique. Seuls les tests les ont vus, et c'est
+l'argument le plus net du projet pour l'exigence du §4 de ce fichier.
 
 Avant lui, le sujet de la branche `feat/light` est clos : **une scène est éclairée par ce qu'elle
 déclare**. La grammaire a une production `light` à trois types — `point`,
@@ -87,12 +98,14 @@ Plus tôt encore, `chore/revamp_bvh_for_trimesh` : ses mesures et ses arbitrages
 [docs/mesures_bvh.md](docs/mesures_bvh.md), dont le §4 tient les chiffres de référence auxquels
 comparer une mesure fraîche.
 
-La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Y
-vient d'abord [`AreaLight`](ideas/area_light.md), en cours : ce qui était le plus grand écart au
-modèle physique du projet est levé pour le `Rectangle`, et ce qui reste est de l'étendre à `Sphere`,
-`Triangle` et au maillage, puis d'échantillonner l'angle solide plutôt que l'aire.
-Viennent ensuite MIS, qui emporte le cosinus de
-[ideas/cosinus_dirac.md](ideas/cosinus_dirac.md), puis la roulette russe.
+La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Ce
+qui était le plus grand écart au modèle physique du projet — une surface émissive n'éclairant rien —
+est levé pour le `Rectangle` et la `Sphere`. Vient maintenant **MIS**, qui emporte le cosinus de
+[ideas/cosinus_dirac.md](ideas/cosinus_dirac.md) et fait tomber le garde spéculaire, puis la
+roulette russe. Deux restes de l'éclairage attendent derrière, et aucun n'est une question
+d'exactitude : [le rectangle sphérique](ideas/rectangle_spherique.md), qui ferait pour le rectangle
+ce que le cône fait pour la sphère, et [les maillages émissifs](ideas/maillage_emissif.md), seul cas
+que le chargeur refuse encore.
 
 Trois chantiers restent *voisins* du BVH et n'en font délibérément pas partie :
 [les feuilles de maillage à un seul triangle](ideas/cout_traversee_bvh.md), débloquées mais
