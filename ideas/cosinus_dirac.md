@@ -79,7 +79,8 @@ deux pbrt on suit. La réponse est v4, et elle doit être écrite dans le code.
 
 `is_specular()` n'a **qu'un seul** consommateur, [path.rs:86](../src/integrators/path.rs#L86), pour le
 garde `is_last_bounce_specular` — et c'est MIS qui fait tomber ce garde
-([area_light.md §5](area_light.md)). MIS réécrit par ailleurs exactement la pondération de `beta` qui
+([docs/sources_de_lumiere.md](../docs/sources_de_lumiere.md) §7.7). MIS réécrit par ailleurs
+exactement la pondération de `beta` qui
 est en cause ici, et introduit le besoin d'un pdf propre. Faire ce travail avant MIS, c'est toucher
 deux fois au même endroit ; le faire avec lui, c'est presque gratuit.
 

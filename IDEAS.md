@@ -15,11 +15,13 @@ dit en une incise ; quand elle contraint l'ordre, c'est l'ordre qui s'adapte. Le
 plus bas portent le détail de chaque entrée — elles servent à retrouver un sujet, pas à savoir quoi
 faire ensuite.
 
-- [ ] **`AreaLight`** — surfaces émissives enregistrées comme sources échantillonnables. **Le plus
-      grand écart au modèle physique du projet**, et son unique prérequis est acquis : la comparaison
-      `naive` / `path` qui lui sert de preuve est désormais possible
-      ([docs/eclairage_declare.md](docs/eclairage_declare.md) §4). Plan détaillé dans
-      [ideas/area_light.md](ideas/area_light.md).
+- [x] **`AreaLight`** — une surface émissive éclaire la scène, par `Rectangle` et par `Sphere`.
+      Dérivations, témoins et mesures dans
+      [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md).
+- [ ] **[Le rectangle sphérique](ideas/rectangle_spherique.md)** — le `Rectangle` tire encore par
+      aire. Variance, pas exactitude ; ligne de base mesurée.
+- [ ] **[Les maillages émissifs](ideas/maillage_emissif.md)** — aucun maillage ne s'échantillonne,
+      donc une lampe triangulaire est refusée au chargement.
 - [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
       `is_last_bounce_specular` de l'intégrateur, et emporte avec lui
       [le cosinus qu'un bsdf spéculaire divise](ideas/cosinus_dirac.md), qui se règle dans le même
@@ -55,6 +57,10 @@ faire ensuite.
       déplacer le décalage anti-acné de la position vers l'intervalle du rayon.
       [ideas/nested_dielectrics.md](ideas/nested_dielectrics.md)
 - [ ] **Add cone volume** — indépendant, et petit.
+- [ ] **Une scène ne déclare pas son cadrage** — la production `camera` prend `pos`, `look`, `up`, et
+      le champ de vision comme les plans de coupe restent des options, donc aucun fichier `.stage` ne
+      se rend correctement à partir de lui-même. **Priorité faible** : rien n'en dépend, et une note
+      en en-tête de scène en tient lieu. Détail sous *Renderer & infrastructure*.
 - [ ] **`Rc` avec enveloppe `unsafe` au lieu d'`Arc`** pour passer aux threads
       ([article stackoverflow](https://stackoverflow.com/questions/63433718/how-to-freeze-an-rc-data-structure-and-send-it-across-threads)).
       Dépend d'une mesure : CLAUDE.md §3 demande que tout `unsafe` soit argumenté par un chiffre, donc
@@ -194,10 +200,10 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
 
 ## Écarts au modèle physique
 
-- [ ] **Pas de lumières d'aire — le plus grand écart.**
-      [ideas/area_light.md](ideas/area_light.md) : `DiffuseLight` n'est qu'un matériau, aucun
-      `AreaLight` n'est enregistré dans `Scene::lights`, donc **une surface émissive ne contribue à
-      aucun éclairage indirect**. Ce fichier porte l'analyse et l'ordre d'attaque.
+- [x] **Pas de lumières d'aire — le plus grand écart.** Levé : un objet à matériau émissif est
+      enregistré comme `AreaLight` au chargement, et contribue donc à l'éclairage indirect. Les neuf
+      écarts qui subsistent sont rassemblés et chiffrés en
+      [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md) §14.
 - [ ] **Pas de MIS.** `Light` n'a pas de `pdf_li`, donc NEE et échantillonnage de BSDF ne peuvent pas
       être pondérés l'un contre l'autre. Bloqué sur l'entrée ci-dessus, et c'est MIS qui fera tomber
       le garde `is_last_bounce_specular`.
@@ -256,11 +262,29 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       `Type::build(max_depth)` dans [integrators.rs](src/integrators.rs), `Type::render_fn()` dans
       [renderers.rs](src/renderers.rs). Prendre `max_depth` plutôt que `&Config` — `config.rs` dépend
       déjà d'`integrators::Type`, et passer `&Config` fermerait le cycle.
-- [ ] **Aucun exemple ne porte plus de surface émissive**, `cornell_box.rs` ayant été retiré. Le
-      témoin visuel de l'`AreaLight` manquante est désormais `test_files/cornell_box.stage`, dont le
-      panneau émissif n'éclaire rien : la scène est éclairée par les deux `light` qu'elle déclare, et
-      le jour où elle ne déclarera plus qu'un panneau, elle sera noire tant qu'`AreaLight` n'existe
-      pas. C'est ce que ce témoin doit montrer.
+- [ ] **Les paramètres de la caméra sont partagés entre la scène et la ligne de commande, et le
+      partage est incohérent dans les deux sens.** `camera thin_lens` déclare son `radius` et son
+      `focal_length`, et [scene_builder.rs:142](src/loader/visitors/scene_builder.rs#L142) prend ceux
+      du nœud : `--lens_radius` et `--focal_distance` ne sont donc lus par personne — aucun autre
+      usage dans `src/` ni dans `examples/` — alors que la table de configuration les affiche comme
+      si elles agissaient. À l'inverse, le champ de vision et les plans de coupe ne se disent que sur
+      la ligne de commande ([scene_builder.rs:119](src/loader/visitors/scene_builder.rs#L119)), donc
+      **aucun fichier `.stage` ne se rend correctement à partir de lui-même** : chaque scène compense
+      par une note en en-tête, et l'oubli ne produit pas une erreur mais une image fausse. Aux
+      options par défaut, `cornell_box_exact.stage` sort **noire à 100 %** — `--far 1000` coupe
+      jusqu'au panneau, qui est à 1114 de l'œil — et sous la seule ouverture par défaut la pièce
+      occupe 11 % du cadre au lieu de 94 %. Le correctif est le principe déjà retenu pour
+      l'éclairage ([docs/eclairage_declare.md](docs/eclairage_declare.md)), appliqué au cadrage : une
+      scène décrit ce qu'elle est. Il traverse lexer → parser → nœud d'AST → `Visitor` → les deux
+      visiteurs → le support VS Code (CLAUDE.md §2), et sa précédence est déjà tranchée par le thin
+      lens — la scène l'emporte ; reste à dire ce que devient une option qui ne sert plus qu'aux
+      scènes muettes.
+- [ ] **Aucun exemple ne porte plus de surface émissive**, `cornell_box.rs` ayant été retiré. Les
+      témoins de l'éclairage sont désormais des scènes `.stage`, et
+      [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md) §13 dit ce que chacune isole.
+      `test_files/cornell_box_exact.stage`, la Cornell box de la donnée mesurée, ne déclare aucun
+      `light` et se rend sous les deux intégrateurs, qui s'y accordent — c'est elle qui a servi de
+      preuve à l'`AreaLight`. Reste que les `examples/`, eux, ne couvrent plus ce cas.
 - [x] **La grammaire `.stage` sait décrire une lumière** — `light point`, `light uniform_infinite`,
       `light background_infinite`, frères des objets dans le bloc `scene`. Les lumières d'aire n'y
       passent pas et se disent toujours par le matériau `diffuse_light`. Les quatre décisions de

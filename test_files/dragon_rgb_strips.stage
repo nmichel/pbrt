@@ -1,0 +1,83 @@
+# The Stanford dragon on a floor, lit by three grazing panels: red, green and blue.
+#
+#   --integrator path --renderer mt --threads 8 --seed 0 --fov 40
+#   --samples_ppx 256 --max_depth 4 --output_width 512 --output_height 512
+#
+# Each panel is the source of `floor_strip.stage` at the dragon's scale: a long, low rectangle
+# standing upright on the floor, its emitting face turned towards the dragon. The three stand on an
+# arc of radius 0.16 around it, 45° apart, with a gap between each, so every colour reaches the
+# dragon from its own azimuth: where one panel's light is shadowed the others still arrive, and the
+# floor around the dragon is coloured by whichever of them it sees.
+#
+# The language has no `scale`, so the scene is built at the size of the scan rather than the
+# reverse: the dragon is about 0.2 long, 0.15 tall and 0.09 deep. Its lowest vertex is at
+# y = 0.0527 in the file, and the translation below sets it 0.0002 above the floor.
+#
+# The camera stands outside the arc, turned 35° from the middle panel towards the dragon's head so
+# that its face is seen three-quarters on. It sees the backs of the panels as dark bars: emission
+# is one-sided. As in `floor_strip.stage`, the foot of each panel, two ten-thousandths of its height
+# above the floor, is where the uniform-area draw of a `rectangle` is noisiest — see
+# `ideas/rectangle_spherique.md` §4.
+
+camera pin_hole
+  pos -0.2 0.2 0.317
+  look 0.0 0.03 0.03
+  up 0.0 1.0 0.0
+
+scene
+
+  # The floor, at y = 0, large enough that the frame never reaches its edge.
+  object simple
+    rectangle 4 4
+    lambertian color 0.6 0.6 0.6
+
+  # The dragon, centred on the vertical axis and resting on the floor. White, so the colour it
+  # shows is the colour of the light it receives.
+  object transformed
+    object simple
+      mesh file "test_files/dragon_vrip.ply" reverse
+      lambertian color 0.8 0.8 0.8
+    transform {
+      translate 0.0059 -0.0525 0.0046
+    }
+
+  # The three panels, each 0.01 high and 0.1 long, their lower edge 0.000002 above the floor.
+  #
+  # A `rectangle` is authored flat, facing +Y. The quarter turn about z stands it up with its
+  # normal along -X and its first side as its height. The panel at azimuth φ stands at
+  # 0.16·(sin φ, 0, cos φ) and must face the dragon, its normal along -(sin φ, 0, cos φ); a turn
+  # of φ − π/2 about y carries -X there.
+
+  # Red, at azimuth -45°, which is on the right of the image: `Matrix4::look_at` builds a
+  # left-handed basis, so -X lies to the camera's right (see `cornell_box_exact.stage`).
+  object transformed
+    object simple
+      rectangle 0.01 0.1
+      diffuse_light color 30.0 0.0 0.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y -2.35619449
+      translate -0.11313708 0.005002 0.11313708
+    }
+
+  # Green, at azimuth 0.
+  object transformed
+    object simple
+      rectangle 0.01 0.1
+      diffuse_light color 0.0 30.0 0.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y -1.57079633
+      translate 0.0 0.005002 0.16
+    }
+
+  # Blue, at azimuth +45°.
+  object transformed
+    object simple
+      rectangle 0.01 0.1
+      diffuse_light color 0.0 0.0 30.0
+    transform {
+      rotate_z 1.57079633
+      rotate_y -0.78539816
+      translate 0.11313708 0.005002 0.11313708
+    }
