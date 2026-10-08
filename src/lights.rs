@@ -157,6 +157,42 @@ pub trait Light: Send + Sync {
     /// Samples a point on the light as seen from `intersection`, drawing from `sampler` if the
     /// source has an extent. A point light needs no number at all.
     fn sample_li(&self, _intersection: &Intersection, _sampler: &mut dyn Sampler) -> Option<(LightLiSample, VisibilityTester)>;
+
+    /// The density with which [`Self::sample_li`], called from `reference`, would have produced the
+    /// direction `wi`.
+    ///
+    /// Reference: PBR Book, 4ed, §12.2 — *Light Interface*, `Light::PDF_Li`.
+    /// <https://pbr-book.org/4ed/Light_Sources/Light_Interface>
+    ///
+    /// # What asks for it
+    ///
+    /// `sample_li` hands over the density of the direction it draws. This answers for a direction
+    /// drawn by *someone else* — a bsdf sample whose ray happened to reach this source — which
+    /// multiple importance sampling has to weigh against the source's own chance of having found
+    /// it. The two must describe one distribution: for every `wi` that `sample_li` can produce from
+    /// `reference`, this returns the `pdf` of that sample, and it returns 0 for every direction
+    /// `sample_li` never produces — one that misses the source, reaches its unlit face, or lands
+    /// where the source drops its samples. A disagreement does not add noise, it biases: the two
+    /// weights stop adding up to 1.
+    ///
+    /// # Frame
+    ///
+    /// `reference` is the shaded point and `wi` a unit vector from it towards the source, both in
+    /// world space — the [`LightLiSample::wi`] convention. The density is per unit solid angle at
+    /// `reference`, the measure of [`LightLiSample::pdf`].
+    ///
+    /// **Visibility is not part of it.** This is the density of a sampling strategy, which draws
+    /// directions whether or not something stands in the way; an occluded sample is a sample worth
+    /// zero, not one that was never drawn.
+    ///
+    /// # Why 0 is the default, and the rule it imposes
+    ///
+    /// Zero is the right answer for a source described by a δ — a point light, which no direction
+    /// drawn by a bsdf ever reaches. It is wrong for anything else, for the reason given above. So:
+    /// **a source whose `sample_li` draws with a density overrides `pdf_li`.**
+    fn pdf_li(&self, _reference: &Vector3f, _wi: &Vector3f) -> f64 {
+        0.0
+    }
 }
 
 mod area_light;
