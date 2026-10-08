@@ -20,8 +20,9 @@ faire ensuite.
       [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md).
 - [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
       `is_last_bounce_specular` de l'intégrateur, et avec lui `Material::is_specular()`, son unique
-      usage : l'échantillon dit déjà s'il est une δ (`ScatterDensity`). Passe devant les deux restes de l'éclairage qui suivent : eux ne touchent
-      que la variance, et MIS déplace la ligne de base sur laquelle le premier se mesure.
+      usage : l'échantillon dit déjà s'il est une δ (`DirectionDensity`). Passe devant les deux
+      restes de l'éclairage qui suivent : eux ne touchent que la variance, et MIS déplace la ligne
+      de base sur laquelle le premier se mesure.
 - [ ] **[Le rectangle sphérique](ideas/rectangle_spherique.md)** — le `Rectangle` tire encore par
       aire. Variance, pas exactitude ; ligne de base mesurée.
 - [ ] **[Les maillages émissifs](ideas/maillage_emissif.md)** — aucun maillage ne s'échantillonne,
@@ -208,7 +209,7 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       être pondérés l'un contre l'autre. Bloqué sur l'entrée ci-dessus, et c'est MIS qui fera tomber
       le garde `is_last_bounce_specular`.
 - [x] **Un matériau spéculaire encodait la formule de son intégrateur** — l'échantillon dit désormais
-      s'il est une δ ([`ScatterDensity`](src/materials.rs)), et un miroir rend ρ tel quel.
+      s'il est une δ ([`DirectionDensity`](src/pdfs.rs)), et un miroir rend ρ tel quel.
 - [ ] **La radiance ne change pas d'échelle en traversant une interface.** Réfractée de ηᵢ vers
       ηₜ, la lumière voit son angle solide comprimé ou dilaté, et la radiance transportée doit être
       multipliée par (ηₜ/ηᵢ)² — ou divisée, selon le sens dans lequel on suit le chemin

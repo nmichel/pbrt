@@ -2,7 +2,8 @@ use crate::colors;
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::interaction::Interaction;
-use crate::materials::{ScatterDensity, ScatterInfo};
+use crate::materials::ScatterInfo;
+use crate::pdfs::DirectionDensity;
 use crate::samplers::Sampler;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
@@ -40,14 +41,14 @@ impl Integrator for NaiveIntegrator {
                     }) => {
                         let li = self.li(&scattered, scene, depth - 1, near, far, sampler);
                         match density {
-                            ScatterDensity::SolidAngle(pdf) => {
+                            DirectionDensity::SolidAngle(pdf) => {
                                 let abs_cos = vector3::abs_dot(&scattered.direction, &interaction.intersection.n);
                                 emitted + attenuation * &li * abs_cos / pdf
                             }
                             // A δ has already integrated over the projected solid angle: the attenuation
                             // is the fraction of energy carried along the one direction, with no cosine
                             // to apply and no density to divide by.
-                            ScatterDensity::Dirac => emitted + attenuation * &li,
+                            DirectionDensity::Dirac => emitted + attenuation * &li,
                         }
                     }
                     None => emitted,

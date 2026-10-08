@@ -41,6 +41,55 @@ pub trait Pdf {
     fn generate(&self, u: &Vector2f) -> Vector3f;
 }
 
+/// How a sampled direction is distributed, and so what an estimator may divide by.
+///
+/// Reference: PBR Book, 4ed, §9.1.2 — *BSDF Representation*, whose `BSDFSample` carries this
+/// distinction as a flag, `IsSpecular()`; and §12.1 — *Light Interface*, whose `LightType` tells a
+/// δ source from one with a density.
+/// <https://pbr-book.org/4ed/Reflection_Models/BSDF_Representation>
+/// <https://pbr-book.org/4ed/Light_Sources/Light_Interface>
+///
+/// # Why the sample says it
+///
+/// A Monte-Carlo estimator divides by the density of what it drew. That density exists only if the
+/// distribution has one: a perfect mirror reflects into a single direction, a point light is seen
+/// along a single direction, and the distribution of either is a δ — which has no value per unit
+/// solid angle that one could divide by.
+///
+/// Whether a draw came from one kind or the other is a property of **the draw**, not of what drew
+/// it: a material with a mirror lobe and a diffuse lobe, picking one at random, produces both. So
+/// the answer travels with each sample — [`ScatterInfo`](crate::materials::ScatterInfo) for a bsdf,
+/// [`LightLiSample`](crate::lights::LightLiSample) for a source — and the integrator reads it there.
+///
+/// # Why an enum, against CLAUDE.md §2
+///
+/// The project adds variants through trait implementations, not through a `match` in the caller.
+/// This is not a variant of a concept: a measure is either absolutely continuous or singular, there
+/// is no third case to add later, and an integrator has to treat the two differently — which is
+/// exactly what a closed sum type says.
+///
+/// # Two simpler shapes, and why neither is taken
+///
+/// **Handing over the combined weight** — `f · |cos θᵢ| / p` for a bsdf — would remove the
+/// distinction altogether: it is all a path tracer multiplies `β` by, and for a δ it is simply ρ.
+/// It is not taken because multiple importance sampling needs the density **on its own**, to weigh
+/// a bsdf sample against a light sample, and a product cannot be split back into its factors.
+///
+/// **Keeping one number, and putting the fiction in it** — a "density" of 1 for a δ, with a mirror's
+/// attenuation divided by the cosine its caller will apply, which is pbrt-v3's convention — makes
+/// the integrator's general formula come out right. The number is then not a density, and the
+/// first consumer to take it at its word, multiple importance sampling, computes a meaningless
+/// weight. A wrong attenuation shows on an image; a wrong density corrupts whatever is computed
+/// from it next.
+pub enum DirectionDensity {
+    /// A density per unit solid angle, in world space, at the point the direction is drawn from.
+    SolidAngle(f64),
+
+    /// A δ distribution: the direction is the only one that could have been produced, and there is
+    /// no density to divide by.
+    Dirac,
+}
+
 pub mod cosine;
 pub mod hemisphere;
 pub mod sphere;

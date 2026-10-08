@@ -3,61 +3,19 @@ use crate::geom::ray::Ray;
 use crate::geom::surface_point::SurfacePoint;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
+use crate::pdfs::DirectionDensity;
 use crate::samplers::Sampler;
 use crate::spectrum::Spectrum;
 use std::sync::Arc;
 
-/// What the direction of a [`ScatterInfo`] was drawn from, and so what an estimator may divide by.
-///
-/// Reference: PBR Book, 4ed, §9.1.2 — *BSDF Representation*, whose `BSDFSample` carries the same
-/// distinction as a flag, `IsSpecular()`.
-/// <https://pbr-book.org/4ed/Reflection_Models/BSDF_Representation>
-///
-/// # Why the sample says it, and not the material
-///
-/// A Monte-Carlo estimator divides by the density of what it drew. That density exists only if the
-/// distribution has one: a perfect mirror reflects into a single direction, its distribution is a
-/// δ, and a δ has no value per unit solid angle that one could divide by. Whether a draw came from
-/// one or the other is a property of **the draw**: a material with a mirror lobe and a diffuse lobe,
-/// picking one at random, produces both kinds.
-///
-/// # Why an enum, against CLAUDE.md §2
-///
-/// The project adds variants through trait implementations, not through a `match` in the caller.
-/// This is not a variant of a concept: a measure is either absolutely continuous or singular, there
-/// is no third case to add later, and an integrator has to treat the two differently — which is
-/// exactly what a closed sum type says.
-///
-/// # Two simpler shapes, and why neither is taken
-///
-/// **Handing over the combined weight** `f · |cos θᵢ| / p` would remove the distinction altogether:
-/// it is all a path tracer multiplies `β` by, and for a δ it is simply ρ. It is not taken because
-/// multiple importance sampling needs the density **on its own**, to weigh a bsdf sample against a
-/// light sample, and a product cannot be split back into its factors.
-///
-/// **Keeping one number, and putting the fiction in it** — `attenuation = ρ / |cos θᵢ|` and a "density"
-/// of 1, which is pbrt-v3's convention — makes the integrator's general formula come out right, but
-/// only because the material divides out a cosine it knows its caller will apply. Its density is
-/// then not a density, and the first consumer to take it at its word, multiple importance sampling,
-/// computes a meaningless weight. A wrong attenuation shows on an image; a wrong density corrupts
-/// whatever is computed from it next.
-pub enum ScatterDensity {
-    /// A density per unit solid angle, in the world frame, at the scattered direction.
-    SolidAngle(f64),
-
-    /// A δ distribution: the direction is the only one the material could have produced, and there
-    /// is no density to divide by.
-    Dirac,
-}
-
 pub struct ScatterInfo {
     pub attenuation: Spectrum,
     pub scattered: Ray,
-    pub density: ScatterDensity,
+    pub density: DirectionDensity,
 }
 
 impl ScatterInfo {
-    pub fn new(attenuation: Spectrum, scattered: Ray, density: ScatterDensity) -> Self {
+    pub fn new(attenuation: Spectrum, scattered: Ray, density: DirectionDensity) -> Self {
         Self {
             attenuation,
             scattered,
@@ -177,7 +135,7 @@ pub trait Material: Send + Sync {
     /// # Why 0 is the default, and the rule it imposes
     ///
     /// Zero is the right answer for a material whose `f` is zero everywhere, which is what the
-    /// default `f` above says: a δ, whose draw comes as [`ScatterDensity::Dirac`] and has no
+    /// default `f` above says: a δ, whose draw comes as [`DirectionDensity::Dirac`] and has no
     /// density at any direction, or a material that scatters nothing. Next event estimation gets
     /// nothing from such a material whatever its weight, so the zero is harmless.
     ///

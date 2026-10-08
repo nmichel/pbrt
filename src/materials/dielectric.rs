@@ -1,4 +1,4 @@
-use super::{Material, ScatterDensity, ScatterInfo};
+use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::shading_frame::{self, ShadingFrame};
@@ -6,6 +6,7 @@ use crate::geom::surface_point::SurfacePoint;
 use crate::geom::vector3;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
+use crate::pdfs::DirectionDensity;
 use crate::samplers::Sampler;
 use crate::textures::*;
 use std::sync::Arc;
@@ -47,7 +48,7 @@ impl Material for Dielectric {
 
         // A δ sample carries the reflectance ρ itself, whichever of the two directions is drawn: the
         // cosine and the δ have cancelled out of `f · |cos θᵢ| / p` already, which is what
-        // `ScatterDensity::Dirac` tells the integrator.
+        // `DirectionDensity::Dirac` tells the integrator.
         let attenuation = self.albedo.shade(&SurfacePoint::from(intersection));
         let local_outward_normal: Vector3f;
         let world_outward_normal: Vector3f;
@@ -104,7 +105,7 @@ impl Material for Dielectric {
                 let scatter_direction = frame.local_to_world(&local_scatter_direction);
                 let scattered_ray = Ray::new(&scattered_ray_origin, &scatter_direction);
 
-                Some(ScatterInfo::new(attenuation, scattered_ray, ScatterDensity::Dirac))
+                Some(ScatterInfo::new(attenuation, scattered_ray, DirectionDensity::Dirac))
             }
             None => {
                 // Total reflection
@@ -112,7 +113,7 @@ impl Material for Dielectric {
                 let shift_avoid_acne = world_outward_normal * 0.001;
                 let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
 
-                Some(ScatterInfo::new(attenuation, scattered_ray, ScatterDensity::Dirac))
+                Some(ScatterInfo::new(attenuation, scattered_ray, DirectionDensity::Dirac))
             }
         }
     }

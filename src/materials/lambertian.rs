@@ -1,4 +1,4 @@
-use super::{Material, ScatterDensity, ScatterInfo};
+use super::{Material, ScatterInfo};
 use crate::colors;
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
@@ -7,7 +7,7 @@ use crate::geom::surface_point::SurfacePoint;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
 use crate::pdfs::cosine::CosinePdf;
-use crate::pdfs::Pdf;
+use crate::pdfs::{DirectionDensity, Pdf};
 use crate::samplers::Sampler;
 use crate::spectrum::Spectrum;
 use crate::textures::*;
@@ -51,7 +51,7 @@ impl Material for Lambertian {
         let attenuation = self.albedo.shade(&SurfacePoint::from(intersection)) / std::f64::consts::PI;
         let scattering_pdf = pdf.value(&local_wi);
 
-        return Some(ScatterInfo::new(attenuation, scattered_ray, ScatterDensity::SolidAngle(scattering_pdf)));
+        return Some(ScatterInfo::new(attenuation, scattered_ray, DirectionDensity::SolidAngle(scattering_pdf)));
     }
 
     fn f(&self, world_wo: &Vector3f, world_wi: &Vector3f, interaction: &Interaction) -> Spectrum {
@@ -163,8 +163,8 @@ mod tests {
                 let sample = material.scatter(&incoming, &interaction, &mut sampler).unwrap();
                 let wi = sample.scattered.direction;
                 let drawn_with = match sample.density {
-                    ScatterDensity::SolidAngle(pdf) => pdf,
-                    ScatterDensity::Dirac => panic!("a lambertian draw has a density"),
+                    DirectionDensity::SolidAngle(pdf) => pdf,
+                    DirectionDensity::Dirac => panic!("a lambertian draw has a density"),
                 };
 
                 let same_side = vector3::dot(&wi, &n()) * vector3::dot(&wo, &n()) > 0.0;

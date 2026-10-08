@@ -1,11 +1,11 @@
-use super::{Material, ScatterDensity, ScatterInfo};
+use super::{Material, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::shading_frame::{self, ShadingFrame};
 use crate::geom::surface_point::SurfacePoint;
 use crate::interaction::Interaction;
 use crate::pdfs::sphere::SpherePdf;
-use crate::pdfs::Pdf;
+use crate::pdfs::{DirectionDensity, Pdf};
 use crate::samplers::Sampler;
 use crate::textures::*;
 use std::sync::Arc;
@@ -60,7 +60,7 @@ impl Material for Metal {
 
             // A δ sample carries the reflectance ρ itself, the fraction of energy sent along the one
             // direction: the cosine and the δ have cancelled out of `f · |cos θᵢ| / p` already, which
-            // is what `ScatterDensity::Dirac` tells the integrator.
+            // is what `DirectionDensity::Dirac` tells the integrator.
             let attenuation = self.albedo.shade(&SurfacePoint::from(intersection));
 
             // **Not a δ as soon as `fuzz > 0`**, and declared one anyway. The blurred direction has a
@@ -68,7 +68,7 @@ impl Material for Metal {
             // `fuzz`, and its image after renormalisation is not a distribution with a closed form.
             // Without a density there is nothing to divide by, so the blur is treated as part of the
             // mirror: unbiased with respect to its own model, which is already not a physical one.
-            Some(ScatterInfo::new(attenuation, scattered_ray, ScatterDensity::Dirac))
+            Some(ScatterInfo::new(attenuation, scattered_ray, DirectionDensity::Dirac))
         }
         else {
             None
@@ -118,7 +118,7 @@ mod tests {
 
     /// A perfect white mirror loses no energy, at any incidence, grazing ones included.
     ///
-    /// An integrator does `β ← β · attenuation` with a [`ScatterDensity::Dirac`] sample, so the
+    /// An integrator does `β ← β · attenuation` with a [`DirectionDensity::Dirac`] sample, so the
     /// attenuation *is* the fraction of energy carried on, and for a white mirror it must be exactly
     /// 1 — not 1 to a tolerance: the reflectance is handed over untouched, with no cosine divided
     /// out of it that the integrator would have to multiply back in. The incidences go down to
@@ -139,7 +139,7 @@ mod tests {
 
             let sample = white_mirror().scatter(&incoming, &interaction, &mut sampler).unwrap();
 
-            assert!(matches!(sample.density, ScatterDensity::Dirac), "cos θₒ = {}", cos_theta_o);
+            assert!(matches!(sample.density, DirectionDensity::Dirac), "cos θₒ = {}", cos_theta_o);
             assert_eq!(sample.attenuation, colors::WHITE, "energy lost or gained at cos θₒ = {}", cos_theta_o);
 
             let mirror = -wo + n * (2.0 * vector3::dot(&wo, &n));
