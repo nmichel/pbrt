@@ -1,4 +1,4 @@
-use super::{Material, ScatterInfo};
+use super::{Material, ScatterDensity, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::shading_frame::{self, ShadingFrame};
@@ -103,7 +103,7 @@ impl Material for Dielectric {
 
                 attenuation = super::cancel_integrator_cosine(attenuation, &local_scatter_direction);
 
-                Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
+                Some(ScatterInfo::new(attenuation, scattered_ray, ScatterDensity::Dirac))
             }
             None => {
                 // Total reflection
@@ -113,7 +113,7 @@ impl Material for Dielectric {
 
                 attenuation = super::cancel_integrator_cosine(attenuation, &local_reflected);
 
-                Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
+                Some(ScatterInfo::new(attenuation, scattered_ray, ScatterDensity::Dirac))
             }
         }
     }

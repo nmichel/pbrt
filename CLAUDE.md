@@ -20,7 +20,8 @@ fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a ap
 `docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
 une entrée cochée y garde une ligne, pas son corps.
 
-**Chantier en cours** — aucun. Le sujet de la branche `feat/area_light` est clos : **une surface
+**Chantier en cours** — MIS, sur la branche `feat/mis`. Avant lui, le sujet de la branche
+`feat/area_light` est clos : **une surface
 émissive éclaire la scène**. Un objet dont
 le matériau émet est enregistré comme [`AreaLight`](src/lights/area_light.rs) par
 [`SceneBuilderVisitor`](src/loader/visitors/scene_builder.rs), sur la forme *déjà placée* que rend

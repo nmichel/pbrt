@@ -1,4 +1,4 @@
-use super::{Material, ScatterInfo};
+use super::{Material, ScatterDensity, ScatterInfo};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::geom::shading_frame::{self, ShadingFrame};
@@ -60,7 +60,12 @@ impl Material for Metal {
 
             let attenuation = super::cancel_integrator_cosine(self.albedo.shade(&SurfacePoint::from(intersection)), &local_target);
 
-            Some(ScatterInfo::new(attenuation, scattered_ray, 1.0))
+            // **Not a δ as soon as `fuzz > 0`**, and declared one anyway. The blurred direction has a
+            // density, but nobody has derived it — the offset is uniform on a sphere of radius
+            // `fuzz`, and its image after renormalisation is not a distribution with a closed form.
+            // Without a density there is nothing to divide by, so the blur is treated as part of the
+            // mirror: unbiased with respect to its own model, which is already not a physical one.
+            Some(ScatterInfo::new(attenuation, scattered_ray, ScatterDensity::Dirac))
         }
         else {
             None

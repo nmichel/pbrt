@@ -2,7 +2,7 @@ use crate::colors;
 use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::interaction::Interaction;
-use crate::materials::ScatterInfo;
+use crate::materials::{ScatterDensity, ScatterInfo};
 use crate::samplers::Sampler;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
@@ -33,9 +33,19 @@ impl Integrator for NaiveIntegrator {
                     None => Spectrum::new(0.0, 0.0, 0.0),
                 };
                 match material.scatter(ray, &interaction, sampler) {
-                    Some(ScatterInfo { attenuation, scattered, pdf }) => {
+                    Some(ScatterInfo {
+                        attenuation,
+                        scattered,
+                        density,
+                    }) => {
                         let abs_cos = vector3::abs_dot(&scattered.direction, &interaction.intersection.n);
-                        emitted + attenuation * &self.li(&scattered, scene, depth - 1, near, far, sampler) * abs_cos / pdf
+                        let li = self.li(&scattered, scene, depth - 1, near, far, sampler);
+                        match density {
+                            ScatterDensity::SolidAngle(pdf) => emitted + attenuation * &li * abs_cos / pdf,
+                            // The cosine a specular material has already divided out, by
+                            // `materials::cancel_integrator_cosine`.
+                            ScatterDensity::Dirac => emitted + attenuation * &li * abs_cos,
+                        }
                     }
                     None => emitted,
                 }

@@ -3,7 +3,7 @@ use crate::geom::ray::Ray;
 use crate::geom::vector3;
 use crate::interaction::{self, Interaction};
 use crate::lights::Light;
-use crate::materials::ScatterInfo;
+use crate::materials::ScatterDensity;
 use crate::samplers::Sampler;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
@@ -81,7 +81,12 @@ impl Integrator for PathIntegrator {
                 if let Some(ref scatter_info) = material.scatter(&current_ray, &interaction, sampler) {
                     // Sample outgoing direction to continue the path
                     let abs_cos_theta = vector3::abs_dot(&scatter_info.scattered.direction, &interaction.intersection.n);
-                    beta *= scatter_info.attenuation * abs_cos_theta / scatter_info.pdf;
+                    beta *= match scatter_info.density {
+                        ScatterDensity::SolidAngle(pdf) => scatter_info.attenuation * abs_cos_theta / pdf,
+                        // The cosine a specular material has already divided out, by
+                        // `materials::cancel_integrator_cosine`.
+                        ScatterDensity::Dirac => scatter_info.attenuation * abs_cos_theta,
+                    };
                     current_ray = scatter_info.scattered.clone();
                     is_last_bounce_specular = material.is_specular();
                 }

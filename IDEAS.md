@@ -18,14 +18,15 @@ faire ensuite.
 - [x] **`AreaLight`** — une surface émissive éclaire la scène, par `Rectangle` et par `Sphere`.
       Dérivations, témoins et mesures dans
       [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md).
+- [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
+      `is_last_bounce_specular` de l'intégrateur, et emporte avec lui
+      [le cosinus qu'un bsdf spéculaire divise](ideas/cosinus_dirac.md), qui se règle dans le même
+      geste et pas avant. Passe devant les deux restes de l'éclairage qui suivent : eux ne touchent
+      que la variance, et MIS déplace la ligne de base sur laquelle le premier se mesure.
 - [ ] **[Le rectangle sphérique](ideas/rectangle_spherique.md)** — le `Rectangle` tire encore par
       aire. Variance, pas exactitude ; ligne de base mesurée.
 - [ ] **[Les maillages émissifs](ideas/maillage_emissif.md)** — aucun maillage ne s'échantillonne,
       donc une lampe triangulaire est refusée au chargement.
-- [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
-      `is_last_bounce_specular` de l'intégrateur, et emporte avec lui
-      [le cosinus qu'un bsdf spéculaire divise](ideas/cosinus_dirac.md), qui se règle dans le même
-      geste et pas avant.
 - [ ] **Roulette russe** — dépend de MIS, et corrige au passage la coupe prématurée de `path.rs:65`.
 - [ ] **Éléments nommés dans la grammaire `.stage`** — déclarer une forme, un matériau, une texture
       ou un objet sous un nom, et le réutiliser plutôt que le recopier. **Indépendant du transport

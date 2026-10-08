@@ -1,4 +1,4 @@
-use super::{Material, ScatterInfo};
+use super::{Material, ScatterDensity, ScatterInfo};
 use crate::colors;
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
@@ -37,7 +37,7 @@ impl Material for Lambertian {
         let attenuation = self.albedo.shade(&SurfacePoint::from(intersection)) / std::f64::consts::PI;
         let scattering_pdf = pdf.value(&local_wi);
 
-        return Some(ScatterInfo::new(attenuation, scattered_ray, scattering_pdf));
+        return Some(ScatterInfo::new(attenuation, scattered_ray, ScatterDensity::SolidAngle(scattering_pdf)));
     }
 
     fn f(&self, world_wo: &Vector3f, world_wi: &Vector3f, interaction: &Interaction) -> Spectrum {

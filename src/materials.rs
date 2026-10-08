@@ -7,15 +7,48 @@ use crate::samplers::Sampler;
 use crate::spectrum::Spectrum;
 use std::sync::Arc;
 
+/// What the direction of a [`ScatterInfo`] was drawn from, and so what an estimator may divide by.
+///
+/// Reference: PBR Book, 4ed, §9.1.2 — *BSDF Representation*, whose `BSDFSample` carries the same
+/// distinction as a flag, `IsSpecular()`.
+/// <https://pbr-book.org/4ed/Reflection_Models/BSDF_Representation>
+///
+/// # Why the sample says it, and not the material
+///
+/// A Monte-Carlo estimator divides by the density of what it drew. That density exists only if the
+/// distribution has one: a perfect mirror reflects into a single direction, its distribution is a
+/// δ, and a δ has no value per unit solid angle that one could divide by. Whether a draw came from
+/// one or the other is a property of **the draw**: a material with a mirror lobe and a diffuse lobe,
+/// picking one at random, produces both kinds.
+///
+/// # Why an enum, against CLAUDE.md §2
+///
+/// The project adds variants through trait implementations, not through a `match` in the caller.
+/// This is not a variant of a concept: a measure is either absolutely continuous or singular, there
+/// is no third case to add later, and an integrator has to treat the two differently — which is
+/// exactly what a closed sum type says.
+pub enum ScatterDensity {
+    /// A density per unit solid angle, in the world frame, at the scattered direction.
+    SolidAngle(f64),
+
+    /// A δ distribution: the direction is the only one the material could have produced, and there
+    /// is no density to divide by.
+    Dirac,
+}
+
 pub struct ScatterInfo {
     pub attenuation: Spectrum,
     pub scattered: Ray,
-    pub pdf: f64,
+    pub density: ScatterDensity,
 }
 
 impl ScatterInfo {
-    pub fn new(attenuation: Spectrum, scattered: Ray, pdf: f64) -> Self {
-        Self { attenuation, scattered, pdf }
+    pub fn new(attenuation: Spectrum, scattered: Ray, density: ScatterDensity) -> Self {
+        Self {
+            attenuation,
+            scattered,
+            density,
+        }
     }
 }
 
@@ -211,9 +244,9 @@ mod tests {
 
             let attenuation = cancel_integrator_cosine(white_mirror, &local_wi);
 
-            // What an integrator does with a ScatterInfo: attenuation ⋅ |cos θᵢ| / pdf, with the
-            // pdf of a delta distribution being 1.
-            let beta = attenuation * local_wi.z.abs() / 1.0;
+            // What an integrator does with a `ScatterDensity::Dirac` sample: attenuation ⋅ |cos θᵢ|,
+            // with no density to divide by.
+            let beta = attenuation * local_wi.z.abs();
 
             assert_conserves_energy(beta, &format!("perfect mirror at cos θₒ = {}", cos_theta_o));
         }
