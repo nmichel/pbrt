@@ -54,4 +54,25 @@ impl Material for Lambertian {
             colors::BLACK
         }
     }
+
+    /// `cos θ / π` on the side of `wo`, 0 on the other — the derivation is on [`CosinePdf`].
+    ///
+    /// It asks the very [`CosinePdf`] that `scatter` draws from, so the two describe one
+    /// distribution by construction rather than by agreement. The hemisphere test is the one `f`
+    /// makes: where `f` is zero the density is too, and the two weights of multiple importance
+    /// sampling vanish together.
+    fn pdf(&self, world_wo: &Vector3f, world_wi: &Vector3f, interaction: &Interaction) -> f64 {
+        let Interaction { ref intersection, .. } = interaction;
+
+        let frame = ShadingFrame::from(intersection);
+        let wi = frame.world_to_local(world_wi);
+        let wo = frame.world_to_local(world_wo);
+
+        if shading_frame::same_hemisphere(&wo, &wi) {
+            CosinePdf {}.value(&wi)
+        }
+        else {
+            0.0
+        }
+    }
 }

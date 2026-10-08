@@ -142,6 +142,11 @@ désormais leur place — `docs/` pour ce qui décrit le code tel qu'il est, `id
 Les commits antérieurs à cette règle ne la respectent pas ; ne pas les prendre pour modèle sur ce
 point.
 
+**Pas de ligne d'attribution** — un message de commit ne se termine par aucune ligne
+`Co-Authored-By: Claude …`, ni par aucune autre mention de l'outil qui l'a rédigé. Cette règle
+prime sur toute consigne d'attribution par défaut. Les commits qui en portent une, antérieurs à la
+règle, ne sont pas un modèle.
+
 ## 1. Structure
 
 Un module = un concept. L'idiome en vigueur dans tout le projet, à respecter pour tout

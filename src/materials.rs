@@ -154,6 +154,40 @@ pub trait Material: Send + Sync {
     fn f(&self, _wo: &Vector3f, _wi: &Vector3f, _interaction: &Interaction) -> Spectrum {
         colors::BLACK
     }
+
+    /// The density, per unit solid angle, with which [`Self::scatter`] would have drawn `wi`
+    /// leaving towards `wo`.
+    ///
+    /// Reference: PBR Book, 4ed, §9.1.2 — *BSDF Representation*, `BxDF::PDF`.
+    /// <https://pbr-book.org/4ed/Reflection_Models/BSDF_Representation>
+    ///
+    /// # What asks for it
+    ///
+    /// `scatter` already hands over the density of the direction it draws. This answers for a
+    /// direction drawn by *someone else* — a point sampled on a light, by next event estimation —
+    /// which multiple importance sampling has to weigh against the bsdf's own chance of having
+    /// found it. The two must describe the same distribution: for every `wi` that `scatter` can
+    /// produce, this returns the density it came with.
+    ///
+    /// # Frame
+    ///
+    /// The trait's: `wo` and `wi` in world coordinates, both pointing away from the surface, `wo`
+    /// towards the viewer as [`Intersection::wo`](crate::geom::intersectable::Intersection) does.
+    ///
+    /// # Why 0 is the default, and the rule it imposes
+    ///
+    /// Zero is the right answer for a material whose `f` is zero everywhere, which is what the
+    /// default `f` above says: a δ, whose draw comes as [`ScatterDensity::Dirac`] and has no
+    /// density at any direction, or a material that scatters nothing. Next event estimation gets
+    /// nothing from such a material whatever its weight, so the zero is harmless.
+    ///
+    /// **It is wrong for anything else.** A material that defines `f` and keeps this default
+    /// would draw with one density in `scatter` and declare zero here; the two weights of multiple
+    /// importance sampling would then no longer add up to 1, and the image would be biased. So:
+    /// **a material that overrides `f` overrides `pdf`.**
+    fn pdf(&self, _wo: &Vector3f, _wi: &Vector3f, _interaction: &Interaction) -> f64 {
+        0.0
+    }
 }
 
 mod dielectric;
