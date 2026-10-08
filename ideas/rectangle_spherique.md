@@ -37,8 +37,7 @@ constante et ne débordant jamais.
   d'apprentissage, c'est une raison suffisante en soi, plus que le gain de bruit.
 
 **Ce qui le fait passer après MIS.** MIS est un plus gros levier : il fait tomber le garde
-`is_last_bounce_specular`, emporte le cosinus de [cosinus_dirac.md](cosinus_dirac.md), et améliore
-*toutes* les configurations au lieu d'une forme. Il déplace surtout la ligne de base du §4 : au pied
+`is_last_bounce_specular` et améliore *toutes* les configurations au lieu d'une forme. Il déplace surtout la ligne de base du §4 : au pied
 d'une source proche, là où `d²/|cos θₗ|` s'emballe, un tirage par le bsdf trouve la source sans
 passer par ce rapport, et la pondération réduit d'autant le poids du tirage par aire. Mesurer ce
 chantier avant MIS, ce serait le comparer à un chiffre que MIS rend caduc ; **les écarts du §4 sont

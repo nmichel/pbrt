@@ -58,7 +58,10 @@ impl Material for Metal {
             let shift_avoid_acne = n * 0.001;
             let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
 
-            let attenuation = super::cancel_integrator_cosine(self.albedo.shade(&SurfacePoint::from(intersection)), &local_target);
+            // A δ sample carries the reflectance ρ itself, the fraction of energy sent along the one
+            // direction: the cosine and the δ have cancelled out of `f · |cos θᵢ| / p` already, which
+            // is what `ScatterDensity::Dirac` tells the integrator.
+            let attenuation = self.albedo.shade(&SurfacePoint::from(intersection));
 
             // **Not a δ as soon as `fuzz > 0`**, and declared one anyway. The blurred direction has a
             // density, but nobody has derived it — the offset is uniform on a sphere of radius
@@ -74,5 +77,79 @@ impl Material for Metal {
 
     fn is_specular(&self) -> bool {
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::colors;
+    use crate::geom::vector2::Vector2u;
+    use crate::geom::vector3::{self, Vector3f};
+    use crate::samplers::IndependentSampler;
+
+    /// How far the reflected direction may sit from the mirror one: both come out of a change of
+    /// frame and back, so they agree to rounding and not bit for bit.
+    const DIRECTION_TOLERANCE: f64 = 1e-12;
+
+    /// A white mirror, which is the case where the energy claim has an exact value: everything that
+    /// arrives leaves.
+    fn white_mirror() -> Arc<Metal> {
+        Arc::new(Metal::new(0.0, Arc::new(PlainColor::new(colors::WHITE))))
+    }
+
+    /// The surface z = 0 facing `+z`, reached by a ray arriving from `wo`.
+    fn seen_from(wo: Vector3f, material: Arc<Metal>) -> Interaction {
+        Interaction {
+            intersection: Intersection {
+                p: Vector3f::zero(),
+                d: 1.0,
+                n: Vector3f::new(0.0, 0.0, 1.0),
+                wo: wo.normalized(),
+                u: 0.5,
+                v: 0.5,
+                dpdu: Vector3f::new(1.0, 0.0, 0.0),
+                dpdv: Vector3f::new(0.0, 1.0, 0.0),
+            },
+            material,
+        }
+    }
+
+    /// A perfect white mirror loses no energy, at any incidence, grazing ones included.
+    ///
+    /// An integrator does `β ← β · attenuation` with a [`ScatterDensity::Dirac`] sample, so the
+    /// attenuation *is* the fraction of energy carried on, and for a white mirror it must be exactly
+    /// 1 — not 1 to a tolerance: the reflectance is handed over untouched, with no cosine divided
+    /// out of it that the integrator would have to multiply back in. The incidences go down to
+    /// cos θₒ = 0.001, where such a division would have been the dominant term.
+    ///
+    /// The direction is checked against the world-space formula `r = −wo + 2 (wo ⋅ n) n`, which
+    /// does not go through the shading frame the material uses.
+    #[test]
+    fn test_a_white_mirror_loses_no_energy() {
+        let n = Vector3f::new(0.0, 0.0, 1.0);
+        let mut sampler = IndependentSampler::new(0, &Vector2u::new(0, 0), 0);
+
+        for cos_theta_o in [1.0_f64, 0.9, 0.5, 0.1, 0.01, 0.001] {
+            let sin_theta_o = (1.0 - cos_theta_o * cos_theta_o).sqrt();
+            let wo = Vector3f::new(sin_theta_o, 0.0, cos_theta_o);
+            let interaction = seen_from(wo, white_mirror());
+            let incoming = Ray::new(&wo, &-wo);
+
+            let sample = white_mirror().scatter(&incoming, &interaction, &mut sampler).unwrap();
+
+            assert!(matches!(sample.density, ScatterDensity::Dirac), "cos θₒ = {}", cos_theta_o);
+            assert_eq!(sample.attenuation, colors::WHITE, "energy lost or gained at cos θₒ = {}", cos_theta_o);
+
+            let mirror = -wo + n * (2.0 * vector3::dot(&wo, &n));
+            let departure = (sample.scattered.direction - mirror).length();
+            assert!(
+                departure < DIRECTION_TOLERANCE,
+                "reflected {} off the mirror direction at cos θₒ = {}",
+                departure,
+                cos_theta_o
+            );
+        }
     }
 }

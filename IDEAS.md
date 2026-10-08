@@ -19,9 +19,8 @@ faire ensuite.
       Dérivations, témoins et mesures dans
       [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md).
 - [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
-      `is_last_bounce_specular` de l'intégrateur, et emporte avec lui
-      [le cosinus qu'un bsdf spéculaire divise](ideas/cosinus_dirac.md), qui se règle dans le même
-      geste et pas avant. Passe devant les deux restes de l'éclairage qui suivent : eux ne touchent
+      `is_last_bounce_specular` de l'intégrateur, et avec lui `Material::is_specular()`, son unique
+      usage : l'échantillon dit déjà s'il est une δ (`ScatterDensity`). Passe devant les deux restes de l'éclairage qui suivent : eux ne touchent
       que la variance, et MIS déplace la ligne de base sur laquelle le premier se mesure.
 - [ ] **[Le rectangle sphérique](ideas/rectangle_spherique.md)** — le `Rectangle` tire encore par
       aire. Variance, pas exactitude ; ligne de base mesurée.
@@ -208,15 +207,19 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
 - [ ] **Pas de MIS.** `Light` n'a pas de `pdf_li`, donc NEE et échantillonnage de BSDF ne peuvent pas
       être pondérés l'un contre l'autre. Bloqué sur l'entrée ci-dessus, et c'est MIS qui fera tomber
       le garde `is_last_bounce_specular`.
-- [ ] **Un matériau spéculaire encode la formule de son intégrateur** —
-      [`cancel_integrator_cosine`](src/materials.rs) divise par |cos θᵢ| ce que l'intégrateur va
-      multiplier par |cos θᵢ|. Le résultat est juste, et c'est la convention de pbrt-v3 ; la couture,
-      elle, est percée, et la singularité en |cos θᵢ| → 0 n'est tenue que par la géométrie des deux
-      appelants. Le correctif est un discriminant porté par l'échantillon et non par le matériau,
-      comme le `BSDFSample` de pbrt-v4 ; à faire **avec MIS**, qui réécrit la même pondération et
-      supprime l'unique usage d'`is_specular()`. Deux fausses pistes, dont un pdf falsifié qui
-      contaminerait MIS, et le fait que l'image ne sera plus identique au bit près :
-      [ideas/cosinus_dirac.md](ideas/cosinus_dirac.md).
+- [x] **Un matériau spéculaire encodait la formule de son intégrateur** — l'échantillon dit désormais
+      s'il est une δ ([`ScatterDensity`](src/materials.rs)), et un miroir rend ρ tel quel.
+- [ ] **La radiance ne change pas d'échelle en traversant une interface.** Réfractée de ηᵢ vers
+      ηₜ, la lumière voit son angle solide comprimé ou dilaté, et la radiance transportée doit être
+      multipliée par (ηₜ/ηᵢ)² — ou divisée, selon le sens dans lequel on suit le chemin
+      ([PBR Book, 4ᵉ éd., §9.5.2 — *Non-Symmetric Scattering and
+      Refraction*](https://pbr-book.org/4ed/Reflection_Models/Dielectric_BSDF#NonSymmetricScatteringandRefraction)).
+      [`Dielectric`](src/materials/dielectric.rs) ne le fait pas, et rien ne le dit. Un chemin qui
+      entre dans un objet fermé puis en ressort prend les deux facteurs, qui s'annulent : c'est
+      pourquoi aucune image ne l'a montré. Le défaut apparaît dès qu'un chemin commence ou finit
+      d'un seul côté — une caméra sous l'eau, une source enfermée dans du verre — et il pèsera sur
+      [les diélectriques imbriqués](ideas/nested_dielectrics.md), où les deux indices d'une interface
+      ne sont plus 1 et η.
 - [ ] **La roulette russe est commentée** ([path.rs:93](src/integrators/path.rs#L93)) ; les chemins
       sont coupés net à `max_depth`, et la coupe de [path.rs:65](src/integrators/path.rs#L65) tombe
       *avant* l'échantillonnage de lumière du dernier sommet — perte d'énergie systématique.

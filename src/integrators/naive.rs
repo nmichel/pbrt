@@ -38,13 +38,16 @@ impl Integrator for NaiveIntegrator {
                         scattered,
                         density,
                     }) => {
-                        let abs_cos = vector3::abs_dot(&scattered.direction, &interaction.intersection.n);
                         let li = self.li(&scattered, scene, depth - 1, near, far, sampler);
                         match density {
-                            ScatterDensity::SolidAngle(pdf) => emitted + attenuation * &li * abs_cos / pdf,
-                            // The cosine a specular material has already divided out, by
-                            // `materials::cancel_integrator_cosine`.
-                            ScatterDensity::Dirac => emitted + attenuation * &li * abs_cos,
+                            ScatterDensity::SolidAngle(pdf) => {
+                                let abs_cos = vector3::abs_dot(&scattered.direction, &interaction.intersection.n);
+                                emitted + attenuation * &li * abs_cos / pdf
+                            }
+                            // A δ has already integrated over the projected solid angle: the attenuation
+                            // is the fraction of energy carried along the one direction, with no cosine
+                            // to apply and no density to divide by.
+                            ScatterDensity::Dirac => emitted + attenuation * &li,
                         }
                     }
                     None => emitted,

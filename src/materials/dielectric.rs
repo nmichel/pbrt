@@ -45,7 +45,10 @@ impl Material for Dielectric {
         // certain)
         let local_reflected = shading_frame::reflect(&local_wo);
 
-        let mut attenuation = self.albedo.shade(&SurfacePoint::from(intersection));
+        // A δ sample carries the reflectance ρ itself, whichever of the two directions is drawn: the
+        // cosine and the δ have cancelled out of `f · |cos θᵢ| / p` already, which is what
+        // `ScatterDensity::Dirac` tells the integrator.
+        let attenuation = self.albedo.shade(&SurfacePoint::from(intersection));
         let local_outward_normal: Vector3f;
         let world_outward_normal: Vector3f;
         let ni: f64;
@@ -101,8 +104,6 @@ impl Material for Dielectric {
                 let scatter_direction = frame.local_to_world(&local_scatter_direction);
                 let scattered_ray = Ray::new(&scattered_ray_origin, &scatter_direction);
 
-                attenuation = super::cancel_integrator_cosine(attenuation, &local_scatter_direction);
-
                 Some(ScatterInfo::new(attenuation, scattered_ray, ScatterDensity::Dirac))
             }
             None => {
@@ -110,8 +111,6 @@ impl Material for Dielectric {
                 let target = frame.local_to_world(&local_reflected);
                 let shift_avoid_acne = world_outward_normal * 0.001;
                 let scattered_ray = Ray::new(&(p + &shift_avoid_acne), &target);
-
-                attenuation = super::cancel_integrator_cosine(attenuation, &local_reflected);
 
                 Some(ScatterInfo::new(attenuation, scattered_ray, ScatterDensity::Dirac))
             }

@@ -83,12 +83,9 @@ d'un étage n'est pas neutre mais plus rapide, de 1 à 16 % selon la scène, un 
 Avant lui, `chore/shading_frame` : le repère de shading est devenu un type,
 [`ShadingFrame`](src/geom/shading_frame.rs), qui porte la base, la convention
 « z est la normale » et la dérivation du changement de repère, là où elle était énoncée trois fois et
-la base reconstruite à chaque conversion. `reflect` et `same_hemisphere` y vivent, le cosinus
-surnuméraire d'une distribution de Dirac est devenu `materials::cancel_integrator_cosine`, et
-`vector3::abs_dot` porte le |cos θ| des intégrateurs, qui est en espace monde. C'était un refactor :
-l'image est restée identique au bit près à chaque commit. Ce qu'il a trouvé sans le traiter est dans
-`IDEAS.md`, et la sortie de `cancel_integrator_cosine` — qui, elle, ne sera pas neutre sur l'image —
-dans [ideas/cosinus_dirac.md](ideas/cosinus_dirac.md).
+la base reconstruite à chaque conversion. `reflect` et `same_hemisphere` y vivent, et
+`vector3::abs_dot` porte le |cos θ| des intégrateurs, qui est en espace monde. C'était un refactor : l'image est restée identique au bit près
+à chaque commit. Ce qu'il a trouvé sans le traiter est dans `IDEAS.md`.
 
 Avant eux, `feat/rework_sampling` : un rendu répète son image, indépendamment du nombre de threads et
 du renderer choisi, `utils::random_double` a cédé la place au trait `Sampler`, et `--seed` choisit
@@ -101,9 +98,8 @@ comparer une mesure fraîche.
 
 La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Ce
 qui était le plus grand écart au modèle physique du projet — une surface émissive n'éclairant rien —
-est levé pour le `Rectangle` et la `Sphere`. Vient maintenant **MIS**, qui emporte le cosinus de
-[ideas/cosinus_dirac.md](ideas/cosinus_dirac.md) et fait tomber le garde spéculaire, puis la
-roulette russe. Deux restes de l'éclairage attendent derrière, et aucun n'est une question
+est levé pour le `Rectangle` et la `Sphere`. Vient maintenant **MIS**, qui fait tomber le garde
+spéculaire, puis la roulette russe. Deux restes de l'éclairage attendent derrière, et aucun n'est une question
 d'exactitude : [le rectangle sphérique](ideas/rectangle_spherique.md), qui ferait pour le rectangle
 ce que le cône fait pour la sphère, et [les maillages émissifs](ideas/maillage_emissif.md), seul cas
 que le chargeur refuse encore.

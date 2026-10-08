@@ -80,12 +80,15 @@ impl Integrator for PathIntegrator {
 
                 if let Some(ref scatter_info) = material.scatter(&current_ray, &interaction, sampler) {
                     // Sample outgoing direction to continue the path
-                    let abs_cos_theta = vector3::abs_dot(&scatter_info.scattered.direction, &interaction.intersection.n);
                     beta *= match scatter_info.density {
-                        ScatterDensity::SolidAngle(pdf) => scatter_info.attenuation * abs_cos_theta / pdf,
-                        // The cosine a specular material has already divided out, by
-                        // `materials::cancel_integrator_cosine`.
-                        ScatterDensity::Dirac => scatter_info.attenuation * abs_cos_theta,
+                        ScatterDensity::SolidAngle(pdf) => {
+                            let abs_cos_theta = vector3::abs_dot(&scatter_info.scattered.direction, &interaction.intersection.n);
+                            scatter_info.attenuation * abs_cos_theta / pdf
+                        }
+                        // A δ has already integrated over the projected solid angle: the attenuation is
+                        // the fraction of energy carried along the one direction, with no cosine to
+                        // apply and no density to divide by.
+                        ScatterDensity::Dirac => scatter_info.attenuation,
                     };
                     current_ray = scatter_info.scattered.clone();
                     is_last_bounce_specular = material.is_specular();
