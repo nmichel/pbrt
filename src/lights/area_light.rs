@@ -37,7 +37,9 @@ use std::sync::Arc;
 
 use super::{Light, LightLiSample, LightType, VisibilityTester};
 use crate::geom::intersectable::Intersection;
+use crate::geom::ray::Ray;
 use crate::geom::vector3;
+use crate::geom::vector3::Vector3f;
 use crate::materials::Emitter;
 use crate::pdfs::DirectionDensity;
 use crate::samplers::Sampler;
@@ -97,6 +99,36 @@ impl Light for AreaLight {
 
         Some((light_sample, VisibilityTester::between(&intersection.p, &sample.sp.p)))
     }
+
+    /// The density `sample_li` would have given `wi` from `reference`: the shape's, unless the
+    /// point `wi` reaches is on the unlit face.
+    ///
+    /// It mirrors `sample_li` step by step, because it must answer 0 exactly where `sample_li`
+    /// produces nothing. The shape knows the geometry — [`AreaSampleable::pdf_solid_angle`] answers
+    /// 0 for a direction that misses it — and this adds the one refusal the shape cannot know
+    /// about: emission is one-sided, and `sample_li` drops a point whose normal turns away from the
+    /// shaded point. So the point is found here too, by the ray a bsdf sample would have followed,
+    /// and its face read with the same test.
+    ///
+    /// **The cost**: finding that point is one intersection with this shape alone, and a shape that
+    /// keeps the default `pdf_solid_angle` performs a second one to read its density. Handing the
+    /// point back from `pdf_solid_angle` would save it, at the price of a shape answering for a
+    /// question — which face emits — that is not its own.
+    fn pdf_li(&self, reference: &Vector3f, wi: &Vector3f) -> f64 {
+        let hits = self.shape.intersect(&Ray::new(reference, wi), 0.0, f64::MAX);
+        let Some(hit) = hits.first()
+        else {
+            return 0.0;
+        };
+
+        // The test `sample_li` makes, on the direction the radiance would leave in.
+        let w = -*wi;
+        if vector3::dot(&hit.n, &w) <= 0.0 {
+            return 0.0;
+        }
+
+        self.shape.pdf_solid_angle(reference, wi)
+    }
 }
 
 #[cfg(test)]
@@ -107,6 +139,8 @@ mod tests {
     use crate::geom::vector2::Vector2u;
     use crate::geom::vector3::Vector3f;
     use crate::materials::{DiffuseLight, Material};
+    use crate::pdfs::sphere::SpherePdf;
+    use crate::pdfs::Pdf;
     use crate::samplers::IndependentSampler;
     use crate::shapes::{Rectangle, Shape};
     use crate::spectrum::Spectrum;
@@ -243,6 +277,85 @@ mod tests {
         let mut sampler = FixedPair::new(0.5, 0.5);
 
         assert!(light.sample_li(&shaded_at(0.0), &mut sampler).is_none());
+    }
+
+    /// A shaded point on the lit side, off the axis, so that `d²/|cos θₗ|` varies across the source.
+    fn shaded_off_axis() -> Intersection {
+        let mut shaded = shaded_at(DISTANCE);
+        shaded.p = Vector3f::new(0.9, DISTANCE, -1.1);
+        shaded
+    }
+
+    /// How closely `pdf_li` reproduces the density of a drawn sample. The rectangle keeps the
+    /// default `pdf_solid_angle`, which finds the drawn point again by intersecting.
+    const ROUND_TRIP_TOLERANCE: f64 = 1e-9;
+
+    /// For every direction `sample_li` draws, `pdf_li` returns the density it came with.
+    #[test]
+    fn test_pdf_li_is_the_density_sample_li_draws_with() {
+        let light = area_light();
+        let shaded = shaded_off_axis();
+        let mut sampler = sampler();
+
+        for _ in 0..1000 {
+            let (sample, _) = light.sample_li(&shaded, &mut sampler).unwrap();
+            let drawn_with = density_of(&sample);
+            let stated = light.pdf_li(&shaded.p, &sample.wi);
+
+            assert!(
+                (stated / drawn_with - 1.0).abs() < ROUND_TRIP_TOLERANCE,
+                "wi = {}: drawn with {}, stated {}",
+                sample.wi,
+                drawn_with,
+                stated
+            );
+        }
+    }
+
+    /// `∫ pdf_li dω = 1` from the lit side, over the whole sphere of directions.
+    ///
+    /// Estimated by drawing directions uniformly, density `1/4π`. It sees what the round trip
+    /// cannot: the directions `sample_li` never produces, which must be worth 0 — those that miss
+    /// the source, above all.
+    #[test]
+    fn test_pdf_li_integrates_to_one_from_the_lit_side() {
+        let light = area_light();
+        let reference = shaded_off_axis().p;
+        let uniform = SpherePdf {};
+        let mut sampler = sampler();
+
+        const SAMPLES: usize = 100_000;
+        let mut total = 0.0;
+        for _ in 0..SAMPLES {
+            let w = uniform.generate(&sampler.get_2d());
+            total += light.pdf_li(&reference, &w) / uniform.value(&w);
+        }
+        let integral = total / SAMPLES as f64;
+
+        assert!((integral - 1.0).abs() < 0.01, "∫ pdf_li dω estimated at {}", integral);
+    }
+
+    /// From behind the source, `pdf_li` is 0 for every direction — including those that reach it.
+    ///
+    /// `sample_li` gives no sample there (`test_a_point_behind_the_source_gets_no_sample`), so no
+    /// direction is ever drawn, and the density must say so. The shape alone would not: seen from
+    /// behind, a rectangle still subtends the same solid angle, and its `pdf_solid_angle` answers
+    /// accordingly. The face test is this file's.
+    #[test]
+    fn test_pdf_li_is_zero_from_behind_the_source() {
+        let light = area_light();
+        let behind = Vector3f::new(0.0, -DISTANCE, 0.0);
+        let uniform = SpherePdf {};
+        let mut sampler = sampler();
+
+        let towards_the_source = Vector3f::new(0.0, 1.0, 0.0);
+        assert!(light.shape.pdf_solid_angle(&behind, &towards_the_source) > 0.0, "the shape alone sees it");
+        assert_eq!(light.pdf_li(&behind, &towards_the_source), 0.0, "the light does not emit that way");
+
+        for _ in 0..10_000 {
+            let w = uniform.generate(&sampler.get_2d());
+            assert_eq!(light.pdf_li(&behind, &w), 0.0, "w = {}", w);
+        }
     }
 
     /// Hands out one chosen pair, so that a test can name the point it draws instead of taking the
