@@ -90,19 +90,24 @@ impl Shape for Transformed {
 
         Some(Arc::new(PlacedAreaSampler {
             shape: local_sampler,
-            to_world: (*self.to_world).clone(),
+            placed: self,
         }))
     }
 }
 
 /// A shape's area-sampling face, wearing the placement of the [`Transformed`] it came from.
 ///
-/// It holds its own copy of the transformation — a [`Transform`] is a value, and so is cheap to
-/// own — rather than borrowing from the decorator. Nothing else would let the returned handle
-/// outlive the call that asked for it.
+/// It holds that decorator itself, shared rather than borrowed, so the returned handle outlives
+/// the call that asked for it. Two things are read from it: the placement, which every point
+/// drawn crosses on its way out, and the placed surface as a whole, which answers the
+/// [`Intersectable`] half of [`AreaSampleable`] — the very intersection the visible object
+/// performs, rather than a second copy of it.
 struct PlacedAreaSampler {
+    /// The child's own area-sampling face, in the child's space.
     shape: Arc<dyn AreaSampleable>,
-    to_world: Transform,
+
+    /// The decorator this face belongs to: its placement, and its world-space intersection.
+    placed: Arc<Transformed>,
 }
 
 impl AreaSampleable for PlacedAreaSampler {
@@ -129,8 +134,8 @@ impl AreaSampleable for PlacedAreaSampler {
 
         ShapeSample {
             sp: SurfacePoint {
-                p: self.to_world.transform_point_to_world(&local.sp.p),
-                n: self.to_world.transform_normal_to_world(&local.sp.n),
+                p: self.placed.to_world.transform_point_to_world(&local.sp.p),
+                n: self.placed.to_world.transform_normal_to_world(&local.sp.n),
                 u: local.sp.u,
                 v: local.sp.v,
             },
@@ -160,19 +165,52 @@ impl AreaSampleable for PlacedAreaSampler {
     /// sample in two hundred, and a pixel that met one stayed black: see the note on a reference
     /// sitting on the surface in [`Sphere::sample_solid_angle`](super::Sphere).
     fn sample_solid_angle(&self, reference: &Vector3f, u: &Vector2f) -> Option<SolidAngleSample> {
-        let local_reference = self.to_world.transform_point_to_local(reference);
+        let local_reference = self.placed.to_world.transform_point_to_local(reference);
         let local = self.shape.sample_solid_angle(&local_reference, u)?;
 
         Some(SolidAngleSample {
             sp: SurfacePoint {
-                p: self.to_world.transform_point_to_world(&local.sp.p),
-                n: self.to_world.transform_normal_to_world(&local.sp.n),
+                p: self.placed.to_world.transform_point_to_world(&local.sp.p),
+                n: self.placed.to_world.transform_normal_to_world(&local.sp.n),
                 u: local.sp.u,
                 v: local.sp.v,
             },
-            wi: self.to_world.transform_direction_to_world(&local.wi),
+            wi: self.placed.to_world.transform_direction_to_world(&local.wi),
             pdf: local.pdf,
         })
+    }
+
+    /// The child's density, asked in its own space: `reference` and `wi` travel **in**, the density
+    /// comes back unchanged.
+    ///
+    /// **This relay is not optional**, for the reason the trait states: `sample_solid_angle` above
+    /// forwards to the child, so the evaluation must too. The trait's default body would intersect
+    /// the placed surface and convert from area — the right answer for a child that draws by area,
+    /// and the wrong one for a [`Sphere`](super::Sphere), which draws within its cone and whose
+    /// density is `1/Ω` rather than `d²/(area·|cos θₗ|)`. The two would describe different draws,
+    /// and the weights built on them would no longer add up to 1.
+    ///
+    /// The density crosses unchanged for the reason given on `sample_solid_angle`: an isometry
+    /// preserves solid angles.
+    fn pdf_solid_angle(&self, reference: &Vector3f, wi: &Vector3f) -> f64 {
+        let local_reference = self.placed.to_world.transform_point_to_local(reference);
+        let local_wi = self.placed.to_world.transform_direction_to_local(wi);
+        self.shape.pdf_solid_angle(&local_reference, &local_wi)
+    }
+}
+
+/// The placed surface, as the [`Transformed`] it came from intersects it.
+impl Intersectable for PlacedAreaSampler {
+    fn intersect(&self, ray: &Ray, near: f64, far: f64) -> IntersectionResult {
+        self.placed.intersect(ray, near, far)
+    }
+
+    fn intersect_p(&self, ray: &Ray, near: f64, far: f64) -> bool {
+        self.placed.intersect_p(ray, near, far)
+    }
+
+    fn contain_point(&self, point: &Vector3f) -> bool {
+        self.placed.contain_point(point)
     }
 }
 
@@ -231,7 +269,9 @@ impl AABound for Transformed {
 mod tests {
     use super::*;
 
+    use crate::geom::vector2::Vector2u;
     use crate::geom::vector3;
+    use crate::samplers::{IndependentSampler, Sampler};
     use crate::shapes::{Plane, Rectangle, Sphere};
 
     const EPSILON: f64 = 1e-12;
@@ -527,6 +567,44 @@ mod tests {
                 hit.n,
                 hit.p
             );
+        }
+    }
+
+    /// A sphere placed off every axis, and a reference point outside it at twice its radius from
+    /// the centre, so the cone it subtends is wide: `sin θmax = 1/2`.
+    fn placed_sphere_and_reference() -> (Arc<dyn AreaSampleable>, Vector3f) {
+        const RADIUS: f64 = 1.3;
+
+        let placed: Arc<dyn Shape> = Arc::new(Transformed::new(Arc::new(Sphere::new(RADIUS)), placement()));
+        let centre = placement().transform_point_to_world(&Vector3f::zero());
+        let reference = centre + Vector3f::new(1.0, -2.0, 2.0).normalized() * (2.0 * RADIUS);
+
+        (placed.area_sampler().unwrap(), reference)
+    }
+
+    /// For every direction a placed sphere draws, the placed `pdf_solid_angle` returns the density
+    /// it came with — **exactly**, the child's cone being computed from the same local reference on
+    /// both sides.
+    ///
+    /// It sees both ways the relay can fail. A missing relay lets the trait's default body answer
+    /// with the density of a draw by area, `d²/(area·|cos θₗ|)`, which varies across the cap where
+    /// the cone's `1/Ω` does not. A relay that left `wi` in world space asks the child about a
+    /// direction rotated away from the one drawn, which may leave the cone.
+    ///
+    /// **There is no integral test here, and on purpose.** `∫ pdf dω = 1` is the child's property,
+    /// checked where the child is. What a relay can get wrong is a rotation or a translation, and
+    /// neither moves that integral: the uniform measure over directions is invariant under a
+    /// rotation, and a reference carried to the wrong place gives the density seen from another
+    /// point, a density all the same. Such a test would pass on the very defects it would be
+    /// written for.
+    #[test]
+    fn test_a_placed_sphere_states_the_density_it_draws_with() {
+        let (sampler, reference) = placed_sphere_and_reference();
+        let mut numbers = IndependentSampler::new(0, &Vector2u::new(0, 0), 0);
+
+        for _ in 0..1000 {
+            let sample = sampler.sample_solid_angle(&reference, &numbers.get_2d()).unwrap();
+            assert_eq!(sampler.pdf_solid_angle(&reference, &sample.wi), sample.pdf, "wi = {}", sample.wi);
         }
     }
 }

@@ -145,6 +145,8 @@ mod tests {
     use super::*;
 
     use crate::geom::vector2::Vector2u;
+    use crate::pdfs::sphere::SpherePdf;
+    use crate::pdfs::Pdf;
     use crate::samplers::{IndependentSampler, Sampler};
 
     /// An open surface encloses nothing, so no point is inside it — and its flat bound is then a
@@ -305,5 +307,62 @@ mod tests {
             assert!((hit.u - sample.sp.u).abs() < 1e-12, "u: hit {}, drawn {}", hit.u, sample.sp.u);
             assert!((hit.v - sample.sp.v).abs() < 1e-12, "v: hit {}, drawn {}", hit.v, sample.sp.v);
         }
+    }
+
+    /// A point above the surface, off its centre and closer to it than the surface is wide, so that
+    /// the directions reaching it span a wide cone and include grazing ones.
+    fn reference() -> Vector3f {
+        Vector3f::new(0.7, 1.0, -0.4)
+    }
+
+    /// How closely `pdf_solid_angle` must reproduce the density of a drawn sample. The two read [2]
+    /// of `solid_angle_from_area` at the same point reached two ways — drawn, and found again by
+    /// intersecting along the drawn direction — so they agree to rounding, not bit for bit.
+    const ROUND_TRIP_TOLERANCE: f64 = 1e-9;
+
+    /// For every direction `sample_solid_angle` draws, `pdf_solid_angle` returns the density it came
+    /// with.
+    ///
+    /// The rectangle keeps both default bodies, so this checks the pair the trait defines: drawing
+    /// by area and converting, against intersecting and converting back.
+    #[test]
+    fn test_pdf_solid_angle_is_the_density_sample_solid_angle_draws_with() {
+        let rectangle = Rectangle::new(WIDTH, HEIGHT);
+        let mut sampler = sampler();
+
+        for _ in 0..1000 {
+            let sample = rectangle.sample_solid_angle(&reference(), &sampler.get_2d()).unwrap();
+            let stated = rectangle.pdf_solid_angle(&reference(), &sample.wi);
+
+            assert!(
+                (stated / sample.pdf - 1.0).abs() < ROUND_TRIP_TOLERANCE,
+                "wi = {}: drawn with {}, stated {}",
+                sample.wi,
+                sample.pdf,
+                stated
+            );
+        }
+    }
+
+    /// `∫ pdf_solid_angle dω = 1` over the whole sphere of directions.
+    ///
+    /// Estimated by drawing directions uniformly over the sphere, whose density is `1/4π`:
+    /// `E[pdf(ω) · 4π] = ∫ pdf dω`. It sees what the round trip cannot — the directions
+    /// `sample_solid_angle` never produces. A `pdf_solid_angle` answering anything but 0 for a
+    /// direction that misses the surface, or counting the surface twice, would integrate past 1.
+    #[test]
+    fn test_pdf_solid_angle_integrates_to_one() {
+        let rectangle = Rectangle::new(WIDTH, HEIGHT);
+        let uniform = SpherePdf {};
+        let mut sampler = sampler();
+
+        let mut total = 0.0;
+        for _ in 0..SAMPLES {
+            let w = uniform.generate(&sampler.get_2d());
+            total += rectangle.pdf_solid_angle(&reference(), &w) / uniform.value(&w);
+        }
+        let integral = total / SAMPLES as f64;
+
+        assert!((integral - 1.0).abs() < TOLERANCE, "∫ pdf dω estimated at {}", integral);
     }
 }

@@ -9,7 +9,7 @@ use num_traits::clamp;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
-use super::{solid_angle_from_area, AreaSampleable, Shape, ShapeSample, SolidAngleSample};
+use super::{solid_angle_from_area, solid_angle_pdf_from_area, AreaSampleable, Shape, ShapeSample, SolidAngleSample};
 
 pub struct Sphere {
     r: f64,
@@ -226,18 +226,15 @@ impl AreaSampleable for Sphere {
     /// away — but the fallback is what keeps the answer defined rather than a special case that
     /// has to be remembered.
     fn sample_solid_angle(&self, reference: &Vector3f, u: &Vector2f) -> Option<SolidAngleSample> {
-        // The sphere is centred on the origin of its own space, so the reference point's distance
-        // to the centre is its own length.
-        let squared_distance = vector3::dot(reference, reference);
-        let squared_radius = self.r * self.r;
-
-        if squared_distance <= squared_radius {
+        let Some(cone) = self.subtended_cone(reference)
+        else {
             return solid_angle_from_area(self.sample_area(u), reference);
-        }
-
-        let sin2_theta_max = squared_radius / squared_distance; // (1), squared
-        let cos_theta_max = (1.0 - sin2_theta_max).max(0.0).sqrt();
-        let one_minus_cos_theta_max = sin2_theta_max / (1.0 + cos_theta_max); // (10)
+        };
+        let SubtendedCone {
+            sin2_theta_max,
+            one_minus_cos_theta_max,
+            ..
+        } = cone;
 
         let one_minus_cos_theta = u.x * one_minus_cos_theta_max; // (3)
         let cos_theta = 1.0 - one_minus_cos_theta;
@@ -253,7 +250,7 @@ impl AreaSampleable for Sphere {
 
         // The frame of the derivation: z towards the centre, the other two axes arbitrary — which
         // is all φ being uniform asks of them.
-        let axis = (reference * -1.0).normalized();
+        let axis = cone.axis;
         let (tangent, bitangent) = vector3::coordinate_system(&axis);
 
         // (8)
@@ -272,7 +269,87 @@ impl AreaSampleable for Sphere {
         Some(SolidAngleSample {
             sp: SurfacePoint { p, n, u: u_tex, v: v_tex },
             wi,
-            pdf: 1.0 / (2.0 * PI * one_minus_cos_theta_max), // (5) with (2)
+            pdf: cone.pdf(),
+        })
+    }
+
+    /// `1/Ω` inside the cone the sphere subtends from `reference`, 0 outside it — the density of
+    /// [`sample_solid_angle`](Self::sample_solid_angle), `[5]`, read back.
+    ///
+    /// Reference: PBR Book, 4ed, §6.2.4 — *Spheres*, « Sampling », `Sphere::PDF`.
+    /// <https://pbr-book.org/4ed/Shapes/Spheres#Sampling>
+    ///
+    /// **Membership of the cone is the whole question**, the density being constant inside it. A
+    /// direction at angle θ from the axis towards the centre is in the cone when θ ≤ θmax, that is
+    /// when `cos θ ≥ cos θmax`. pbrt's `Sphere::PDF` skips the test, being only ever asked about a
+    /// direction known to reach the sphere; the contract here answers for every direction, and one
+    /// outside the cone is one the draw never produces.
+    ///
+    /// Inside the sphere there is no cone, and the evaluation falls back exactly as the draw does,
+    /// to the density of a draw by area.
+    ///
+    /// The cone is computed by the same `subtended_cone` as the draw's, so
+    /// the density of a drawn direction comes back bit for bit.
+    fn pdf_solid_angle(&self, reference: &Vector3f, wi: &Vector3f) -> f64 {
+        let Some(cone) = self.subtended_cone(reference)
+        else {
+            return solid_angle_pdf_from_area(self, reference, wi);
+        };
+
+        let cos_theta = vector3::dot(wi, &cone.axis);
+        if cos_theta < cone.cos_theta_max {
+            return 0.0;
+        }
+
+        cone.pdf()
+    }
+}
+
+/// The cone a sphere subtends from a point outside it: `[1]`, `[2]` and `[10]` of
+/// [`Sphere::sample_solid_angle`], computed once for the draw and its evaluation alike.
+struct SubtendedCone {
+    /// Unit vector from the reference point towards the centre: the axis θ is measured from.
+    axis: Vector3f,
+
+    /// `sin²θmax = r²/d²`, `[1]` squared.
+    sin2_theta_max: f64,
+
+    cos_theta_max: f64,
+
+    /// `1 − cos θmax`, by `[10]` rather than by the subtraction, which would cancel for a small or
+    /// distant sphere.
+    one_minus_cos_theta_max: f64,
+}
+
+impl SubtendedCone {
+    /// `[5]` with `[2]`: one over the solid angle of the cone.
+    fn pdf(&self) -> f64 {
+        1.0 / (2.0 * PI * self.one_minus_cos_theta_max)
+    }
+}
+
+impl Sphere {
+    /// The cone this sphere subtends from `reference`, or `None` when `reference` is inside or on
+    /// the surface, where there is no cone to speak of.
+    fn subtended_cone(&self, reference: &Vector3f) -> Option<SubtendedCone> {
+        // The sphere is centred on the origin of its own space, so the reference point's distance
+        // to the centre is its own length.
+        let squared_distance = vector3::dot(reference, reference);
+        let squared_radius = self.r * self.r;
+
+        if squared_distance <= squared_radius {
+            return None;
+        }
+
+        let sin2_theta_max = squared_radius / squared_distance; // (1), squared
+        let cos_theta_max = (1.0 - sin2_theta_max).max(0.0).sqrt();
+        let one_minus_cos_theta_max = sin2_theta_max / (1.0 + cos_theta_max); // (10)
+
+        Some(SubtendedCone {
+            axis: (reference * -1.0).normalized(),
+            sin2_theta_max,
+            cos_theta_max,
+            one_minus_cos_theta_max,
         })
     }
 }
@@ -467,6 +544,8 @@ impl AABound for Sphere {
 mod test {
     use super::*;
     use crate::geom::vector2::Vector2u;
+    use crate::pdfs::sphere::SpherePdf;
+    use crate::pdfs::Pdf;
     use crate::samplers::{IndependentSampler, Sampler};
 
     /// A radius that is neither one nor a half, so a factor of r or r² cannot pass unnoticed.
@@ -827,5 +906,76 @@ mod test {
             sphere.intersect(&Ray::new(&outside, &away), 0.0, f64::MAX).is_empty(),
             "from outside, it misses"
         );
+    }
+
+    /// A reference point inside the sphere, off its centre so that `d²/|cos θₗ|` varies from one
+    /// direction to the next.
+    fn inside() -> Vector3f {
+        Vector3f::new(0.3, -0.2, 0.1)
+    }
+
+    /// Uniform draws over the sphere of directions for the integral of the cone's density: a standard
+    /// error of `√(38/N) ≈ 0.003`, a third of [`TOLERANCE`]. See the test that uses it.
+    const CONE_INTEGRAL_SAMPLES: usize = 4_000_000;
+
+    /// How closely the fallback must reproduce the density of a drawn sample: it finds the drawn
+    /// point again by intersecting, so the two agree to rounding. The cone needs no such allowance.
+    const ROUND_TRIP_TOLERANCE: f64 = 1e-9;
+
+    /// From outside, `pdf_solid_angle` returns **exactly** the density each direction drawn in the
+    /// cone came with: both read one `subtended_cone`, and the density does not depend on where in
+    /// the cone the direction falls. From inside, it returns the density of the fallback draw.
+    #[test]
+    fn test_pdf_solid_angle_is_the_density_sample_solid_angle_draws_with() {
+        let sphere = Sphere::new(RADIUS);
+        let mut sampler = sampler();
+
+        for _ in 0..1000 {
+            let sample = sphere.sample_solid_angle(&reference(), &sampler.get_2d()).unwrap();
+            assert_eq!(
+                sphere.pdf_solid_angle(&reference(), &sample.wi),
+                sample.pdf,
+                "in the cone, wi = {}",
+                sample.wi
+            );
+
+            let sample = sphere.sample_solid_angle(&inside(), &sampler.get_2d()).unwrap();
+            let stated = sphere.pdf_solid_angle(&inside(), &sample.wi);
+            assert!(
+                (stated / sample.pdf - 1.0).abs() < ROUND_TRIP_TOLERANCE,
+                "inside, wi = {}: drawn with {}, stated {}",
+                sample.wi,
+                sample.pdf,
+                stated
+            );
+        }
+    }
+
+    /// `∫ pdf_solid_angle dω = 1` over the whole sphere of directions, from outside and from inside.
+    ///
+    /// Estimated by drawing directions uniformly, density `1/4π`. From outside it is what checks the
+    /// cone test: a `pdf_solid_angle` that answered `1/Ω` for every direction, as pbrt's does,
+    /// integrates to `4π/Ω` — about 39 from [`reference`].
+    ///
+    /// That ratio is also why the outside estimate needs [`CONE_INTEGRAL_SAMPLES`]: one uniform
+    /// direction in 39 lands in the cone and is then worth 39, so the variance of a term is about
+    /// 38, and the standard error at `N` draws `√(38/N)` — 0.019 at the [`SAMPLES`] the other tests
+    /// use, too close to the tolerance for a seed to be trusted with.
+    #[test]
+    fn test_pdf_solid_angle_integrates_to_one() {
+        let sphere = Sphere::new(RADIUS);
+        let uniform = SpherePdf {};
+        let mut sampler = sampler();
+
+        for (reference, samples, label) in [(reference(), CONE_INTEGRAL_SAMPLES, "outside"), (inside(), SAMPLES, "inside")] {
+            let mut total = 0.0;
+            for _ in 0..samples {
+                let w = uniform.generate(&sampler.get_2d());
+                total += sphere.pdf_solid_angle(&reference, &w) / uniform.value(&w);
+            }
+            let integral = total / samples as f64;
+
+            assert!((integral - 1.0).abs() < TOLERANCE, "{}: ∫ pdf dω estimated at {}", label, integral);
+        }
     }
 }

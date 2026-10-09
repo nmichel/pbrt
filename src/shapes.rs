@@ -1,5 +1,6 @@
 use crate::geom::aabound::AABound;
 use crate::geom::intersectable::Intersectable;
+use crate::geom::ray::Ray;
 use crate::geom::surface_point::SurfacePoint;
 use crate::geom::vector2::Vector2f;
 use crate::geom::vector3;
@@ -106,15 +107,28 @@ pub fn solid_angle_from_area(sample: ShapeSample, reference: &Vector3f) -> Optio
 
     let wi = to_sample.normalized();
 
-    // (2). `wi` points from the reference towards the surface and the cosine is stated the other
-    // way round, but the absolute value makes the two readings the same number.
+    // `wi` points from the reference towards the surface and the cosine is stated the other way
+    // round, but the absolute value makes the two readings the same number.
     let cos_theta_l = vector3::abs_dot(&sample.sp.n, &wi);
-    let pdf = sample.pdf * squared_distance / cos_theta_l;
+    let pdf = solid_angle_density(sample.pdf, squared_distance, cos_theta_l)?;
+
+    Some(SolidAngleSample { sp: sample.sp, wi, pdf })
+}
+
+/// `[2]` of [`solid_angle_from_area`], `p(ω) = p(A) · d² / |cos θₗ|`, and the values it refuses.
+///
+/// A density that comes out infinite — the surface seen edge-on, `cos θₗ = 0` — or not positive
+/// cannot be divided by, so the sample is dropped. Dropping a sample is a decision about the
+/// *distribution*: the directions it stood for are never drawn, so their density is 0, and
+/// whoever evaluates the density afterwards must say so. Drawing and evaluating both come through
+/// here — [`solid_angle_from_area`] and [`solid_angle_pdf_from_area`] — and so cannot disagree on
+/// what was thrown away.
+fn solid_angle_density(area_pdf: f64, squared_distance: f64, abs_cos_theta_l: f64) -> Option<f64> {
+    let pdf = area_pdf * squared_distance / abs_cos_theta_l;
     if !pdf.is_finite() || pdf <= 0.0 {
         return None;
     }
-
-    Some(SolidAngleSample { sp: sample.sp, wi, pdf })
+    Some(pdf)
 }
 
 /// A surface that can hand out points of itself, drawn uniformly over its area.
@@ -142,7 +156,15 @@ pub fn solid_angle_from_area(sample: ShapeSample, reference: &Vector3f) -> Optio
 ///
 /// The point comes out in the shape's own space, like every other quantity a shape exchanges. A
 /// [`Transformed`] shape places it on the way out, as it places a hit.
-pub trait AreaSampleable: Send + Sync {
+///
+/// # Why it requires `Intersectable`
+///
+/// A shape that hands out points of itself must also answer the converse: given a direction, how
+/// likely was it to have been drawn — which first means finding the point of the surface that
+/// direction reaches. [`pdf_solid_angle`](Self::pdf_solid_angle) does that by intersecting the
+/// shape, so its default body needs the shape to be intersectable. Every shape that can be sampled
+/// already is, since being seen is what makes a surface worth lighting from.
+pub trait AreaSampleable: Intersectable {
     /// The total surface area, in the shape's own space.
     fn area(&self) -> f64;
 
@@ -180,6 +202,72 @@ pub trait AreaSampleable: Send + Sync {
     fn sample_solid_angle(&self, reference: &Vector3f, u: &Vector2f) -> Option<SolidAngleSample> {
         solid_angle_from_area(self.sample_area(u), reference)
     }
+
+    /// The density with which [`sample_solid_angle`](Self::sample_solid_angle), called from
+    /// `reference`, would have produced the direction `wi`.
+    ///
+    /// Reference: PBR Book, 4ed, §6.1.7 — *Shapes*, « Sampling », `Shape::PDF`.
+    /// <https://pbr-book.org/4ed/Shapes/Basic_Shape_Interface#Sampling>
+    ///
+    /// # The contract
+    ///
+    /// For every direction `sample_solid_angle` can produce from `reference`, this returns the
+    /// density that sample came with; for every other direction, 0. The two methods are a pair:
+    /// **a shape that overrides one overrides the other**, and so does any wrapper that forwards
+    /// one. Otherwise the default below answers for a draw that is not the one made, and the
+    /// weights multiple importance sampling builds on these densities stop adding up to 1.
+    ///
+    /// **"The sample" is the one at the first point `wi` meets.** A closed surface drawn by area
+    /// yields points on its far side too, along directions that also reach its near side; this
+    /// answers for the near one, which is the point a ray along `wi` sees and the only one a
+    /// one-sided emitter keeps. Its integral over directions is then the share of draws that land
+    /// on the near side — `(1 − r/d)/2` for a sphere seen from distance `d` — and not 1.
+    ///
+    /// # The default
+    ///
+    /// [`solid_angle_pdf_from_area`]: the density a draw by area converted into solid angle gives
+    /// `wi`, which is what the default [`sample_solid_angle`](Self::sample_solid_angle) draws with.
+    ///
+    /// # Frame
+    ///
+    /// As for `sample_solid_angle`: `reference` in the shape's own space, `wi` a unit vector from it.
+    fn pdf_solid_angle(&self, reference: &Vector3f, wi: &Vector3f) -> f64 {
+        solid_angle_pdf_from_area(self, reference, wi)
+    }
+}
+
+/// The density with which [`solid_angle_from_area`], applied to a uniform draw over `shape`, would
+/// have produced `wi` from `reference` — the evaluation that undoes that draw.
+///
+/// It finds the point the direction reaches by intersecting the shape, then reads `[2]` of
+/// [`solid_angle_from_area`] at that point, with the area density `1/area` that a uniform draw has
+/// everywhere.
+///
+/// - **No hit**: the direction misses the surface, which a draw of a point on it never produces —
+///   density 0.
+/// - **The first hit**, not any other: it is the point a ray along `wi` sees. A closed surface
+///   drawn by area also yields points on its far side, along the same directions; those face away
+///   from `reference`, and the one-sided emitters this serves drop them.
+/// - **A refused density**, edge-on or not positive, is 0: `solid_angle_density` refuses the same
+///   values here as when drawing.
+///
+/// **The cost**: one intersection with this shape alone, paid by whoever asks — a bsdf ray that has
+/// just reached the source, and has already paid for the traversal of the whole scene.
+///
+/// A free function rather than only the trait's default body, for the reason
+/// [`solid_angle_from_area`] is one: a shape that draws better than by area still falls back to it
+/// somewhere, and has to evaluate that fallback the same way.
+pub fn solid_angle_pdf_from_area<S: AreaSampleable + ?Sized>(shape: &S, reference: &Vector3f, wi: &Vector3f) -> f64 {
+    let ray = Ray::new(reference, wi);
+    let hits = shape.intersect(&ray, 0.0, f64::MAX);
+    let Some(hit) = hits.first()
+    else {
+        return 0.0;
+    };
+
+    let squared_distance = (&hit.p - reference).squared_length();
+    let cos_theta_l = vector3::abs_dot(&hit.n, wi);
+    solid_angle_density(1.0 / shape.area(), squared_distance, cos_theta_l).unwrap_or(0.0)
 }
 
 mod aabox;
