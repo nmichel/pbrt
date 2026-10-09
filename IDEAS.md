@@ -202,12 +202,12 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
 ## Écarts au modèle physique
 
 - [x] **Pas de lumières d'aire — le plus grand écart.** Levé : un objet à matériau émissif est
-      enregistré comme `AreaLight` au chargement, et contribue donc à l'éclairage indirect. Les neuf
+      enregistré comme `AreaLight` au chargement, et contribue donc à l'éclairage indirect. Les
       écarts qui subsistent sont rassemblés et chiffrés en
       [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md) §14.
-- [ ] **Pas de MIS.** `Light` n'a pas de `pdf_li`, donc NEE et échantillonnage de BSDF ne peuvent pas
-      être pondérés l'un contre l'autre. Bloqué sur l'entrée ci-dessus, et c'est MIS qui fera tomber
-      le garde `is_last_bounce_specular`.
+- [ ] **Pas de MIS.** NEE et échantillonnage de BSDF ne sont pas pondérés l'un contre l'autre :
+      l'intégrateur élit l'un ou l'autre par le garde `is_last_bounce_specular`. En cours sur
+      `feat/mis`, dans l'ordre de la liste de tête.
 - [x] **Un matériau spéculaire encodait la formule de son intégrateur** — l'échantillon dit désormais
       s'il est une δ ([`DirectionDensity`](src/pdfs.rs)), et un miroir rend ρ tel quel.
 - [ ] **La radiance ne change pas d'échelle en traversant une interface.** Réfractée de ηᵢ vers

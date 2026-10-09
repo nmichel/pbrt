@@ -39,6 +39,7 @@ use super::{Light, LightLiSample, LightType, VisibilityTester};
 use crate::geom::intersectable::Intersection;
 use crate::geom::vector3;
 use crate::materials::Emitter;
+use crate::pdfs::DirectionDensity;
 use crate::samplers::Sampler;
 use crate::shapes::AreaSampleable;
 
@@ -91,7 +92,7 @@ impl Light for AreaLight {
         let light_sample = LightLiSample {
             spectrum: self.emitter.l(&sample.sp, &w),
             wi: sample.wi,
-            pdf: sample.pdf,
+            density: DirectionDensity::SolidAngle(sample.pdf),
         };
 
         Some((light_sample, VisibilityTester::between(&intersection.p, &sample.sp.p)))
@@ -143,6 +144,15 @@ mod tests {
         }
     }
 
+    /// The density of a sample, which an area light always has: a source with an extent is seen
+    /// along a whole cone of directions, never along a single one.
+    fn density_of(sample: &LightLiSample) -> f64 {
+        match sample.density {
+            DirectionDensity::SolidAngle(pdf) => pdf,
+            DirectionDensity::Dirac => panic!("an area light drew a δ"),
+        }
+    }
+
     fn sampler() -> IndependentSampler {
         // A fixed seed, so these tests either pass or fail, always the same way.
         IndependentSampler::new(0, &Vector2u::new(0, 0), 0)
@@ -162,12 +172,8 @@ mod tests {
         let (sample, _) = light.sample_li(&shaded_at(DISTANCE), &mut sampler).unwrap();
 
         let expected = DISTANCE * DISTANCE / AREA;
-        assert!(
-            (sample.pdf - expected).abs() < 1e-12,
-            "density is {} where d²/area is {}",
-            sample.pdf,
-            expected
-        );
+        let density = density_of(&sample);
+        assert!((density - expected).abs() < 1e-12, "density is {} where d²/area is {}", density, expected);
         assert_eq!(sample.wi, Vector3f::new(0.0, -1.0, 0.0), "the axis points down at the source");
         assert_eq!(sample.spectrum, EMITTED, "seen from the lit face");
     }
@@ -201,7 +207,7 @@ mod tests {
         let mut total = 0.0;
         for _ in 0..SAMPLES {
             let (sample, _) = light.sample_li(&shaded, &mut sampler).unwrap();
-            total += 1.0 / sample.pdf;
+            total += 1.0 / density_of(&sample);
         }
 
         let estimate = total / SAMPLES as f64;

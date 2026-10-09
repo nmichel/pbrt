@@ -72,7 +72,14 @@ impl Integrator for PathIntegrator {
                         let wi = &sample_li.wi;
                         let f = material.f(&-current_ray.direction, wi, &interaction) * vector3::abs_dot(wi, &interaction.intersection.n);
                         if visibility_tester.unoccluded(scene) {
-                            let light_contribution = &sample_li.spectrum * &f * &beta / (sampled_light.p * sample_li.pdf);
+                            // What this sample is divided by: the chance of having picked this
+                            // source, times the density of `wi` if it has one. A δ source has
+                            // none — its `spectrum` is the integral over directions already.
+                            let sample_probability = match sample_li.density {
+                                DirectionDensity::SolidAngle(pdf) => sampled_light.p * pdf,
+                                DirectionDensity::Dirac => sampled_light.p,
+                            };
+                            let light_contribution = &sample_li.spectrum * &f * &beta / sample_probability;
                             accumulated_radiance += light_contribution;
                         }
                     }

@@ -2,7 +2,7 @@ use super::{Light, LightLiSample, LightType, VisibilityTester};
 use crate::geom::intersectable::Intersection;
 use crate::geom::ray::Ray;
 use crate::pdfs::sphere::SpherePdf;
-use crate::pdfs::Pdf;
+use crate::pdfs::{DirectionDensity, Pdf};
 use crate::samplers::Sampler;
 use crate::spectrum::Spectrum;
 
@@ -44,7 +44,11 @@ impl Light for UniformInfiniteLight {
         let pdf = sphere_pdf.value(&wi);
         let spectrum = self.i;
 
-        let sample = LightLiSample { spectrum, wi, pdf };
+        let sample = LightLiSample {
+            spectrum,
+            wi,
+            density: DirectionDensity::SolidAngle(pdf),
+        };
         let tester = VisibilityTester::towards_infinity(&intersection.p, &wi);
         Some((sample, tester))
     }

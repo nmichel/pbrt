@@ -91,15 +91,18 @@ Pour une densité `p(ω)` sur les directions et un tirage `ω_i ∼ p` :
 [2]  ⟨L_direct⟩ = f(p, ω_o, ω_i) · L_i(p, ω_i) · |cos θ| / p(ω_i)
 ```
 
-C'est exactement ce qu'écrit [path.rs:73-75](../src/integrators/path.rs#L73), à un facteur près : la
+C'est exactement ce qu'écrit [path.rs:69-84](../src/integrators/path.rs#L69), à un facteur près : la
 scène ayant `N` sources et une seule étant tirée, avec la probabilité discrète `P = 1/N`, le même
 argument s'applique une fois de plus et l'estimateur divise aussi par `P`.
 
-**La couture est là.** L'intégrateur ne sait rien des sources ; il divise par `LightLiSample::pdf`.
-Le contrat qui rend [2] juste tient en une phrase :
+**La couture est là.** L'intégrateur ne sait rien des sources ; il divise par la densité que porte
+`LightLiSample::density`. Le contrat qui rend [2] juste tient en une phrase :
 
-> `pdf` est une densité **par unité d'angle solide**, au point ombré, pour la direction `wi`
+> `density` est une densité **par unité d'angle solide**, au point ombré, pour la direction `wi`
 > rendue — et `spectrum` est la radiance qui arrive de cette direction-là.
+
+Une source δ en est l'exception, et elle le dit par le type plutôt que par une valeur : sa densité
+est `DirectionDensity::Dirac`, et il n'y a rien à diviser (§5.4).
 
 Toute source doit honorer ce contrat *dans ses propres termes*. Les trois familles qui suivent
 l'honorent de trois façons qui n'ont rien en commun, et c'est tout l'intérêt de les lire ensemble.
@@ -351,30 +354,30 @@ Il n'y a rien à estimer : [22] est exact, et aucun nombre aléatoire n'est cons
 ignore son `sampler`. **Aucun changement de variable n'intervient ici**, et c'est ce qui distingue
 cette source de toutes les autres : il n'y a pas de tirage.
 
-### 5.4 Ce que le code écrit, et l'abus qu'il commet
+### 5.4 Ce que le code écrit
 
 ```rust
 let spectrum = &self.i / wi.squared_length();   // I/d², par [20]
-let sample = LightLiSample { spectrum, wi: wi.normalized(), pdf: 1.0 };
+let sample = LightLiSample { spectrum, wi: wi.normalized(), density: DirectionDensity::Dirac };
 ```
 
-Reporté dans [2], cela rend `f · (I/d²) · |cos θ|`, qui est exactement [22]. **`pdf = 1.0` n'est pas
-une densité** : c'est l'élément neutre qui rend inoffensive la division de la formule générique. Le
-type dit `f64` et la valeur n'a pas d'unité — là où toute autre densité de ce document est en sr⁻¹.
+Le terme `f · L_i · |cos θ| / p` de [2] n'a pas de sens ici, puisque ni `L_i` ni `p` n'existent
+comme fonctions : seul leur rapport, l'intégrale effondrée [22], en a un. `spectrum` porte donc
+`I/d²`, et la densité **dit** qu'elle est une δ plutôt que de feindre une valeur.
+L'intégrateur ne divise alors que par la probabilité discrète d'avoir choisi la source, et rend
+`f · (I/d²) · |cos θ| / P` — exactement [22], au facteur `P` du §2 près.
 
-C'est un abus assumé de l'interface, avec deux conséquences qu'il faut connaître :
+Deux conséquences :
 
 - **Aucune variance** n'est introduite par ce terme, quelle que soit la graine.
-- **MIS ne peut pas le pondérer.** Une heuristique de puissance compare deux densités dans une même
-  mesure ; un `1` sans unité n'est comparable à rien. pbrt-v4 traite le cas en faisant rendre `0` à
-  `PDF_Li` pour les sources δ, ce qui donne à la pondération un cas particulier explicite. Ce projet
-  n'a pas encore de `Light::pdf_li` ; l'entrée est dans [IDEAS.md](../IDEAS.md), et elle est un
-  prérequis de MIS.
+- **MIS n'a rien à pondérer.** Aucune direction tirée par un bsdf ne rencontre jamais un point :
+  la stratégie du bsdf a une chance nulle de trouver la source, la pondération donne donc tout au
+  tirage de la source, et `Light::pdf_li` garde pour elle son défaut, `0`. C'est le traitement de
+  pbrt-v4, dont `PDF_Li` rend `0` pour les sources δ.
 
-À noter : [`LightType`](../src/lights.rs) existe et distingue `Point`, `Infinite` et `Area`, mais
-**personne ne l'interroge pour cette question**. Son seul usage est
-[`Integrator::background_radiance`](../src/integrators.rs), qui somme les `le` des sources à
-l'infini. Le caractère singulier d'une source n'est aujourd'hui lisible nulle part dans l'interface.
+Le caractère singulier d'une source est porté par **l'échantillon**, comme celui d'un rebond
+spéculaire, et non par [`LightType`](../src/lights.rs) : le même type,
+[`DirectionDensity`](../src/pdfs.rs), sert aux deux.
 
 ## 6. Les sources à l'infini : [`UniformInfiniteLight`](../src/lights/uniform_infinite_light.rs), [`BackgroundInfiniteLight`](../src/lights/background_infinite_light.rs)
 
@@ -1135,20 +1138,19 @@ cette scène que [43] a été vérifié — 32,7 % des tirages survivaient juste
 
 ## 14. Les écarts au modèle physique, rassemblés
 
-1. **`pdf = 1` pour une source δ** (§5.4) — correct pour l'estimateur, incomparable pour MIS.
-2. **Tirage sur la sphère entière** pour les sources à l'infini (§6.3) — non biaisé, variance portée
+1. **Tirage sur la sphère entière** pour les sources à l'infini (§6.3) — non biaisé, variance portée
    de `V` à `2V + μ²`.
-3. **Pas d'échantillonnage par importance du dégradé** de `BackgroundInfiniteLight` (§6.3).
-4. **Tirage uniforme sur l'aire** pour le `Rectangle`, et non sur l'angle solide qu'il sous-tend
+2. **Pas d'échantillonnage par importance du dégradé** de `BackgroundInfiniteLight` (§6.3).
+3. **Tirage uniforme sur l'aire** pour le `Rectangle`, et non sur l'angle solide qu'il sous-tend
    (§10.1) — non biaisé, bruyant quand la source est grande ou vue de biais. La `Sphere` ne l'a plus.
-5. **Aucun maillage ne s'échantillonne** (§10.2) — une lampe triangulaire est refusée au chargement.
-6. **Pas d'émission bilatérale** (§7.2) — un choix, pas un manque.
-7. **Choix uniforme de la source** parmi `N` ([path.rs](../src/integrators/path.rs)) — une petite
+4. **Aucun maillage ne s'échantillonne** (§10.2) — une lampe triangulaire est refusée au chargement.
+5. **Pas d'émission bilatérale** (§7.2) — un choix, pas un manque.
+6. **Choix uniforme de la source** parmi `N` ([path.rs](../src/integrators/path.rs)) — une petite
    source très lumineuse est tirée aussi souvent qu'un grand panneau faible.
-8. **Le rayon d'ombre ne teste pas le dernier dix-millième du segment** (§7.6) — un occulteur collé
+7. **Le rayon d'ombre ne teste pas le dernier dix-millième du segment** (§7.6) — un occulteur collé
    à la source passe inaperçu. C'est le prix d'un défaut bien pire, et le seul de cette liste dont
    la mesure soit dans ce document.
-9. **Les échantillons de densité non finie sont jetés** ([13] déborde quand `cos θₗ → 0`), ce qui
+8. **Les échantillons de densité non finie sont jetés** ([13] déborde quand `cos θₗ → 0`), ce qui
    retire une portion du domaine et introduit donc un biais — infime, et que le tirage en angle
    solide supprime puisque sa densité est constante.
 

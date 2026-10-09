@@ -2,6 +2,7 @@ use super::{Light, LightLiSample, LightType, VisibilityTester};
 use crate::geom::intersectable::Intersection;
 use crate::geom::transform::Transform;
 use crate::geom::vector3::Vector3f;
+use crate::pdfs::DirectionDensity;
 use crate::samplers::Sampler;
 use crate::spectrum::Spectrum;
 
@@ -40,8 +41,8 @@ impl Light for PointLight {
     /// light arrives from one direction, so the integral collapses onto it: there is no estimate,
     /// no variance, and the `sampler` is untouched.
     ///
-    /// `pdf` is `1.0` so that the integrator's division leaves [1] alone — see [`LightLiSample`],
-    /// and `docs/sources_de_lumiere.md` §5 for what that costs multiple importance sampling.
+    /// The sample is a [`DirectionDensity::Dirac`]: `spectrum` is already the collapsed integral
+    /// `[1]`, and there is no density to divide it by — see `docs/sources_de_lumiere.md` §5.
     fn sample_li(&self, intersection: &Intersection, _sampler: &mut dyn Sampler) -> Option<(LightLiSample, VisibilityTester)> {
         let world_light_pos = self.t.transform_point_to_world(&Vector3f::new(0.0, 0.0, 0.0));
         let wi = &world_light_pos - &intersection.p;
@@ -50,7 +51,7 @@ impl Light for PointLight {
         let sample = LightLiSample {
             spectrum: spectrum,
             wi: wi.normalized(),
-            pdf: 1.0,
+            density: DirectionDensity::Dirac,
         };
         let tester = VisibilityTester::between(&intersection.p, &world_light_pos);
         Some((sample, tester))

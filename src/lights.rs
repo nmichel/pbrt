@@ -10,6 +10,7 @@
 use super::geom::intersectable::Intersection;
 use super::geom::ray::Ray;
 use super::geom::vector3::Vector3f;
+use super::pdfs::DirectionDensity;
 use super::samplers::Sampler;
 use super::scene::Scene;
 use super::spectrum::Spectrum;
@@ -119,10 +120,11 @@ pub enum LightType {
 /// # The contract, which is the seam
 ///
 /// An integrator knows nothing of light sources: it weights `spectrum` by the bsdf and a cosine and
-/// divides by `pdf`. That estimator is only unbiased if every source agrees on what the three
+/// divides by the density. That estimator is only unbiased if every source agrees on what the three
 /// fields mean, and the agreement is a matter of **measure**:
 ///
-/// - `pdf` is a density **per unit solid angle at the shaded point**, for the direction `wi`;
+/// - `density` is a density **per unit solid angle at the shaded point**, for the direction `wi` —
+///   or a δ, for a source seen along that one direction only;
 /// - `spectrum` is the radiance arriving from `wi`, and radiance does not fall off with distance.
 ///
 /// The inverse square law therefore belongs to whichever of the two the source's own physics puts
@@ -136,12 +138,10 @@ pub struct LightLiSample {
     /// The direction from the shading point to the sampled point on the light source.
     pub wi: Vector3f,
 
-    /// The density of `wi`, per unit solid angle at the shaded point.
-    ///
-    /// A source described by a delta distribution has no such density: it answers `1.0`, the
-    /// neutral element that makes the integrator's division harmless. That value is not a density,
-    /// which is why multiple importance sampling will have to tell the two cases apart.
-    pub pdf: f64,
+    /// How `wi` was drawn: with a density per unit solid angle at the shaded point, or as the one
+    /// direction a δ source is seen along — in which case `spectrum` is what the integral over
+    /// directions collapses to, and there is nothing to divide it by.
+    pub density: DirectionDensity,
 }
 
 pub trait Light: Send + Sync {
@@ -179,7 +179,7 @@ pub trait Light: Send + Sync {
     ///
     /// `reference` is the shaded point and `wi` a unit vector from it towards the source, both in
     /// world space — the [`LightLiSample::wi`] convention. The density is per unit solid angle at
-    /// `reference`, the measure of [`LightLiSample::pdf`].
+    /// `reference`, the measure of [`LightLiSample::density`].
     ///
     /// **Visibility is not part of it.** This is the density of a sampling strategy, which draws
     /// directions whether or not something stands in the way; an occluded sample is a sample worth
