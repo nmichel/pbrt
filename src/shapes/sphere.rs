@@ -362,11 +362,13 @@ impl Intersectable for Sphere {
         // Compute intersection point (geometric solution):
         // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
 
+        // `tca` is where along the ray the centre projects. A negative one means the ray heads away
+        // from the centre, which rules out a hit **only from outside**: from inside, every ray
+        // meets the sphere, those heading away included, at the far root. So there is no early
+        // return on its sign; a ray from outside heading away has both roots negative, and the
+        // `tmax < near` test below already drops it.
         let l = &ray.origin * -1.0;
         let tca = vector3::dot(&l, &ray.direction);
-        if tca < 0.0 {
-            return IntersectionResult::new();
-        }
 
         let r2 = self.r * self.r;
         let d2 = vector3::dot(&l, &l) - tca * tca;
@@ -792,5 +794,38 @@ mod test {
             assert!((hit.u - sample.sp.u).abs() < 1e-9, "u: hit {}, drawn {}", hit.u, sample.sp.u);
             assert!((hit.v - sample.sp.v).abs() < 1e-9, "v: hit {}, drawn {}", hit.v, sample.sp.v);
         }
+    }
+
+    /// A ray heading away from the centre meets the sphere from inside, once, and misses it from
+    /// outside.
+    ///
+    /// The sign of `tca` — the ray heading towards the centre or away from it — settles a miss
+    /// only from outside. From inside every ray reaches the surface, and one heading away reaches
+    /// it soonest. Treating that sign as a miss everywhere let rays leave a glass sphere, or a
+    /// camera placed in one, through a wall they never saw.
+    ///
+    /// From inside, the expected distance follows from `‖o + t·d‖ = r` with `tca = −o⋅d`:
+    /// `t = tca + √(r² − ‖o‖² + tca²)`, the far root, the near one being behind the origin.
+    #[test]
+    fn test_a_ray_heading_away_from_the_centre_hits_from_inside_only() {
+        let sphere = Sphere::new(RADIUS);
+        let away = Vector3f::new(0.8, 0.35, 0.46).normalized();
+
+        let inside = Vector3f::new(0.3, -0.2, 0.1);
+        assert!(vector3::dot(&inside, &away) > 0.0, "the ray must head away from the centre");
+
+        let hits = sphere.intersect(&Ray::new(&inside, &away), 0.0, f64::MAX);
+        assert_eq!(hits.len(), 1, "from inside, a ray heading away meets the surface once");
+
+        let tca = -vector3::dot(&inside, &away);
+        let expected = tca + (RADIUS * RADIUS - vector3::dot(&inside, &inside) + tca * tca).sqrt();
+        assert!((hits[0].d - expected).abs() < 1e-12, "hit at {}, expected at {}", hits[0].d, expected);
+        assert!((hits[0].p.length() - RADIUS).abs() < 1e-12, "{} is not on the sphere", hits[0].p);
+
+        let outside = away * (2.0 * RADIUS);
+        assert!(
+            sphere.intersect(&Ray::new(&outside, &away), 0.0, f64::MAX).is_empty(),
+            "from outside, it misses"
+        );
     }
 }

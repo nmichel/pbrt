@@ -6,8 +6,14 @@
 # WHAT IT ISOLATES
 #
 # The same question as `direct_lighting.stage` — do `naive` and `path` agree — asked of a curved
-# source. It is deliberately that scene with the panel swapped for a sphere and the camera left
-# where it was, so the two sets of figures can be read against each other.
+# source. It is deliberately that scene with the panel swapped for a sphere, the lamp at the same
+# height, so the two sets of figures can be read against each other.
+#
+# The camera is the one thing that had to move. The panel hangs at y = 3 and the camera just under
+# it, at 2.9; a sphere of radius 1 centred at the same height reaches down to y = 2, so the same
+# camera would sit *inside* the lamp, looking at its unlit inner face. It hangs at 1.9 instead,
+# just under the sphere, still looking straight down with the lamp behind it. The floor is lit
+# exactly as before; only the patch of it in frame is smaller.
 #
 # WHY A SPHERE IS NOT A RECTANGLE WITH A DIFFERENT SHAPE
 #
@@ -28,7 +34,7 @@
 # here is only half the result; the other half is the waste above, which is the baseline to beat.
 
 camera pin_hole
-  pos 0.0 2.9 0.0
+  pos 0.0 1.9 0.0
   look 0.0 0.0 0.0
   up 0.0 0.0 -1.0
 

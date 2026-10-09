@@ -844,20 +844,28 @@ définie plutôt qu'un cas particulier à retenir.
 
 ### 9.3 Ce que le cône rapporte
 
-Écart quadratique moyen contre une même référence convergée, la seule différence entre les deux
-colonnes étant la méthode de tirage de la sphère, sur
+Écart quadratique moyen contre une même référence convergée — `path` à 16384 chemins, de moyenne
+129,34 —, la seule différence entre les deux colonnes étant la méthode de tirage de la sphère, sur
 [sphere_source.stage](../test_files/sphere_source.stage) :
 
 | chemins/pixel | tirage par aire | tirage dans le cône |
 |---|---|---|
-| 16 | 26,75 | **1,41** |
-| 64 | 12,80 | **0,79** |
-| 256 | 6,40 | **0,51** |
+| 16 | 32,87 | **1,37** |
+| 64 | 15,65 | **0,77** |
+| 256 | 7,81 | **0,50** |
 
-Le bruit est divisé par **seize**, et la moyenne ne bouge pas — 106,89 contre 106,87 : le gain est
-de la variance en moins, pas une image différente. Seize fois moins de bruit à nombre de chemins
-constant vaut, à bruit constant, environ **250 fois moins de chemins**, l'écart d'un estimateur de
-Monte-Carlo décroissant en `1/√N`.
+Le bruit est divisé par **seize** à 256 chemins, par vingt à vingt-quatre en dessous, et la moyenne
+ne bouge pas — 129,33 contre 129,34 à 4096 chemins : le gain est de la variance en moins, pas une
+image différente. Seize fois moins de bruit à nombre de chemins constant vaut, à bruit constant,
+environ **250 fois moins de chemins**, l'écart d'un estimateur de Monte-Carlo décroissant en `1/√N`.
+
+La colonne du cône ne se lit pas au-delà : elle descend à 0,35 puis 0,23 à 1024 et 4096 chemins, et
+bute là sur ce que l'arrondi sur 8 bits et le bruit propre de la référence laissent de toute façon.
+
+**La colonne du tirage par aire ne se rejoue pas telle quelle**, puisque la sphère tire dans le cône :
+elle se mesure en forçant le repli de [`Sphere::sample_solid_angle`](../src/shapes/sphere.rs) — sa
+garde « référence à l'intérieur » rendue toujours vraie —, et c'est ainsi que les chiffres ci-dessus
+et ceux du §13.4 ont été pris.
 
 ## 10. Ce qui n'est pas fait, et la forme que cela prendrait
 
@@ -1108,17 +1116,20 @@ noyait dans le terme direct la mesure du terme indirect.
 
 ### 13.4 `sphere_source.stage` — une source qui n'est pas plate
 
-Le témoin de 13.1 avec son panneau remplacé par une sphère et sa caméra laissée en place, pour que
-les deux jeux de chiffres se lisent l'un contre l'autre.
+Le témoin de 13.1 avec son panneau remplacé par une sphère à la même hauteur, pour que les deux
+jeux de chiffres se lisent l'un contre l'autre. La caméra seule a bougé : celle de 13.1 serait
+*dans* la sphère, qui descend jusqu'à y = 2, et elle est descendue à 1,9, juste sous la lampe. Le
+sol est éclairé de la même façon ; seule la portion cadrée change.
 
 | chemins/pixel | `naive` | `path`, tirage par aire |
 |---|---|---|
-| 64 | 100,56 | 106,17 |
-| 256 | 105,85 | 106,71 |
-| 1024 | 106,69 | 106,85 |
-| 4096 | **106,84** | **106,87** |
+| 64 | 125,49 | 128,42 |
+| 256 | 128,66 | 129,12 |
+| 1024 | 129,22 | 129,30 |
+| 4096 | **129,32** | **129,33** |
 
-Trois centièmes d'écart : le tirage uniforme sur l'aire d'une sphère est non biaisé. C'est aussi sur
+Un centième d'écart, et `naive` a cessé de monter — 129,35 à 16384 chemins : le tirage uniforme sur
+l'aire d'une sphère est non biaisé. C'est aussi sur
 cette scène que [43] a été vérifié — 32,7 % des tirages survivaient juste sous la lampe et 43,8 % à
 8,5 d'écart, contre 33,3 % et 44,1 % prédits — et que le gain du cône est chiffré au §9.3.
 
