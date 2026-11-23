@@ -74,10 +74,6 @@ impl Material for Metal {
             None
         }
     }
-
-    fn is_specular(&self) -> bool {
-        true
-    }
 }
 
 #[cfg(test)]

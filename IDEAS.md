@@ -18,10 +18,9 @@ faire ensuite.
 - [x] **`AreaLight`** — une surface émissive éclaire la scène, par `Rectangle` et par `Sphere`.
       Dérivations, témoins et mesures dans
       [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md).
-- [ ] **MIS** — la pondération est en place, et le garde `is_last_bounce_specular` est tombé avec
-      elle ; mesures et défaut levé dans [docs/ponderation_mis.md](docs/ponderation_mis.md). Reste
-      `Material::is_specular()`, qui n'a plus aucun appelant : l'échantillon dit déjà s'il est une δ
-      (`DirectionDensity`).
+- [x] **MIS** — NEE et tirage de BSDF pondérés par l'heuristique de puissance ; le garde
+      `is_last_bounce_specular` et `Material::is_specular()` sont tombés. Mesures et défaut levé
+      dans [docs/ponderation_mis.md](docs/ponderation_mis.md).
 - [ ] **[Le rectangle sphérique](ideas/rectangle_spherique.md)** — le `Rectangle` tire encore par
       aire. Variance, pas exactitude ; ligne de base mesurée.
 - [ ] **[Les maillages émissifs](ideas/maillage_emissif.md)** — aucun maillage ne s'échantillonne,

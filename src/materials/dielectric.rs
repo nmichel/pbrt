@@ -117,10 +117,6 @@ impl Material for Dielectric {
             }
         }
     }
-
-    fn is_specular(&self) -> bool {
-        true
-    }
 }
 
 fn refract(wo: &Vector3f, n: &Vector3f, ni_over_nt: f64) -> Option<Vector3f> {

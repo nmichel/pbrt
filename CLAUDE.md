@@ -20,8 +20,15 @@ fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a ap
 `docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
 une entrée cochée y garde une ligne, pas son corps.
 
-**Chantier en cours** — MIS, sur la branche `feat/mis`. Avant lui, le sujet de la branche
-`feat/area_light` est clos : **une surface
+**Chantier en cours** — MIS, sur la branche `feat/mis` : **NEE et le tirage de BSDF sont pondérés**
+par l'heuristique de puissance, et le garde spéculaire est tombé. Une touche sur un émetteur nomme
+la lumière qui l'échantillonne ([`Interaction::area_light`](src/interaction.rs)), et la source est
+interrogée depuis l'origine du rayon tiré et non depuis le point ombré — faute de quoi un rayon
+rasant qui frôle le bord d'une source la manque au second calcul et porte ρ·L entier. Aucune
+moyenne convergée ne bouge ; le bruit tombe là où la source sous-tend beaucoup, et nulle part
+ailleurs. Mesures dans [docs/ponderation_mis.md](docs/ponderation_mis.md).
+
+Avant lui, le sujet de la branche `feat/area_light` est clos : **une surface
 émissive éclaire la scène**. Un objet dont
 le matériau émet est enregistré comme [`AreaLight`](src/lights/area_light.rs) par
 [`SceneBuilderVisitor`](src/loader/visitors/scene_builder.rs), sur la forme *déjà placée* que rend
@@ -98,8 +105,8 @@ comparer une mesure fraîche.
 
 La liste de tête d'`IDEAS.md` est ordonnée : sa position dit quand un sujet est censé être traité. Ce
 qui était le plus grand écart au modèle physique du projet — une surface émissive n'éclairant rien —
-est levé pour le `Rectangle` et la `Sphere`. Vient maintenant **MIS**, qui fait tomber le garde
-spéculaire, puis la roulette russe. Deux restes de l'éclairage attendent derrière, et aucun n'est une question
+est levé pour le `Rectangle` et la `Sphere`. **MIS** est en place, et la roulette
+russe, qui en dépendait, peut suivre. Deux restes de l'éclairage attendent derrière, et aucun n'est une question
 d'exactitude : [le rectangle sphérique](ideas/rectangle_spherique.md), qui ferait pour le rectangle
 ce que le cône fait pour la sphère, et [les maillages émissifs](ideas/maillage_emissif.md), seul cas
 que le chargeur refuse encore.
@@ -113,8 +120,8 @@ d'une exécution ([docs/mesures_bvh.md](docs/mesures_bvh.md) §2.3, qui porte au
 réouverture). **Un gain de construction se rapporte à une exécution entière, jamais au chargement
 seul** ; c'est la leçon de ce dernier, et elle vaut pour le prochain.
 
-**Lancer les tests** — `cargo test` est vert en entier : 184 tests de bibliothèque, 2 tests
-d'intégration, 11 doc-tests, et les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour
+**Lancer les tests** — `cargo test` est vert en entier : 212 tests de bibliothèque, 2 tests
+d'intégration, 12 doc-tests, et les `examples/` compilent. Y ajouter `cargo fmt --check`. Pour
 tout changement de construction ou de traversée d'un accélérateur,
 `cargo run --release --bin bvh_stats -- <scène>`
 donne les compteurs à comparer ; ils ne voient que les rayons primaires et d'ombre, donc le
@@ -262,8 +269,10 @@ Exemples de référence à imiter, déjà dans le projet :
   jusqu'à `[-wox, -woy, woz]` au lieu de livrer le résultat brut ; et ses tests recoupent cette
   dérivation avec la formule générale en espace monde, ce qui est la forme la plus aboutie de
   l'exigence « les tests font partie de la documentation ».
-- [integrators/path.rs](src/integrators/path.rs) — justifie le traitement de la radiance de
-  fond après un rebond spéculaire par un renvoi au PBR Book.
+- [integrators/path.rs](src/integrators/path.rs) — pose l'estimateur à deux stratégies, en tire
+  la condition de non-biais avant de choisir l'heuristique de puissance, et traite les δ comme sa
+  limite plutôt que comme une exception ; ses tests confrontent l'intégrateur à deux radiances
+  calculées à la main.
 
 Deux exigences supplémentaires :
 

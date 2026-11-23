@@ -105,10 +105,6 @@ pub trait Material: Send + Sync {
         None
     }
 
-    fn is_specular(&self) -> bool {
-        false
-    }
-
     fn f(&self, _wo: &Vector3f, _wi: &Vector3f, _interaction: &Interaction) -> Spectrum {
         colors::BLACK
     }
