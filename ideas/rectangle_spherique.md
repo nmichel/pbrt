@@ -36,12 +36,13 @@ constante et ne débordant jamais.
   quadrilatère sur la sphère, inversion d'une densité en deux temps. Pour un renderer
   d'apprentissage, c'est une raison suffisante en soi, plus que le gain de bruit.
 
-**Ce qui le fait passer après MIS.** MIS est un plus gros levier : il fait tomber le garde
-`is_last_bounce_specular` et améliore *toutes* les configurations au lieu d'une forme. Il déplace surtout la ligne de base du §4 : au pied
+**Ce que MIS lui a laissé.** On attendait de MIS qu'il déplace la ligne de base du §4 : au pied
 d'une source proche, là où `d²/|cos θₗ|` s'emballe, un tirage par le bsdf trouve la source sans
-passer par ce rapport, et la pondération réduit d'autant le poids du tirage par aire. Mesurer ce
-chantier avant MIS, ce serait le comparer à un chiffre que MIS rend caduc ; **les écarts du §4 sont
-à reprendre une fois MIS en place**, et c'est leur version d'alors que ce chantier doit faire baisser.
+passer par ce rapport. C'est vrai au pied de la source — la variance d'un point y est divisée par 8
+à 40 —, mais **le cadrage du témoin ne montre que le sol loin de la bande**, où NEE garde tout le
+poids : la ligne de base est restée au centième près la même, mesurée avec MIS en place
+([docs/ponderation_mis.md](../docs/ponderation_mis.md) §4). Le rectangle sphérique, qui supprime ce
+rapport du tirage de la source elle-même, garde donc toute la colonne du §4 à faire baisser.
 
 ## 4. Le témoin existe, et sa ligne de base est mesurée
 
@@ -67,7 +68,10 @@ basse à 0,001 du sol, et un point du sol à son pied voit `d → 0` dans `cos �
 pixels isolés très lumineux qu'il produit n'apparaissent qu'à partir de `--max_depth 3` — un
 rebond qui retombe au pied du panneau — et `path` et `naive` y restent d'accord à 0,4 % près
 (15,0 en 128 × 128, 8192 et 16384 chemins par pixel) : ce n'est pas un biais, c'est ce bruit-là
-que le tirage en angle solide borne.
+que le tirage en angle solide borne. **MIS en a déjà retiré l'essentiel** : à 1024 chemins, l'écart
+quadratique y passe de 3,71 à 1,52 et plus aucun pixel ne sature
+([docs/ponderation_mis.md](../docs/ponderation_mis.md) §3). Ce témoin n'est donc plus celui où le
+rectangle sphérique a le plus à gagner.
 
 **`grazing_source.stage` ne dit rien du biais** : une bande mince sous-tend trop peu d'angle
 solide pour que `naive` la trouve. Pour l'absence de biais, c'est `direct_lighting.stage` qu'il faut, où les deux

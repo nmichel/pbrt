@@ -77,8 +77,9 @@ Un intégrateur sépare l'intégrale en deux moitiés qu'il estime différemment
   `Light::sample_li` sert, et le sujet de ce document ;
 - **l'éclairage indirect** — la part qui a rebondi. C'est ce que `Material::scatter` sert.
 
-[`PathIntegrator`](../src/integrators/path.rs) fait les deux et doit donc se garder de compter
-l'émission deux fois : c'est le rôle de `is_last_bounce_specular`.
+[`PathIntegrator`](../src/integrators/path.rs) fait les deux, et une source y est donc atteinte
+par deux routes — le tirage de la source et un rayon de BSDF qui la rencontre. Il ne les additionne
+pas, ce qui compterait l'émission deux fois : il les pondère (§7.7).
 [`NaiveIntegrator`](../src/integrators/naive.rs) ne fait que la seconde — il ne consulte jamais
 `Scene::lights` — et c'est précisément ce qui fait de lui un témoin indépendant
 ([eclairage_declare.md](eclairage_declare.md) §4).
@@ -593,27 +594,24 @@ doit franchir est l'erreur d'arrondi sur la distance elle-même, laquelle croît
 Une source ponctuelle n'est jamais sur une surface, et c'est pourquoi le défaut n'apparaît qu'avec
 les lumières d'aire.
 
-### 7.7 Le double comptage, et le prix que MIS paiera
+### 7.7 Le double comptage, et sa pondération
 
 Dès que NEE peut échantillonner une source, un chemin qui l'atteint **par échantillonnage de BSDF**
-et qui y ajouterait `material.emit` compterait la même contribution deux fois. Le garde
-`is_last_bounce_specular` de [path.rs](../src/integrators/path.rs) fait exactement ce qu'il faut :
-après un rebond diffus, NEE a servi et l'émission ne doit pas être ajoutée ; après un rebond
-spéculaire, NEE n'a pas pu servir et elle doit l'être.
+et qui y ajouterait `material.emit` en entier compterait la même contribution deux fois.
+[`PathIntegrator`](../src/integrators/path.rs) garde les deux contributions et les pondère par
+l'heuristique de puissance de Veach, de sorte que leurs poids somment à 1 pour toute direction :
+c'est l'*échantillonnage d'importance multiple* (MIS). L'en-tête de `path.rs` en porte la
+dérivation ; les mesures et le défaut qu'elle a levé sont dans
+[ponderation_mis.md](ponderation_mis.md).
 
-C'est un choix **entre** deux estimateurs, et c'est ce que MIS remplacera : prendre les deux et les
-pondérer, au lieu d'en élire un. L'estimateur intermédiaire est correct, et bruyant sur les grandes
-sources vues sous un angle rasant — précisément le cas que MIS répare.
-
-**Le prix du découpage du §7.1 se paiera là.** Pour pondérer, l'intégrateur doit évaluer
-`power_heuristic(pdf_bsdf, pdf_li)` au moment où un rayon de BSDF touche une surface émissive, donc
-connaître **l'identité de la lumière touchée** — son aire, et la probabilité discrète `1/N` de
-l'avoir tirée. Le `get_area_light` que pbrt fait porter à ses primitives n'est pas de la décoration :
-c'est ce chaînon. Ici l'intégrateur tient le matériau, pas la lumière, et ne l'a donc pas. La sortie
-n'est pas forcément celle de pbrt — la plus naturelle serait qu'`Interaction` porte un
-`Option<&dyn Light>` à côté du matériau, sur le type dont le rôle *est* de marier géométrie et
-matériau. Elle a un coût, [`Simple::intersect`](../src/objects/simple.rs) clonant déjà un `Arc` par
-touche. **À trancher avec MIS**, et pas avant.
+**Ce que cela demande aux sources.** Le poids d'une émission trouvée par un rayon de BSDF lit la
+densité avec laquelle NEE aurait tiré la même direction, donc **la source touchée** et la
+probabilité `1/N` de l'avoir choisie. Le matériau ne la connaît pas — il dit ce que la surface émet,
+pas quelle entrée de `Scene::lights` l'échantillonne. C'est
+[`Interaction::area_light`](../src/interaction.rs) qui la porte, comme `SurfaceInteraction` dans
+pbrt : [`SceneBuilderVisitor`](../src/loader/visitors/scene_builder.rs) remet le même `Arc` à la
+scène et à l'objet [`Simple`](../src/objects/simple.rs), qui le recopie dans chaque touche. Le coût
+est un clone d'`Option<Arc>` par touche, qui n'incrémente un compteur que sur une surface émissive.
 
 ## 8. Le rectangle : tirage par aire
 
@@ -1064,10 +1062,10 @@ second estimateur pour un coût raisonnable.
 
 | chemins/pixel | `naive` | `path` |
 |---|---|---|
-| 16 | 97,80 | 103,27 |
-| 64 | 102,75 | 103,51 |
-| 256 | 103,43 | 103,57 |
-| 1024 | 103,57 | 103,59 |
+| 16 | 97,80 | 103,36 |
+| 64 | 102,75 | 103,54 |
+| 256 | 103,43 | 103,59 |
+| 1024 | 103,57 | 103,60 |
 | 4096 | **103,59** | — |
 
 Les deux estimateurs se rejoignent au centième, et `naive` y arrive en **1024 chemins** là où

@@ -18,11 +18,10 @@ faire ensuite.
 - [x] **`AreaLight`** — une surface émissive éclaire la scène, par `Rectangle` et par `Sphere`.
       Dérivations, témoins et mesures dans
       [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md).
-- [ ] **MIS** — dépend d'`AreaLight` : sans `pdf_li`, il n'y a rien à pondérer. Fait tomber le garde
-      `is_last_bounce_specular` de l'intégrateur, et avec lui `Material::is_specular()`, son unique
-      usage : l'échantillon dit déjà s'il est une δ (`DirectionDensity`). Passe devant les deux
-      restes de l'éclairage qui suivent : eux ne touchent que la variance, et MIS déplace la ligne
-      de base sur laquelle le premier se mesure.
+- [ ] **MIS** — la pondération est en place, et le garde `is_last_bounce_specular` est tombé avec
+      elle ; mesures et défaut levé dans [docs/ponderation_mis.md](docs/ponderation_mis.md). Reste
+      `Material::is_specular()`, qui n'a plus aucun appelant : l'échantillon dit déjà s'il est une δ
+      (`DirectionDensity`).
 - [ ] **[Le rectangle sphérique](ideas/rectangle_spherique.md)** — le `Rectangle` tire encore par
       aire. Variance, pas exactitude ; ligne de base mesurée.
 - [ ] **[Les maillages émissifs](ideas/maillage_emissif.md)** — aucun maillage ne s'échantillonne,
@@ -205,9 +204,8 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       enregistré comme `AreaLight` au chargement, et contribue donc à l'éclairage indirect. Les
       écarts qui subsistent sont rassemblés et chiffrés en
       [docs/sources_de_lumiere.md](docs/sources_de_lumiere.md) §14.
-- [ ] **Pas de MIS.** NEE et échantillonnage de BSDF ne sont pas pondérés l'un contre l'autre :
-      l'intégrateur élit l'un ou l'autre par le garde `is_last_bounce_specular`. En cours sur
-      `feat/mis`, dans l'ordre de la liste de tête.
+- [x] **Pas de MIS.** NEE et échantillonnage de BSDF sont pondérés par l'heuristique de puissance
+      — [docs/ponderation_mis.md](docs/ponderation_mis.md).
 - [x] **Un matériau spéculaire encodait la formule de son intégrateur** — l'échantillon dit désormais
       s'il est une δ ([`DirectionDensity`](src/pdfs.rs)), et un miroir rend ρ tel quel.
 - [ ] **La radiance ne change pas d'échelle en traversant une interface.** Réfractée de ηᵢ vers
