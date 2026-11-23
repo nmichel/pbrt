@@ -5,6 +5,7 @@ use crate::geom::intersectable::{Intersectable, Intersection, IntersectionResult
 use crate::geom::ray::Ray;
 use crate::geom::vector3::Vector3f;
 use crate::interaction::Interaction;
+use crate::lights::Light;
 use crate::materials::Material;
 use crate::shapes::Shape;
 
@@ -13,13 +14,28 @@ use super::Object;
 pub struct Simple {
     pub shape: Arc<dyn Shape>,
     pub material: Arc<dyn Material>,
+
+    /// The source that samples this very surface, handed on to every [`Interaction`] it produces.
+    /// See [`Interaction::area_light`] for who reads it, and why the surface is where it is held.
+    pub area_light: Option<Arc<dyn Light>>,
 }
 
 impl Simple {
+    /// An object that is not a light — whatever its material, since an emitter no source samples
+    /// is lit by nothing but the paths that find it.
     pub fn new(shape: Arc<dyn Shape>, material: Arc<dyn Material>) -> Self {
         Self {
             shape: Arc::clone(&shape),
             material: Arc::clone(&material),
+            area_light: None,
+        }
+    }
+
+    /// An emissive object, together with the source of `Scene::lights` that samples its surface.
+    pub fn emitting(shape: Arc<dyn Shape>, material: Arc<dyn Material>, area_light: Arc<dyn Light>) -> Self {
+        Self {
+            area_light: Some(area_light),
+            ..Self::new(shape, material)
         }
     }
 }
@@ -33,6 +49,7 @@ impl Object for Simple {
             Some(Interaction {
                 intersection: unsafe { *intersection },
                 material,
+                area_light: self.area_light.clone(),
             })
         }
         else {

@@ -65,6 +65,7 @@ impl Object for Transformed {
                 Some(Interaction {
                     intersection: self.transform.transform_interaction_to_world(&interaction.intersection),
                     material: interaction.material.clone(),
+                    area_light: interaction.area_light.clone(),
                 })
             }
         }

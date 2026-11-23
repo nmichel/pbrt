@@ -113,6 +113,7 @@ mod tests {
                 dpdv: Vector3f::new(0.0, 1.0, 0.0),
             },
             material,
+            area_light: None,
         }
     }
 

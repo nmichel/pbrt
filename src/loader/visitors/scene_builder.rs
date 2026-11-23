@@ -182,6 +182,11 @@ impl Visitor for SceneBuilderVisitor<'_> {
     /// light built from its own copy could drift from the object, and the shadow it cast would be
     /// the only sign of it.
     ///
+    /// The object keeps the light in turn, so that a path reaching the surface by its bsdf can ask
+    /// *that* source how likely next event estimation was to find it — see
+    /// [`Interaction::area_light`](crate::interaction::Interaction). The same `Arc` goes to the scene
+    /// and to the object: the two are one source, not two copies of it.
+    ///
     /// # Two questions, and the diagnostic is their conjunction
     ///
     /// Does this material emit, and can this shape hand out points of itself? Each is asked of the
@@ -199,18 +204,21 @@ impl Visitor for SceneBuilderVisitor<'_> {
         let local_shape = self.shapes.pop().unwrap();
         let shape = self.place(local_shape);
 
-        self.objects.push(Arc::new(Simple::new(Arc::clone(&shape), Arc::clone(&material))));
-
-        match (Arc::clone(&material).emitter(), Arc::clone(&shape).area_sampler()) {
-            (Some(emitter), Some(sampler)) => self.area_lights.push(Arc::new(AreaLight::new(sampler, emitter))),
+        let object = match (Arc::clone(&material).emitter(), Arc::clone(&shape).area_sampler()) {
+            (Some(emitter), Some(sampler)) => {
+                let light: Arc<dyn Light> = Arc::new(AreaLight::new(sampler, emitter));
+                self.area_lights.push(Arc::clone(&light));
+                Simple::emitting(shape, material, light)
+            }
             (Some(_), None) => {
                 panic!(
                     "an emissive material sits on a `{}`, which cannot hand out points of itself: it would be seen and would light nothing",
                     node.shape.name()
                 )
             }
-            (None, _) => {}
-        }
+            (None, _) => Simple::new(shape, material),
+        };
+        self.objects.push(Arc::new(object));
     }
 
     /// Composes the block's transformation into the current transformation matrix.
@@ -541,6 +549,38 @@ mod test {
                 hit.p
             );
         }
+    }
+
+    /// A ray that hits an emissive object is told which source of the scene it has reached — the
+    /// very one next event estimation samples, not a copy of it.
+    ///
+    /// Identity is what multiple importance sampling needs: the density it reads off that source
+    /// must be the density of the strategy that would have drawn the direction, and a second source
+    /// built from the same surface would be one `Scene::lights` never picks.
+    #[test]
+    fn test_a_hit_on_an_emitter_names_the_light_of_the_scene() {
+        let visitor = build(&lamp_over_the_origin("diffuse_light color 5.0 5.0 5.0", "rectangle 2.0 2.0"));
+
+        let straight_up = Ray::new(&shaded_origin().p, &Vector3f::new(0.0, 1.0, 0.0));
+        let interaction = visitor.scene.intersect(&straight_up, 0.0001, 100.0).unwrap();
+
+        let reached = interaction.area_light.expect("an emitter sampled as a light names it");
+        let sampled = visitor.scene.get_light_at(0).unwrap();
+        assert!(
+            std::ptr::addr_eq(Arc::as_ptr(&reached), sampled as *const dyn Light),
+            "the hit names a light the scene does not sample"
+        );
+    }
+
+    /// A surface that does not emit names no light.
+    #[test]
+    fn test_a_hit_on_a_surface_that_does_not_emit_names_no_light() {
+        let visitor = build(&lamp_over_the_origin("lambertian color 0.5 0.5 0.5", "rectangle 2.0 2.0"));
+
+        let straight_up = Ray::new(&shaded_origin().p, &Vector3f::new(0.0, 1.0, 0.0));
+        let interaction = visitor.scene.intersect(&straight_up, 0.0001, 100.0).unwrap();
+
+        assert!(interaction.area_light.is_none());
     }
 
     /// Declared lights keep the index their file gives them, whatever objects the scene holds.
