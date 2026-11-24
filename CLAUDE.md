@@ -20,13 +20,22 @@ fait. Le fichier d'un sujet disparaît quand le sujet atterrit, et ce qu'il a ap
 `docs/` si c'est une mesure ou un arbitrage sur le code tel qu'il est. `IDEAS.md` est un index :
 une entrée cochée y garde une ligne, pas son corps.
 
-**Chantier en cours** — MIS, sur la branche `feat/mis` : **NEE et le tirage de BSDF sont pondérés**
-par l'heuristique de puissance, et le garde spéculaire est tombé. Une touche sur un émetteur nomme
-la lumière qui l'échantillonne ([`Interaction::area_light`](src/interaction.rs)), et la source est
-interrogée depuis l'origine du rayon tiré et non depuis le point ombré — faute de quoi un rayon
-rasant qui frôle le bord d'une source la manque au second calcul et porte ρ·L entier. Aucune
-moyenne convergée ne bouge ; le bruit tombe là où la source sous-tend beaucoup, et nulle part
-ailleurs. Mesures dans [docs/ponderation_mis.md](docs/ponderation_mis.md).
+**Aucun chantier n'est en cours.** Le dernier, MIS, sur la branche `feat/mis`, est clos : **NEE et
+le tirage de BSDF sont pondérés** par l'heuristique de puissance, et le garde spéculaire est tombé.
+Une touche sur un émetteur nomme la lumière qui l'échantillonne
+([`Interaction::area_light`](src/interaction.rs)), et la source est interrogée depuis l'origine du
+rayon tiré et non depuis le point ombré — faute de quoi un rayon rasant qui frôle le bord d'une
+source la manque au second calcul et porte ρ·L entier. Aucune moyenne convergée ne bouge ; le bruit
+tombe là où la source sous-tend beaucoup, et nulle part ailleurs. Mesures dans
+[docs/ponderation_mis.md](docs/ponderation_mis.md).
+
+Sa scène témoin est [test_files/dragon_dome.stage](test_files/dragon_dome.stage) : une couronne
+de lampes posées au sol l'éclaire en incidence rasante, là où le tirage par aire d'un `rectangle`
+est le plus bruité et où le tirage de BSDF prend le relais. **Ce qu'elle a trouvé en plus** : le
+tirage uniforme des sources se paie en lucioles dès qu'une source porte l'essentiel de la
+puissance, et l'écrêtage canal par canal change la teinte d'une source saturée. Ni l'un ni l'autre
+n'est une question de MIS ; les deux sont dans `IDEAS.md`, le second avec son analyse dans
+[ideas/tone_mapping.md](ideas/tone_mapping.md).
 
 Avant lui, le sujet de la branche `feat/area_light` est clos : **une surface
 émissive éclaire la scène**. Un objet dont

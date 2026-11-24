@@ -25,7 +25,7 @@ faire ensuite.
       aire. Variance, pas exactitude ; ligne de base mesurée.
 - [ ] **[Les maillages émissifs](ideas/maillage_emissif.md)** — aucun maillage ne s'échantillonne,
       donc une lampe triangulaire est refusée au chargement.
-- [ ] **Roulette russe** — dépend de MIS, et corrige au passage la coupe prématurée de `path.rs:65`.
+- [ ] **Roulette russe** — débloquée par MIS, et corrige au passage la coupe prématurée de `path.rs:221`.
 - [ ] **Éléments nommés dans la grammaire `.stage`** — déclarer une forme, un matériau, une texture
       ou un objet sous un nom, et le réutiliser plutôt que le recopier. **Indépendant du transport
       de lumière** : c'est un confort d'écriture des scènes, et c'est pourquoi il passe après MIS et
@@ -218,8 +218,8 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
       d'un seul côté — une caméra sous l'eau, une source enfermée dans du verre — et il pèsera sur
       [les diélectriques imbriqués](ideas/nested_dielectrics.md), où les deux indices d'une interface
       ne sont plus 1 et η.
-- [ ] **La roulette russe est commentée** ([path.rs:93](src/integrators/path.rs#L93)) ; les chemins
-      sont coupés net à `max_depth`, et la coupe de [path.rs:65](src/integrators/path.rs#L65) tombe
+- [ ] **La roulette russe est commentée** ([path.rs:278](src/integrators/path.rs#L278)) ; les chemins
+      sont coupés net à `max_depth`, et la coupe de [path.rs:221](src/integrators/path.rs#L221) tombe
       *avant* l'échantillonnage de lumière du dernier sommet — perte d'énergie systématique.
 - [ ] **[Pas de tone mapping](ideas/tone_mapping.md).** [`gamma_correct`](src/spectrum.rs#L21) est
       un `sqrt` (gamma 2,0, pas sRGB) et [`in_bound`](src/spectrum.rs#L134) écrête dur à 1,0 : toute
