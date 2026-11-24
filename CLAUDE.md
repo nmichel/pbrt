@@ -126,6 +126,10 @@ chronomètre d'un rendu complet reste une mesure distincte et parfois divergente
 dont le chargement n'est pas dominé par le parse d'un `.ply`
 ([docs/mesures_bvh.md](docs/mesures_bvh.md) §0).
 
+**Lancer un rendu** — un agent passe par `./render_agent.sh <options de pbrt>`, jamais par
+`./target/release/pbrt` ou `cargo run` directement, ni avec un `| tail` : la progression reste
+lisible pendant le rendu, et seul le dernier état revient (le reste est dans `target/renders/`).
+
 **Préfixe de sujet** — le titre de chaque commit d'une branche de travail commence par le sujet de
 cette branche, entre crochets : `[sampling]`, `[bvh]`. Le dépôt ne fusionne qu'en *fast-forward*,
 donc les commits d'une branche arrivent tels quels dans l'historique de `master`, sans commit de
