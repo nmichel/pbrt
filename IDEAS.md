@@ -224,6 +224,14 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
 - [ ] **[Pas de tone mapping](ideas/tone_mapping.md).** [`gamma_correct`](src/spectrum.rs#L21) est
       un `sqrt` (gamma 2,0, pas sRGB) et [`in_bound`](src/spectrum.rs#L134) écrête dur à 1,0 : toute
       la dynamique au-dessus de 1 est jetée, et une source saturée change de teinte à l'écran.
+- [ ] **La source à éclairer est choisie uniformément** ([path.rs](src/integrators/path.rs),
+      `light_selection_probability`) : une source qui porte presque toute la puissance de la scène
+      n'est tirée qu'une fois sur N, et se paie en lucioles. `test_files/dragon_dome.stage` en est
+      le témoin : ses 24 lampes et ses deux sources blanches font 26 sources, et une sphère blanche
+      qui éclairerait le dragon y couvrirait l'image de lucioles — c'est pourquoi la scène confie son
+      appoint à un ciel uniforme, que les rayons de BSDF trouvent seuls. Un tirage proportionnel à
+      la puissance (PBR Book 4ᵉ éd., §12.6, *Light Sampling*) doit garder
+      `light_selection_probability` d'accord avec lui, pour MIS.
 - [ ] **`Spectrum` est un triplet RGB sans espace de couleur déclaré** — ni primaires, ni point
       blanc. Le nom promet un rendu spectral qui n'existe pas.
 - [x] Les lumières étaient câblées dans `Loader::load_scene` — un fichier `.stage` décrit désormais

@@ -1,0 +1,893 @@
+# The Stanford dragon on a floor, under a dome of coloured lamps.
+#
+#   --integrator path --renderer mt --threads 8 --seed 0 --fov 55
+#   --samples_ppx 256 --max_depth 4 --output_width 512 --output_height 512
+#
+# Each lamp is a thin white plate whose face turned towards the dragon carries an emitting
+# rectangle, sunk a little into it and framed by a rim of the plate. The lamps cover the hemisphere
+# of radius 0.25 centred on the dragon's foot, in two rings of constant elevation, both low: on the
+# floor, and at 15°, just above it, each lamp of the second ring above a gap of the first. The
+# plates of the floor ring rise 7° from the centre, those of the second span 12° to 18°. Every
+# lamp faces the centre of the hemisphere. Two rings, and low ones: lamps higher up would light the
+# whole floor and the top of the dragon with a uniform mix of every colour, washing out the
+# gradient that the floor ring draws on the floor and that each flank of the dragon takes from its
+# side.
+#
+# Colour is a gradient across each ring, at full saturation everywhere, warm on the left of the
+# image and cold on the right. Let a be the horizontal direction of azimuth 54°, across the
+# camera's line of sight, on the left. A lamp in direction d is at u = d·a = cos e·cos(φ − 54°)
+# along it, from 1 to -1, and its hue runs linearly in u, downwards round the hue circle, so that
+# no lamp is green: the floor ring from orange, 30°, to blue, 240°, through red and magenta; the
+# upper ring over a narrower span, from red, 0°, to violet, 270°. Both rings are warm on the same
+# side, so they add to each other's gradient instead of averaging it out: each flank of the dragon
+# takes the colour of its own side. The full hue circle spread over the two rings would sum to a
+# neutral grey on the dragon, and the same gradient reversed in the upper ring to mauve on both
+# flanks. Lamps at the same u share a colour, so the colours run in bands across each ring. The
+# brightest channel of every lamp is 1, no more than a display shows; the white lights below
+# do the lighting.
+#
+# The floor ring exercises the grazing case of multiple importance sampling: a lamp standing on the
+# floor lights it at grazing incidence, its rectangle 0.003 above the floor, which is where the
+# uniform-area draw of a `rectangle` is noisiest — see `ideas/rectangle_spherique.md` §4 — and
+# where the bsdf draw takes over.
+#
+# The language has no `scale`, so the scene is built at the size of the scan rather than the
+# reverse: the dragon is about 0.2 long, 0.15 tall and 0.09 deep, and no point of it is farther
+# than about 0.18 from the centre of the hemisphere. Its lowest vertex is at y = 0.0527 in the
+# file, and the translation below sets it 0.0002 above the floor.
+#
+# The camera stands outside the dome and above it: it looks at (0.0, 0.05, 0.0) from azimuth -36°
+# and 30° up, 0.5 away. Its line of sight crosses the dome above both rings, so no lamp
+# stands between it and the dragon; the lamps on its side are in the foreground, seen from behind
+# as thin plates, and the light each throws towards the dragon lies on the floor in front of the
+# camera — which is what the view from above is for. At 0.5, a field of view of 55° holds the
+# whole dome.
+
+camera pin_hole
+  pos -0.2545 0.3000 0.3503
+  look 0.0 0.05 0.0
+  up 0.0 1.0 0.0
+
+scene
+
+  # The floor, at y = 0, large enough that the frame never reaches its edge.
+  object simple
+    rectangle 4 4
+    lambertian color 0.6 0.6 0.6
+
+  # The dragon, centred on the vertical axis and resting on the floor. White, so the colour it
+  # shows is the colour of the light it receives.
+  object transformed
+    object simple
+      mesh file "test_files/dragon_vrip.ply" reverse
+      lambertian color 0.8 0.8 0.8
+    transform {
+      translate 0.0059 -0.0525 0.0046
+    }
+
+  # The white lights. The lamps of the dome shine at most 1 in any channel, which is what lets
+  # the image show their colour, and too little to light the scene on their own. Two white sources
+  # add to them, kept weak, since more white drowns the colours of the dome on the floor and the
+  # dragon. Larger lamps would give more coloured light at the same radiance, but plates large
+  # enough to light the dragon close into a wall that hides the floor from the camera.
+  #
+  # The key light, a white sphere. It gives the dragon's middle, (0.0, 0.07, 0.0), on a surface
+  # turned towards it, 3 times the irradiance the dome gives that surface, 0.0472 — a sum
+  # over the lamps of L·A·cos θ·cos θₗ / r², occlusion ignored. A sphere of radius ρ at distance d
+  # gives E = L·π·sin²θmax with sin θmax = ρ / d, hence L = 5.3. It lights the dragon from
+  # behind, against the camera: at azimuth 150°, near the opposite of the camera's -36°,
+  # and 60° up, 0.6 from the centre. Its white then outlines the dragon and leaves the side the
+  # camera sees to the dome, which is what colours it. It stands far above both rings, so no lamp
+  # shadows it, and above the top of the frame.
+  object transformed
+    object simple
+      sphere 0.05
+      diffuse_light color 5.3 5.3 5.3
+    transform {
+      translate 0.150000 0.519615 -0.259808
+    }
+
+  # The fill light, a uniform sky of radiance 0.1: it lights the backs of the plates in the
+  # foreground, which nothing else reaches, and lifts the shadows. A sky rather than a sphere for
+  # the noise: next event estimation picks one source in 26 uniformly, so a small sphere
+  # carrying much light is drawn rarely and shows as speckles, where a sky is reached by nearly
+  # every bsdf ray, and multiple importance sampling gives those rays nearly all the weight.
+  light uniform_infinite
+    color 0.1 0.1 0.1
+
+  # The lamps.
+  #
+  # A lamp is described in its own frame and then placed. In that frame the front of the plate is
+  # the plane x = 0, facing -X, centred on the origin; the plate runs behind it to x = 0.003.
+  #
+  #   plate    0.08 long, 0.03 high and 0.003 thick, as thick as its rim is wide; the recess
+  #            and the margin behind it take 0.002 of that, and leave a back of 0.001 that
+  #            closes the cavity
+  #   recess   a rectangle 0.074 × 0.024, leaving a rim of 0.003 on all four sides, 0.001 deep; the
+  #            box cut from the plate reaches 0.001 in front of it and 0.002 behind, so no
+  #            face of the cut lies in the plane of the plate's front. In a `.stage` file,
+  #            `csg substraction` removes every element from the **last** one, so the cut is
+  #            listed before the plate (`SceneBuilderVisitor::pop_csg_elems`)
+  #   panel    a `rectangle` 0.024 × 0.074, at x = 0.001, the bottom of the recess. It fills
+  #            the recess exactly, so the cavity behind it is closed to every ray: the panel is
+  #            not coplanar with any face of the plate, and the one face a ray can reach is the
+  #            emitting one.
+  #
+  # Placing. The panel's quarter turn about z stands the authored rectangle up, normal along -X,
+  # its first side as its height and its second along z, the direction of its ring.
+  # The lamp at elevation e and azimuth φ must face the centre, its normal along
+  # -(cos e·sin φ, sin e, cos e·cos φ). A turn of e about z carries -X to (-cos e, -sin e, 0), and a
+  # turn of φ − π/2 about y then carries that to -(cos e·sin φ, sin e, cos e·cos φ). Azimuth 0
+  # points to +Z, the camera's side of the scene; increasing φ runs towards +X.
+  #
+  # The front of a lamp on the floor stands at 0.25 from the centre, its plate 0.000002 above the
+  # floor so that the two are never coplanar; the front of every other lamp is centred on the
+  # hemisphere, at 0.25·(cos e·sin φ, sin e, cos e·cos φ).
+
+  # Lamp 0, elevation 0°, azimuth 0°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.02
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y -1.57079633
+      translate 0.00000000 0.01500200 0.25000000
+    }
+
+  # Lamp 1, elevation 0°, azimuth 30°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.39 0.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y -1.04719755
+      translate 0.12500000 0.01500200 0.21650635
+    }
+
+  # Lamp 2, elevation 0°, azimuth 60°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.49 0.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y -0.52359878
+      translate 0.21650635 0.01500200 0.12500000
+    }
+
+  # Lamp 3, elevation 0°, azimuth 90°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.26 0.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y 0.00000000
+      translate 0.25000000 0.01500200 0.00000000
+    }
+
+  # Lamp 4, elevation 0°, azimuth 120°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.24
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y 0.52359878
+      translate 0.21650635 0.01500200 -0.12500000
+    }
+
+  # Lamp 5, elevation 0°, azimuth 150°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.88
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y 1.04719755
+      translate 0.12500000 0.01500200 -0.21650635
+    }
+
+  # Lamp 6, elevation 0°, azimuth 180°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 0.52 0.00 1.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y 1.57079633
+      translate 0.00000000 0.01500200 -0.25000000
+    }
+
+  # Lamp 7, elevation 0°, azimuth 210°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 0.11 0.00 1.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y 2.09439510
+      translate -0.12500000 0.01500200 -0.21650635
+    }
+
+  # Lamp 8, elevation 0°, azimuth 240°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 0.01 0.00 1.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y 2.61799388
+      translate -0.21650635 0.01500200 -0.12500000
+    }
+
+  # Lamp 9, elevation 0°, azimuth 270°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 0.24 0.00 1.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y 3.14159265
+      translate -0.25000000 0.01500200 -0.00000000
+    }
+
+  # Lamp 10, elevation 0°, azimuth 300°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 0.74 0.00 1.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y 3.66519143
+      translate -0.21650635 0.01500200 0.12500000
+    }
+
+  # Lamp 11, elevation 0°, azimuth 330°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.62
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.00000000
+      rotate_y 4.18879020
+      translate -0.12500000 0.01500200 0.21650635
+    }
+
+  # Lamp 12, elevation 15°, azimuth 15°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.19
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y -1.30899694
+      translate 0.06250000 0.06470476 0.23325318
+    }
+
+  # Lamp 13, elevation 15°, azimuth 45°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.03
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y -0.78539816
+      translate 0.17075318 0.06470476 0.17075318
+    }
+
+  # Lamp 14, elevation 15°, azimuth 75°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.07
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y -0.26179939
+      translate 0.23325318 0.06470476 0.06250000
+    }
+
+  # Lamp 15, elevation 15°, azimuth 105°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.29
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y 0.26179939
+      translate 0.23325318 0.06470476 -0.06250000
+    }
+
+  # Lamp 16, elevation 15°, azimuth 135°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.64
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y 0.78539816
+      translate 0.17075318 0.06470476 -0.17075318
+    }
+
+  # Lamp 17, elevation 15°, azimuth 165°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 0.99 0.00 1.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y 1.30899694
+      translate 0.06250000 0.06470476 -0.23325318
+    }
+
+  # Lamp 18, elevation 15°, azimuth 195°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 0.69 0.00 1.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y 1.83259571
+      translate -0.06250000 0.06470476 -0.23325318
+    }
+
+  # Lamp 19, elevation 15°, azimuth 225°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 0.53 0.00 1.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y 2.35619449
+      translate -0.17075318 0.06470476 -0.17075318
+    }
+
+  # Lamp 20, elevation 15°, azimuth 255°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 0.57 0.00 1.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y 2.87979327
+      translate -0.23325318 0.06470476 -0.06250000
+    }
+
+  # Lamp 21, elevation 15°, azimuth 285°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 0.79 0.00 1.00
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y 3.40339204
+      translate -0.23325318 0.06470476 0.06250000
+    }
+
+  # Lamp 22, elevation 15°, azimuth 315°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.86
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y 3.92699082
+      translate -0.17075318 0.06470476 0.17075318
+    }
+
+  # Lamp 23, elevation 15°, azimuth 345°.
+  object transformed
+    object compound {
+      object simple
+        csg substraction {
+          elem
+            aabox 0.0030 0.0240 0.0740
+            transform {
+              translate 0.0005 0.0 0.0
+            }
+          elem
+            aabox 0.003 0.03 0.08
+            transform {
+              translate 0.0015 0.0 0.0
+            }
+        }
+        lambertian color 0.9 0.9 0.9
+      object transformed
+        object simple
+          rectangle 0.0240 0.0740
+          diffuse_light color 1.00 0.00 0.49
+        transform {
+          rotate_z 1.57079633
+          translate 0.001 0.0 0.0
+        }
+    }
+    transform {
+      rotate_z 0.26179939
+      rotate_y 4.45058959
+      translate -0.06250000 0.06470476 0.23325318
+    }

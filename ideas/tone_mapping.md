@@ -8,10 +8,16 @@ carrée, puis `to_rgb`, qui écrête chaque canal à [0, 1]. Tout ce qui dépass
 
 L'écrêtage se fait **canal par canal**, et ne garde donc pas les rapports entre canaux. Une source
 de radiance (6,4, 12, 0), un vert-jaune, s'affiche (1, 1, 0), un jaune pur. Toute source colorée
-plus brillante que 1 dérive ainsi vers l'un des six coins saturés du cube RGB. Le témoin :
-`test_files/sphere_ring_strips.stage`, dont le panneau `6 30 0`, vert, s'affiche jaune, et dont
-les panneaux bleu-violet s'affichent magenta, alors que le sol qu'ils éclairent, moins lumineux,
-montre leur vraie teinte.
+plus brillante que 1 dérive ainsi vers l'un des six coins saturés du cube RGB. Les témoins :
+
+- `test_files/sphere_ring_strips.stage`, dont le panneau `6 30 0`, vert, s'affiche jaune, et dont
+  les panneaux bleu-violet s'affichent magenta, alors que le sol qu'ils éclairent, moins lumineux,
+  montre leur vraie teinte ;
+- `test_files/dragon_dome.stage`, qui contourne le défaut : ses lampes ne dépassent pas 1 par
+  canal, ce qui laisse voir leur teinte, et ce sont deux sources blanches qui éclairent la scène.
+  Des lampes assez brillantes pour éclairer le dragon seules s'afficheraient aux coins saturés du
+  cube, et la lumière blanche qui les remplace délave les couleurs qu'elles portent sur le sol et
+  le dragon.
 
 ## Ce qui est envisagé
 
