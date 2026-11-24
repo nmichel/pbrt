@@ -219,9 +219,9 @@ Passés, corps dans [docs/mesures_bvh.md](docs/mesures_bvh.md) §3 :
 - [ ] **La roulette russe est commentée** ([path.rs:93](src/integrators/path.rs#L93)) ; les chemins
       sont coupés net à `max_depth`, et la coupe de [path.rs:65](src/integrators/path.rs#L65) tombe
       *avant* l'échantillonnage de lumière du dernier sommet — perte d'énergie systématique.
-- [ ] **Pas de tone mapping.** [`gamma_correct`](src/spectrum.rs#L21) est un `sqrt` (gamma 2,0, pas
-      sRGB) et [`in_bound`](src/spectrum.rs#L134) écrête dur à 1,0 : toute la dynamique au-dessus de 1
-      est jetée.
+- [ ] **[Pas de tone mapping](ideas/tone_mapping.md).** [`gamma_correct`](src/spectrum.rs#L21) est
+      un `sqrt` (gamma 2,0, pas sRGB) et [`in_bound`](src/spectrum.rs#L134) écrête dur à 1,0 : toute
+      la dynamique au-dessus de 1 est jetée, et une source saturée change de teinte à l'écran.
 - [ ] **`Spectrum` est un triplet RGB sans espace de couleur déclaré** — ni primaires, ni point
       blanc. Le nom promet un rendu spectral qui n'existe pas.
 - [x] Les lumières étaient câblées dans `Loader::load_scene` — un fichier `.stage` décrit désormais
